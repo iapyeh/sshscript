@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    download_url="https://github.com/iapyeh/sshscript/archive/refs/tags/0.93.tar.gz",
+    download_url="https://github.com/iapyeh/sshscript/archive/refs/tags/0.94.tar.gz",
     name='sshscript',                           # should match the package folder
     packages=['sshscript'],                     # should match the package folder
     license='MIT',                                  # should match your chosen license
