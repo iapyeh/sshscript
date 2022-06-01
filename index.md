@@ -1,37 +1,172 @@
-## Welcome to GitHub Pages
+# SSHScript Syntax
 
-You can use the [editor on GitHub](https://github.com/iapyeh/sshscript/edit/gh-pages/index.md) to maintain and preview the content for your website in Markdown files.
+Others: invoke, [fabric](https://www.fabfile.org/), pexpect, exscript
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+## 
 
-### Markdown
+## $
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+run a single-line command
 
-```markdown
-Syntax highlighted code block
+- by subprocess.popen
+- by client.exec_command
 
-# Header 1
-## Header 2
-### Header 3
+<aside>
+💡 “|” does not work in subprocess, but work in ssh, eg.
+$ls -l | wc -l
 
-- Bulleted
-- List
+</aside>
 
-1. Numbered
-2. List
+## ${}
 
-**Bold** and _Italic_ and `Code` text
+Many lines of “$” put together, for example:
 
-[Link](url) and ![Image](src)
+```jsx
+
+$ls -l /tmp
+$whoami
+$hostname
+
 ```
 
-For more details see [Basic writing and formatting syntax](https://docs.github.com/en/github/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax).
+They can be put together by 
 
-### Jekyll Themes
+```jsx
+${
+    ls -l /tmp
+    whoami
+    hostname
+}
+```
 
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/iapyeh/sshscript/settings/pages). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
+Every single line are executed individually. The output of stdout or stderr are put together.
 
-### Support or Contact
+Every command is executed one by one.
 
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://support.github.com/contact) and we’ll help you sort it out.
+### $$
+
+Sometimes, we need a shell to work, for example:
+
+```jsx
+$$ echo “1234” | sudo -S rm -rf /goodbye-root
+
+or 
+
+$$ echo $PATH
+$$ echo `pwd` 
+```
+
+The command will be executed in shell. For subprocess, it means with “shell=True” for popen(). For paramiko, it means client.invoke_shell()
+
+The output of stdout or stderr are put together in $.stdout and $.stderr respectively.
+
+## $${}
+
+Many commands can put together, for example:
+
+```jsx
+$${
+    cd /tmp
+    ls -l
+}
+```
+
+They are executed in a single session of shell. 
+
+- For subprocess, it means popen(”bash”) and commands are written to its stdin one by one.
+- For paramiko, it means client.invoke_shell() and commands are written to its stdin one by one.
+
+## with $$ , with $${}:
+
+An interactive shell. Commands in {} are initial commands when the shell starts.
+
+```jsx
+# Example of subprocess:
+os.environ[’CMD_INTERVAL’] = "1" # 1 second between every line
+os.environ['SHELL'] = '/bin/tcsh' # if you want something diffrent 
+with $$sudo -S su as shell:
+    shell.send('root-password-is-123456')
+    shell.send('cd /root')
+    shell.send('pwd')
+    print(shell.stdout) # /root
+    shell.send('ls -l')
+print($.stdout) # the outputs of all lines of execution.
+```
+
+<aside>
+💡 with $, with ${}, with $${…} are all the same as with $$
+
+</aside>
+
+## os.environ
+
+### os.environ[’VERBOSE] = “1”
+
+```jsx
+if sys.stdout.isatty():
+    os.environ['VERBOSE'] = "1"
+```
+
+### os.environ[’CMD_INTERVAL’] = “0.5”
+
+The interval between two lines of command are default to 0.5 seconds after the latest time when having data received from stdout or stderr.  This value can be changed by os.environ[’CMD_INTERVAL’]. For example:
+
+```jsx
+os.environ[’CMD_INTERVAL’] = "0.1"
+$${
+    cd /tmp
+    ls -l
+}
+```
+
+The output of stdout or stderr are put together in $.stdout and $.stderr respectively.
+
+Reset this value by
+
+```jsx
+del os.environ[’CMD_INTERVAL’]
+```
+
+## $.stdin, $.stdout, $.stderr in Py
+
+## $.stderr
+
+There is a special note for $.stderr. Please consider the example in 3 cases:
+
+- A. $cat /non-existed-file
+- B. $$cat /non-existed-file
+- C. with $$cat /non-existed-file
+
+For local subprocess, $.stderr would have value “No such file or directory” in A, B and C.
+
+For remote ssh session, $.stderr would have value “No such file or directory” for A only. 
+
+For remote ssh session, in case B and C, **$.stdout** would have the error message “No such file or directory”. Since this is the behavior of the paramiko invoke_shell() which implicitly set get_pty=True.
+
+## $@{python-expression}  , $$@{python-expression}
+
+## @close()
+
+## @download(src-remote,dst-local)
+
+## @exit()
+
+## @include
+
+## @open(username@host)
+
+## with @open()
+
+## @open() in @open()
+
+## @panaroid(boolean:)
+
+## @timeout(int:)
+
+## @upload(src-local,dst-remote,makedirs=0,overwrite=1)
+
+## __export__ = [’name’,...]
+
+## __export__ = [’*’]
+
+[sshscript.py](http://sshscript.py) -f <file or folder> —script
