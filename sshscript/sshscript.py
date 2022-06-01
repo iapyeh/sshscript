@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
+__version__ = '0.94'
 from paramiko import SSHClient,AutoAddPolicy
 from io import StringIO
 import paramiko
-#from base64 import decodebytes
 import os, sys, traceback, time, re, random, glob
 import logging
 import hashlib
@@ -826,7 +826,7 @@ def main(topic,args):
 __main__.SSHScript = SSHScript
 __main__.logger = logger
 
-if __name__ == '__main__':
+def run():
     import argparse
 
     # REF: https://stackoverflow.com/questions/15753701/how-can-i-pass-a-list-as-a-command-line-argument-with-argparse
@@ -857,3 +857,6 @@ if __name__ == '__main__':
         main('-f',args)
     else:
         parser.print_help()
+
+if __name__ == '__main__':
+    run()
