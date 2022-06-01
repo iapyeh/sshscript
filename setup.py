@@ -1,3 +1,4 @@
+# ref: https://towardsdatascience.com/create-and-publish-your-own-python-package-ea45bee41cdc
 import setuptools
 
 # Reads the content of your README.md into a variable to be used in the setup below
@@ -5,14 +6,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
+    download_url="https://github.com/iapyeh/sshscript/archive/refs/tags/0.93.tar.gz",
     name='sshscript',                           # should match the package folder
     packages=['sshscript'],                     # should match the package folder
-    version='0.9',                                # important for updates
     license='MIT',                                  # should match your chosen license
-    description='Testing installation of Package',
     long_description=long_description,              # loads your README.md
     long_description_content_type="text/markdown",  # README.md is of type 'markdown'
-    author='Mike Huls',
+    author='Hsin Yuan Yeh',
     author_email='iapyeh@gmail.com',
     url='https://github.com/iapyeh/sshscript', 
     project_urls = {                                # Optional
@@ -26,10 +26,13 @@ setuptools.setup(
         'Topic :: Software Development :: Documentation',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3 :: Only',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
     ],
-    
-    download_url="https://github.com/iapyeh/sshscript/archive/refs/tags/0.93.tar.gz",
+    entry_points='''
+        [console_scripts]
+        sshscript=sshscript.sshscript:run
+    ''',    
 )
