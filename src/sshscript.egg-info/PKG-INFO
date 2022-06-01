@@ -1,0 +1,27 @@
+Metadata-Version: 2.1
+Name: sshscript
+Version: 0.94
+Summary: write automation scripts for ssh and subprocess in python
+Home-page: https://github.com/iapyeh/sshscript
+Download-URL: https://github.com/iapyeh/sshscript/archive/refs/tags/0.94.tar.gz
+Author: Hsin Yuan Yeh
+Author-email: iapyeh@gmail.com
+License: MIT
+Project-URL: Bug Tracker, https://github.com/iapyeh/sshscript/issues
+Keywords: pypi,sshscript,ssh,paramiko,subprocess,shell script
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Documentation
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Requires-Python: >=3.6.7
+Description-Content-Type: text/markdown
+License-File: LICENSE.txt
+
+# SSHScript
+
+This is the test

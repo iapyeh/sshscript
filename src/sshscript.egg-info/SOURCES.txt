@@ -1,0 +1,15 @@
+LICENSE.txt
+README.md
+setup.cfg
+setup.py
+src/sshscript/__init__.py
+src/sshscript/sshscript.py
+src/sshscript/sshscriptchannel.py
+src/sshscript/sshscriptdollar.py
+src/sshscript/sshscripterror.py
+src/sshscript.egg-info/PKG-INFO
+src/sshscript.egg-info/SOURCES.txt
+src/sshscript.egg-info/dependency_links.txt
+src/sshscript.egg-info/entry_points.txt
+src/sshscript.egg-info/requires.txt
+src/sshscript.egg-info/top_level.txt
