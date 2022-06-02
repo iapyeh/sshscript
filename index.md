@@ -1,8 +1,6 @@
-# SSHScript Syntax
+# SSHScript
 
-Others: invoke, [fabric](https://www.fabfile.org/), pexpect, exscript
-
-## 
+# Syntax
 
 ## $
 
@@ -17,7 +15,7 @@ $ls -l | wc -l
 
 </aside>
 
-## ${}
+## $”””
 
 Many lines of “$” put together, for example:
 
@@ -32,27 +30,41 @@ $hostname
 They can be put together by 
 
 ```jsx
-${
+$"""
     ls -l /tmp
     whoami
     hostname
-}
+"""
 ```
 
 Every single line are executed individually. The output of stdout or stderr are put together.
 
 Every command is executed one by one.
 
-### $$
+## $$
 
 Sometimes, we need a shell to work, for example:
 
 ```jsx
 $$ echo “1234” | sudo -S rm -rf /goodbye-root
+```
 
 or 
 
+```jsx
 $$ echo $PATH
+
+because, in a non-shell command, like:
+
+$echo $PATH
+
+the output is "$PATH"
+```
+
+or
+
+```jsx
+Also `pwd` works only in $$ not in $.
 $$ echo `pwd` 
 ```
 
@@ -60,15 +72,15 @@ The command will be executed in shell. For subprocess, it means with “shell=Tr
 
 The output of stdout or stderr are put together in $.stdout and $.stderr respectively.
 
-## $${}
+## $$”””
 
 Many commands can put together, for example:
 
 ```jsx
-$${
+$$"""
     cd /tmp
     ls -l
-}
+"""
 ```
 
 They are executed in a single session of shell. 
@@ -76,15 +88,15 @@ They are executed in a single session of shell.
 - For subprocess, it means popen(”bash”) and commands are written to its stdin one by one.
 - For paramiko, it means client.invoke_shell() and commands are written to its stdin one by one.
 
-## with $$ , with $${}:
+## with $ , with $”””
 
-An interactive shell. Commands in {} are initial commands when the shell starts.
+An interactive shell. Commands are initial commands when the shell starts.
 
 ```jsx
 # Example of subprocess:
 os.environ[’CMD_INTERVAL’] = "1" # 1 second between every line
 os.environ['SHELL'] = '/bin/tcsh' # if you want something diffrent 
-with $$sudo -S su as shell:
+with $sudo -S su as shell:
     shell.send('root-password-is-123456')
     shell.send('cd /root')
     shell.send('pwd')
@@ -94,7 +106,7 @@ print($.stdout) # the outputs of all lines of execution.
 ```
 
 <aside>
-💡 with $, with ${}, with $${…} are all the same as with $$
+💡 with $$, with $$””” are all the same as with $
 
 </aside>
 
@@ -145,28 +157,34 @@ For remote ssh session, in case B and C, **$.stdout** would have the error messa
 
 ## $@{python-expression}  , $$@{python-expression}
 
-## @close()
+## $.close()
 
-## @download(src-remote,dst-local)
+## $.download(src-remote,dst-local)
 
-## @exit()
+## $.exit()
 
-## @include
+## $.getkey()
 
-## @open(username@host)
+## $.include()
 
-## with @open()
+## $.open(username@host)
 
-## @open() in @open()
+## $.open() , with
 
-## @panaroid(boolean:)
+## $.open() , nested
 
-## @timeout(int:)
+## $.panaroid(boolean:)
 
-## @upload(src-local,dst-remote,makedirs=0,overwrite=1)
+## $.timeout(int:)
+
+## $.upload(src-local,dst-remote,makedirs=0,overwrite=1)
 
 ## __export__ = [’name’,...]
 
 ## __export__ = [’*’]
 
-[sshscript.py](http://sshscript.py) -f <file or folder> —script
+## CLI
+
+### [sshscript](http://sshscript.py) [file or folder]
+
+### [sshscript](http://sshscript.py) [file or folder]  -- script
