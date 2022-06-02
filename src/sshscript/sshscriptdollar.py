@@ -206,8 +206,10 @@ class SSHScriptDollar(object):
                 except subprocess.TimeoutExpired:
                     cp.kill()
                     outs, errs = cp.communicate()
-                self.channel.allStdoutBuf.append(outs)
-                self.channel.allStderrBuf.append(errs)
+                #self.channel.allStdoutBuf.append(outs)
+                #self.channel.allStderrBuf.append(errs)
+                self.channel.addStdoutData(outs)
+                self.channel.addStderrData(errs)                
                 self.channel.close()
         else:
             # not invoke shell
@@ -231,26 +233,24 @@ class SSHScriptDollar(object):
 
                 # outs,errs are bytes
                 try:
-                    # 多行時，pre-assigned stdin 只套用在第一個指令
-                    #if isinstance(input,str): input = input.encode('utf-8')
                     outs, errs = cp.communicate(timeout=timeout)
-                    #input = b''
                 except subprocess.TimeoutExpired:
                     cp.kill()
                     outs, errs = cp.communicate()
                 self.stdin = cp.stdin
-                self.channel.allStdoutBuf.append(outs)
-                self.channel.allStderrBuf.append(errs)
+                self.channel.addStdoutData(outs)
+                self.channel.addStderrData(errs)
             #多行時，$.stdout, $.stderr是所有的總和
             if self.inWith:
                 # 不invoke shell，卻inWith，好像沒意義
                 # __exit__ will call self.channel.close()
                 pass
             else:
-                # self.channel.close() will do the flollowing two lines
-                #self.stdout = (b''.join(allStdoutBuf)).decode('utf8')
-                #self.stderr = (b''.join(allStderrBuf)).decode('utf8')                
+                # self.channel.close() will not call  self.channel.recv()
+                self.channel.recv()
                 self.channel.close()
+                if self.channel.stderr and self.sshscript._paranoid:
+                    raise SSHScriptError(self.channel.stderr)
     
     def execBySSH(self,invokeShell,deepCall):
         (ssId,cmd,_globals,_locals) = self.args
@@ -292,8 +292,6 @@ class SSHScriptDollar(object):
             # hasMultipleLines:
             # ${....}
             self.channel = ParamikoChannel(self,None, timeout)
-            #allStdoutBuf = []
-            #allStderrBuf = []
             for command in cmds:
                 logger.debug(f'executing {command}')
                 # The paramiko documentation says:
@@ -301,15 +299,13 @@ class SSHScriptDollar(object):
                 # So, we always need not a pty.
                 stdin, stdout,stderr = client.exec_command(command,get_pty=0,timeout=self.sshscript._timeout)
                 self.stdin = stdin
-                #allStdoutBuf.append(stdout.read())
-                #allStderrBuf.append(stderr.read())
                 self.channel.addStdoutData(stdout.read())
                 self.channel.addStderrData(stderr.read())
-            #self.stdout = (b''.join(allStdoutBuf)).decode('utf8')
-            #self.stderr = (b''.join(allStderrBuf)).decode('utf8')
-            #if self.stderr and self.sshscript._paranoid:
-            #    raise SSHScriptError(self.stderr,506)
+            # self.channel.close() will not call  self.channel.recv()
+            self.channel.recv()
             self.channel.close()
+            if self.channel.stderr and self.sshscript._paranoid:
+                raise SSHScriptError(self.channel.stderr)
         
     def __iter__(self):
         """

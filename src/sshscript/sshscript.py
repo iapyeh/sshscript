@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-__version__ = '0.94'
 from paramiko import SSHClient,AutoAddPolicy
 from io import StringIO
 import paramiko
@@ -418,11 +417,11 @@ class SSHScript(object):
             abspath = os.path.join(os.path.abspath(os.path.dirname(scriptPath)),eval(path))
             content = SSHScript.include(prefix,abspath)
             return content
-        #quotes = {}
+        
         def pqouteSub(m):
             quote,content = m.groups()
             hash = hashlib.md5(content.encode('utf8'))
-            key = f'#__{hash.hexdigest()}__#'
+            key = f'#____{hash.hexdigest()}____#'
             quotes[key] = (quote,content)
             return key
 
@@ -621,7 +620,10 @@ class SSHScript(object):
                             # 這樣可以在SSHScriptError丟出之前把_c設定為__c
                             indentOfTryBlock = '    '
                             rows.append(f'{indent}try:')
-                            rows.append(f'{indent}{indentOfTryBlock}__c = SSHScriptDollar(None,r"""{cmd} """,locals(),globals(),inWith={1 if asPartOfWith else 0})')
+                            # strip triple-quote
+                            tripleQuote = '' if cmd.startswith('#____') else '"""'
+                            rows.append(f'{indent}{indentOfTryBlock}__b = r{tripleQuote}{cmd} {tripleQuote}')
+                            rows.append(f'{indent}{indentOfTryBlock}__c = SSHScriptDollar(None,__b,locals(),globals(),inWith={1 if asPartOfWith else 0})')
                             rows.append(f'{indent}{indentOfTryBlock}__ret = __c({invokeShell})')
                             rows.append(f'{indent}finally:')
                             rows.append(f'{indent}{indentOfTryBlock}_c = __c')
@@ -634,13 +636,17 @@ class SSHScript(object):
                         # 前後要留空白，避免 "與"""混在一起
                         invokeShell = 1 if stripedLine[j+1] == '$' else 0
                         cmd = stripedLine[j+2:] if invokeShell else stripedLine[j+1:]
+                        
                         # expand $.stdout, $.(var) etc in cmd
                         if pvar.search(stripedLine):
                             cmd = pstd.sub('\\1_c\\2',cmd.lstrip())
                         
                         rows.append(f'{indent}try:')
                         indentOfTryBlock = '    '
-                        rows.append(f'{indent}{indentOfTryBlock}__c = SSHScriptDollar(None,r"""{cmd} """,locals(),globals(),inWith={1 if asPartOfWith else 0})')
+                        # strip triple-quote
+                        tripleQuote = '' if cmd.startswith('#__') else '"""'
+                        rows.append(f'{indent}{indentOfTryBlock}__b = r{tripleQuote}{cmd} {tripleQuote}')
+                        rows.append(f'{indent}{indentOfTryBlock}__c = SSHScriptDollar(None,__b,locals(),globals(),inWith={1 if asPartOfWith else 0})')
                         rows.append(f'{indent}{indentOfTryBlock}__ret = __c({invokeShell})')
                         rows.append(f'{indent}finally:')
                         rows.append(f'{indent}{indentOfTryBlock}_c = __c')
@@ -678,30 +684,27 @@ class SSHScript(object):
         #print([type(item) for item in self.blocksOfScript])        
         
         assert _locals.get('self')
-        def dumpScriptItem(item):
-            for idx, line in enumerate(item.split('\n')):
+        def dumpScriptItem(scriptChunk):
+            for idx, line in enumerate(scriptChunk.split('\n')):
                 print(f'{str(idx+1).zfill(3)}:{line}')
             traceback.print_exc()
 
-        for item in self.blocksOfScript:
-            if isinstance(item, str):
-                # put back triple-quotes content
+        for scriptChunk in self.blocksOfScript:
+            if isinstance(scriptChunk, str):
+                # restore back triple-quotes content
                 for key,(quote,content) in quotes.items():
-                    item = item.replace(key,f'{quote}{content}{quote}')
+                    scriptChunk = scriptChunk.replace(key,f'{quote}{content}{quote}')
 
                 if showScript:
-                    for line in item.split('\n'):
+                    for line in scriptChunk.split('\n'):
                         self.lineNumberCount += 1
                         print(f'{str(self.lineNumberCount).zfill(3)}:{line}')
                     continue
 
                 try:
-                    exec(item,_globals,_locals)
+                    exec(scriptChunk,_globals,_locals)
                 except SyntaxError as e:
-                    dumpScriptItem(item)
-                    #for idx, line in enumerate(item.split('\n')):
-                    #   print(f'{str(idx+1).zfill(3)}:{line}')
-                    #traceback.print_exc()
+                    dumpScriptItem(scriptChunk)
                     raise
                 except SystemExit as e:
                     if e.code != 0:
@@ -709,15 +712,15 @@ class SSHScript(object):
                     else:
                         raise
                 except SSHScriptError:
-                    dumpScriptItem(item)
+                    dumpScriptItem(scriptChunk)
                     raise
                 except SSHScriptExit:
                     break
                 except:
-                    dumpScriptItem(item)
+                    dumpScriptItem(scriptChunk)
                     raise
-            elif isinstance(item, self.__class__):
-                item.run(None,_locals,_globals,showScript=showScript)
+            elif isinstance(scriptChunk, self.__class__):
+                scriptChunk.run(None,_locals,_globals,showScript=showScript)
         return _locals
 
 def runPath(givenPaths,varGlobals=None,varLocals=None,showScript=False,showFilesOrder=False,unisession=True):

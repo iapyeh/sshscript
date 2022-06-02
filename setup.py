@@ -2,7 +2,7 @@
 import setuptools
 
 # Reads the content of your README.md into a variable to be used in the setup below
-with open("README.md", "r", encoding="utf-8") as fh:
+with open("README.rst", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
@@ -10,8 +10,8 @@ setuptools.setup(
     name='sshscript',                           # should match the package folder
     packages=['sshscript'],                     # should match the package folder
     license='MIT',                                  # should match your chosen license
-    long_description=long_description,              # loads your README.md
-    long_description_content_type="text/markdown",  # README.md is of type 'markdown'
+    long_description=long_description,           
+    long_description_content_type="text/x-rst",  
     author='Hsin Yuan Yeh',
     author_email='iapyeh@gmail.com',
     url='https://github.com/iapyeh/sshscript', 
