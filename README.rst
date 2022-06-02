@@ -50,7 +50,8 @@ Tutorial
 Syntax
 ======
 
-      Please see \ |LINK2|\  .
+Please see \ |LINK2|\  .
+
 
 .. bottom of content
 
@@ -61,4 +62,4 @@ Syntax
 
 .. |LINK2| raw:: html
     
-    <a href="https://iapyeh.github.io/sshscript/"  target="_blank">Syntax</a>
+    <a href="https://iapyeh.github.io/sshscript/"  target="_blank">SSHScript Syntax</a>
