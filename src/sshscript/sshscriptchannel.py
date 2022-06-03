@@ -159,6 +159,84 @@ class GenericChannel(object):
                 self.stderrDumpBuf.append(x)
         self._lastIOTime = time.time()
 
+class POpenPipeChannel(GenericChannel):
+    def __init__(self,owner,cp,timeout):
+        super().__init__()
+        self.owner = owner
+        self.cp = cp
+        if cp is None:
+            # dummy instance for "with $<command> as ..."
+            self._lastIOTime = 0
+        else:
+            self.masterFd = [cp.stdout,cp.stderr]
+            self.slaveFd = [cp.stdin]
+            self.timeout = timeout
+            threading.Thread(target=self._reading).start()
+
+    def send(self,s):
+        self._lastIOTime = time.time()
+        b = s.encode('utf-8')
+        # write to popen's stdin
+        self.slaveFd[0].write(b)
+        self.slaveFd[0].flush()
+        self._lastIOTime = time.time()
+    
+    def _reading(self):
+
+        buffer = {
+            self.masterFd[0]: self.addStdoutData, #stdout
+            self.masterFd[1]: self.addStderrData  #stderr
+        }
+        while buffer:           
+            try:
+                for fd in select(buffer, [], [])[0]:
+                    try:
+                        # diff of read and read1:
+                        # See: https://stackoverflow.com/questions/57726771/what-the-difference-between-read-and-read1-in-python
+                        data = fd.read1(1024)
+                    except OSError as e:
+                        if e.errno == errno.EIO:
+                            pass
+                        elif e.errno == errno.EBADF:
+                            pass
+                        else:
+                            raise #XXX cleanup
+                        del buffer[fd] # EIO means EOF on some systems
+                    else:
+                        if not data: # EOF
+                            del buffer[fd]
+                        else:
+                            self._lastIOTime = time.time()
+                            buffer[fd](data)
+                            
+            except OSError as e:
+                if e.errno == errno.EBADF:
+                    # being closed
+                    break
+                else:
+                    raise
+        #if len(stdoutBuffer):
+        #    self.addStdoutData(b''.join(stdoutBuffer))
+        #if len(stderrBuffer):
+        #    self.addStdoutData(b''.join(stderrBuffer))
+
+    def close(self):
+        self.wait(1) # at least 1 seconds has no io
+        if self.cp: # not dummy instance
+            self.masterFd[0].close()
+            self.masterFd[1].close()
+            self.slaveFd[0].close()
+
+            while self.cp.poll() is None:
+                try:
+                    self.cp.wait(self.timeout)
+                except subprocess.TimeoutExpired:
+                    self.cp.kill()
+                    break
+    
+        self.owner.stderr = (b''.join(self.allStderrBuf)).decode('utf8')
+        self.owner.stdout = (b''.join(self.allStdoutBuf)).decode('utf8')    
+
 class POpenChannel(GenericChannel):
     def __init__(self,owner,cp,timeout,masterFd=None,slaveFd=None):
         super().__init__()
