@@ -2,13 +2,19 @@
 import os, sys, traceback, time, re, random, glob
 import queue, threading
 import subprocess, shlex, socket
-import pty, shutil, asyncio
+import shutil, asyncio
 try:
     from sshscripterror import SSHScriptError
-    from sshscriptchannel import POpenChannel, ParamikoChannel
+    from sshscriptchannel import POpenChannel, ParamikoChannel,POpenPipeChannel
 except ImportError:
     from .sshscripterror import SSHScriptError
-    from .sshscriptchannel import POpenChannel, ParamikoChannel
+    from .sshscriptchannel import POpenChannel, ParamikoChannel,POpenPipeChannel
+try:
+    import pty
+except ImportError:
+    # pty is not available on Windows
+    pty = None
+
 # replace @{var} in $shell-command
 #pvar = re.compile('(\b?)\@\{(.+)\}')
 # replace $.stdout, $.stderr to _c.stdout, _c.stderr, $.host in $LINE
@@ -30,58 +36,17 @@ class SSHScriptDollar(object):
         global logger
         # assign logger 
         if logger is None: logger = __main__.logger
-
-        # ss = instance of SSHScript
         self.args = (ssId,cmd,globals,locals)
         self.sshscript = None #執行的脈絡下的 sshscript instance
         self.inWith = inWith
         self.hasExit = False # True if user calls exit()
         self.invokeShell = False
         self.wrapper = None
-        #self.writingQueue = queue.SimpleQueue()
-        #self.thread = None
         self.bufferedOutputData = b''
         self.bufferedErrorData = b''
-        #self.cachedStdin = stdin
-    """
-    def setResult(self,ctx,channel=None):
-        stdin, stdout,stderr = ctx
-        self.stdin = stdin
-        self.stdoutStream = stdout
-        self.stderrStream = stderr
-        self.channel = channel
-    
-    def getResult(self):
-        #if self.sshscript.host and self.invokeShell:
-        #    while self.channel.active and not self.channel.recv_ready():  time.sleep(0.1)
-        #    assert self.channel.active
-        
-        self.stdin.flush()
-        self.stdin.close()
-        try:
-            stdout = self.stdoutStream.read()
-        except socket.timeout:
-            stdout = b''
-        
-        self.stdout = (self.bufferedOutputData + stdout).decode('utf8')
-        
-        try:
-            stderr = self.stderrStream.read()
-        except socket.timeout:
-            stderr = b''
-        
-        self.stderr = (self.bufferedErrorData + stderr).decode('utf8')
-                
-        # "close channel" should be at the end
-        if self.channel: self.channel.close()
-
-        if self.stderr.strip() and self.sshscript._paranoid:
-            raise SSHScriptError(self.stderr)
-        
-    """
+        # set os.environ['NO_PTY']='1' to disable pty
+        self.usePty = pty and os.environ.get('NO_PTY','') != '1'
     def __call__(self,invokeShell=False,deepCall=True):
-        #(ssId,cmd,_globals,_locals) = self.args
-        #SSHScript = _globals['SSHScript']
         ssId = self.args[0]
         self.sshscript = __main__.SSHScript.items[ssId] if ssId else __main__.SSHScript.inContext
         if self.sshscript.host:
@@ -143,28 +108,40 @@ class SSHScriptDollar(object):
                 shCmd = shutil.which('bash')
                 if shCmd is None:
                     raise RuntimeError('no shell command found')
-            logger.debug(f'shell: {shCmd}')
+                        
             if self.inWith or hasMultipleLines:
                 # prepare popen command
                 args = shlex.split(shCmd)
 
-                # ref: https://errorsfixing.com/run-interactive-bash-in-dumb-terminal-using-python-subprocess-popen-and-pty/
-                # ref: https://stackoverflow.com/questions/19880190/interactive-input-output-using-python
-                masterFd,slaveFd = zip(pty.openpty(),pty.openpty())                
-                cp = subprocess.Popen(args,
-                    # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
-                    #bufsize=1,
-                    stdin=slaveFd[0],stdout=slaveFd[0],stderr=slaveFd[1],
-                    # Run in a new process group to enable bash's job control.
-                    preexec_fn=os.setsid,
-                    # Run in "dumb" terminal.
-                    env=dict(os.environ, TERM='vt100'),
-                    )
+                if self.usePty:
+                    # ref: https://errorsfixing.com/run-interactive-bash-in-dumb-terminal-using-python-subprocess-popen-and-pty/
+                    # ref: https://stackoverflow.com/questions/19880190/interactive-input-output-using-python
+                    masterFd,slaveFd = zip(pty.openpty(),pty.openpty())                
+                    cp = subprocess.Popen(args,
+                        # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
+                        #bufsize=1,
+                        stdin=slaveFd[0],stdout=slaveFd[0],stderr=slaveFd[1],
+                        # Run in a new process group to enable bash's job control.
+                        preexec_fn=os.setsid,
+                        # Run in "dumb" terminal.
+                        env=dict(os.environ, TERM='vt100'),
+                        )                    
+                    self.channel = POpenChannel(self,cp,timeout,masterFd,slaveFd)                    
+                else:
+                    #windows
+                    cp = subprocess.Popen(args,
+                        # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
+                        #bufsize=1,
+                        stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                        # Run in a new process group to enable bash's job control.
+                        preexec_fn=os.setsid,
+                        # Run in "dumb" terminal.
+                        env=dict(os.environ, TERM='vt100'),
+                        )                
+                    self.channel = POpenPipeChannel(self,cp,timeout)
 
                 # value is None. for what? 
                 self.stdin = cp.stdin
-                
-                self.channel = POpenChannel(self,cp,timeout,masterFd,slaveFd)
 
                 # wait for bash to start up
                 try:
@@ -182,39 +159,36 @@ class SSHScriptDollar(object):
             else:
                 # inVokeShell, but only single line and not in with
                 # prepare popen command
-                self.channel = POpenChannel(self,None,timeout)
-                #shCmd = cmds.pop(0)
+                if self.usePty:
+                    self.channel = POpenChannel(self,None,timeout)
+                else:
+                    self.channel = POpenPipeChannel(self,None,timeout)
+                
                 args = shlex.split(shCmd)
                 cp = subprocess.Popen(args,
-                    # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
-                    #bufsize=1,
                     preexec_fn=os.setsid,
                     stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
                     shell=True,
                     )
                 
-                #for cmd in cmds:
-                #    cp.stdin.write(cmd.encode('utf-8')+b'\n')
-                #    if input:
-                #        if isinstance(input,str): input = input.encode('utf-8')
-                #        cp.stdin.write(input+b'\n')
-                #        input = b''
-                #    cp.stdin.flush()
-                  
                 try:
                     input = cmds[0].encode('utf-8')
                     outs, errs = cp.communicate(input=input,timeout=timeout)
                 except subprocess.TimeoutExpired:
                     cp.kill()
                     outs, errs = cp.communicate()
-                #self.channel.allStdoutBuf.append(outs)
-                #self.channel.allStderrBuf.append(errs)
+
                 self.channel.addStdoutData(outs)
                 self.channel.addStderrData(errs)                
                 self.channel.close()
         else:
+            
             # not invoke shell
-            self.channel = POpenChannel(self,None,timeout)
+            if self.usePty:
+                self.channel = POpenChannel(self,None,timeout)
+            else:
+                self.channel = POpenPipeChannel(self,None,timeout)
+            
             for command in cmds:
                 # it is recommended to pass args as a sequence.... If shell is True, 
                 # it is recommended to pass args as a string rather than as a sequence.
