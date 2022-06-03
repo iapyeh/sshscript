@@ -44,6 +44,9 @@ Tutorial
 
 
 
+Please see \ |LINK3|\  .
+
+
 
 .. _h6e172a227d553419513e7a1117648072:
 
@@ -51,6 +54,13 @@ Syntax
 ======
 
 Please see \ |LINK2|\  .
+
+Disclaimer
+==========
+
+* Developing and testing on MacOS, Linux only.
+
+* Please use it at your own risk.
 
 
 .. bottom of content
@@ -62,4 +72,8 @@ Please see \ |LINK2|\  .
 
 .. |LINK2| raw:: html
     
-    <a href="https://iapyeh.github.io/sshscript/"  target="_blank">SSHScript Syntax</a>
+    <a href="https://iapyeh.github.io/sshscript/syntax"  target="_blank">SSHScript Syntax</a>
+
+.. |LINK3| raw:: html
+    
+    <a href="https://iapyeh.github.io/sshscript/tutorial"  target="_blank">Tutorial</a>
