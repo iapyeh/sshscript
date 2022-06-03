@@ -37,7 +37,7 @@ password = 'your-secret'
 opensslVersions = []
 for host in hosts:
     with $.open(f'{user}@{host}',password) as _:
-	      $openssl version
+	$openssl version
         opensslVersions.append([host,$.stdout])
 # output
 from tabulate import tabulate
@@ -77,7 +77,7 @@ And the check-openssl-version.spy can be re-written like this:
 
 ```jsx
 # collect
-**$.include('common.spy')  # <------- look here**
+$.include('common.spy')  # <------- look here**
 opensslVersions = []
 for host in hosts:
     with $.open(f'{username}@{host}',password) as _:
