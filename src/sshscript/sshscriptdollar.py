@@ -24,6 +24,7 @@ logger = None
 loop = asyncio.get_event_loop()
 
 class SSHScriptDollar(object):
+    exportedProperties = set(['stdout','stderr','stdin'])
     # aka $shell-commmand , or coverted "_c"
     def __init__(self,ssId,cmd=None,globals=None,locals=None,inWith=False):
         global logger
