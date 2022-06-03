@@ -19,7 +19,7 @@ The sshscript is an integration of subprocess and \ |LINK1|\ . It provides an un
 .. code:: 
 
     # execute a command on remote host and parse the output 
-    @open('user@host')
+    $.open('user@host')
     $ls -l
     for line in $.stdout.split('\n'):
        if line.startswith('d'): continue
