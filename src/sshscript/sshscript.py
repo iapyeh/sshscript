@@ -21,22 +21,25 @@ pvarS = re.compile('(\b?)\@\{(.+?)\}',re.S)
 # replace @{var} in $shell-command
 pvar = re.compile('(\b?)\@\{(.+)\}')
 # replace $.stdout, $.stderr to _c.stdout, _c.stderr, $.host in $LINE
-pstd = re.compile('(\b?)\$(\.[a-z]+)\b?')
+pstd = re.compile('(\b?)\$\.([a-z]+)\b?')
+#pstd = re.compile('^([ \t]*?)\$\.([a-z]+)\b?') 不能加入^,否則在字串中的$.stdout會無法匹配
 # looking for @include( to self.open( in Py
-pAtInclude = re.compile('^( *?)\@include\(([^\)]+)\)',re.M)
+#pAtInclude = re.compile('^( *?)\@include\(([^\)]+)\)',re.M)
+pAtInclude = re.compile('^( *?)\$.include\(([^\)]+)\)',re.M)
 # line startswith $, such as $${, ${, $shell-command but not $.
 pDollarWithoutDot = re.compile('^\$[^\.][\{\w]?')
-# line startswith $shell-command , $$shell-command or $@{py-var} or $$#! , but not ${, $${, $<space> 
-# why not $<space> ?
-pDollarCommand = re.compile('^\$(?!\$?\{)') # will match  $<space>abc
+# line startswith $shell-command , $$shell-command , $@{py-var} , $$#! , $<space>abc
+# but not ${, $${
+pDollarCommand = re.compile('^\$(?!\$?\{)') # will match 
 # replace @open( to self.open( in Py
 pAtFuncS = re.compile('^([\t ]*?)\@(\w+\()',re.M)
-# replace "with @open", "with @subopen"
-pAtFuncSWith = re.compile('^([\t ]*?)with([\t ]+)\@(\w+\()',re.M)
 # find $.stdin =
 pStdinEquals = re.compile('^[\t ]*?(\$\.stdin[\t ]*=)',re.M)
 # find "with $shell-command"
-pWithDollar = re.compile('^[\t ]*?with +\$',re.M)
+pWithDollar = re.compile('^[\t ]*?with +\$[^\.]',re.M)
+# replace "with @open", "with @subopen"
+#pAtFuncSWith = re.compile('^([\t ]*?)with([\t ]+)\@(\w+\()',re.M)
+pAtFuncSWith = re.compile('^([\t ]*?)with([\t ]+)\$\.(\w+\()',re.M)
 # find with ... as ...
 pAsString = re.compile(' +as +([^\:]+)\:')
 # find with ... } as ... ; curly brackets
@@ -82,12 +85,40 @@ class LineGenerator:
     def __iter__(self):
         return self
 
+# replace $.stdout, $.stderr to _c.stdout, _c.stderr
+# replace $.open(), $.subopen() to SSHScript.inContext.
+pQuoted = re.compile('\(.*\)')
+# exported to $.<func>, such as $.open, $.close, $.exit
+SSHScriptExportedFuncs = set()
+#SSHScriptClsExportedFuncs = set() # "include" only, now.
+def pstdSub(m):
+    pre,post = m.groups()
+    if post in SSHScriptExportedFuncs:
+        return f'{pre}SSHScript.inContext.{post}'
+    elif post in SSHScriptDollar.exportedProperties:
+        return f'{pre}_c.{post}'
+    #elif post in SSHScriptClsExportedFuncs:
+    #    return f'{pre}SSHScript.{post}'
+    else:
+        # SSHScript.inContext's property
+        return f'{pre}SSHScript.inContext.{post}'
+
+def export2Dollar(func):
+    try:
+        SSHScriptExportedFuncs.add(func.__name__)
+    except AttributeError:
+        # classmethod
+        #assert isinstance(func,classmethod)
+        #SSHScriptClsExportedFuncs.add(func.__func__.__name__)
+        raise
+    return func
+
 class SSHScript(object):
     # this SSHScript() which in context of @method in py
     inContext = None
     # a lookup table of instances of SSHScript by id
     items = {}
-   
+
     @classmethod
     def connect(cls,host,port=22,username=None,password=None,**kw):
         client = SSHClient()
@@ -97,6 +128,7 @@ class SSHScript(object):
         #3.連線伺服器
         client.connect(host,port=port,username=username,password=password,**kw)
         return client
+    
     @classmethod
     def include(cls,prefix,abspath):
         if not os.path.exists(abspath):
@@ -186,10 +218,12 @@ class SSHScript(object):
 
     def getSocketWithProxyCommand(self,argsOfProxyCommand):
         return paramiko.ProxyCommand(argsOfProxyCommand)        
-    #@exit
+    
+    @export2Dollar
     def exit(self,code=0):
         raise SSHScriptExit(code)
-    #@open
+    
+    @export2Dollar
     def open(self,host,username=None,password=None,port=22,**kw):
         # host 可以是 username@hostname 的格式
         if '@' in host:
@@ -232,19 +266,12 @@ class SSHScript(object):
                 logger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port}')
                 self._client = SSHScript.connect(host,port,username,password,**kw)
 
-        ## do initiailation, assigns $.pwd
-        c = SSHScriptDollar(self.id,'pwd')
-        c(deepCall=False)
-        # 既然不支援@chdir,self.pwd可能已經用不到了
-        #self.pwd = c.stdout.rstrip()
-
         self._previousSshscriptInContext = SSHScript.inContext
         SSHScript.inContext = self
-        #logger.debug(f'new  SSHScript.inContext is {self}, pwd = {self.pwd}')
     
         return self
     
-    #@subopen
+    @export2Dollar
     def subopen(self,host,username=None,password=None,port=22,**kw):
         # enter a new channel
         if '@' in host: username,host = host.split('@')
@@ -252,7 +279,7 @@ class SSHScript(object):
         nestedSession.open(host,username,password,port,**kw)
         return nestedSession
     
-    #@paranoid()
+    @export2Dollar
     def paranoid(self,yes):
         self._paranoid = yes
     
@@ -262,7 +289,8 @@ class SSHScript(object):
     # protocol of "with subopen as "
     def __exit__(self,*args):
         self.close() # close all subsession if any
-
+    
+    @export2Dollar
     def close(self,depthClose=False):
         # 除非指定depthClose,否則只關閉最底下的那層
         if self.subSession:
@@ -302,8 +330,8 @@ class SSHScript(object):
         del SSHScript.items[self.id]
 
     #def getRsaKeyAtPath(self,pathOfRsaPrivate):
-    # @usekey()
-    def useKey(self,pathOfRsaPrivate):
+    @export2Dollar
+    def getkey(self,pathOfRsaPrivate):
         #pathOfRsaPrivate = f'/home/{$.username}/.ssh/id_rsa'
         if self.host:
             _,stdout,_ = self._client.exec_command(f'cat "{pathOfRsaPrivate}"')
@@ -314,44 +342,18 @@ class SSHScript(object):
                 return paramiko.RSAKey.from_private_key(fd)
     
     
-    # 簡化，可以用shell取代
-    #@pty(0), @pty(1)
-    #def pty(self,yes):
-    #    self._pty = yes
-    
-    # 簡化
-    #@env
-    #def env(self,aDict=None,**kw):
-    #    if aDict: self._env = aDict
-    #    if len(kw)and self._env: self._env.update(kw)
-    #    elif len(kw): self._env = kw
-    
-    #@timeout
+    @export2Dollar
     def timeout(self,v):
         self._timeout = float(v)
     
-    """
-    #@chdir
-    def chdir(self,path):
-        if path[0] == '/':
-            newpath = os.path.abspath(path)
-        else:
-            newpath = os.path.abspath(os.path.join(self.pwd,path))
-        # ensure this directory is existed. (但這不表示使用者有權限chdir過去，有可能造成問題，是否要提供此功能，有待商榷)
-        c = SSHScriptDollar(self.id,f'[ -d {newpath} ] && echo 1')(deepCall=False)#self._client.exec_command(f'[ -d {newpath} ] && echo 1'))
 
-        if c.stdout == '1':
-            self.pwd = newpath
-        else:
-            raise SSHScriptError(f'{newpath} not existed or not directory')
-    """
     @property
     def sftp(self):
         if self._sftp is None:
             self._sftp = self.client.open_sftp()
         return self._sftp
 
-    #@upload
+    @export2Dollar
     def upload(self,src,dst,makedirs=False,overwrite=True):
         """
         if dst is in an non-existing directory, FileNotFoundError will be raised.
@@ -393,7 +395,7 @@ class SSHScript(object):
                 pass
         self.sftp.put(src,dst)
 
-    #@download
+    @export2Dollar
     def download(self,src,dst):
 
         if self.subSession:
@@ -460,7 +462,8 @@ class SSHScript(object):
                 m = pCurlyBrackets.search(nextLine)
                 if m:  break
                 # expand $.stdout, $.(var) etc
-                cmd = pstd.sub('\\1_c\\2',nextLine.lstrip())
+                #cmd = pstd.sub('\\1_c\\2',nextLine.lstrip())
+                cmd = pstd.sub(pstdSub,nextLine.lstrip())
                 rowsInCurlyBrackets.append(cmd)
             return self.parseScript('\n'.join(rowsInCurlyBrackets),_locals=_locals,quotes=quotes)
 
@@ -476,9 +479,9 @@ class SSHScript(object):
             else:            
                 # i = index of the 1st no-space char of this line
                 i = 0
-                for j,c in enumerate(line):
+                for idx,c in enumerate(line):
                     if c != ' ' and c != '\t':
-                        i = j
+                        i = idx
                         break
 
                 # initial assignment to leadingIndent
@@ -502,9 +505,6 @@ class SSHScript(object):
                     rows.append(stripedLine)
                     continue
                 
-                # 可能不需要了
-                #if len(stripedLine) < i:
-                #    raise Exception((leadingIndent,i,len(stripedLine),stripedLine,line))
                 
                 # 多行的${}, $${}內的內容（暫存用）
                 shellCommandLines = []
@@ -544,7 +544,8 @@ class SSHScript(object):
                             m = pCurlyBracketsAsString.search(nextLine)
                             if not m:
                                 # expand $.stdout, $.(var) etc
-                                cmd = pstd.sub('\\1_c\\2',nextLine.lstrip())
+                                #cmd = pstd.sub('\\1_c\\2',nextLine.lstrip())
+                                cmd = pstd.sub(pstdSub,nextLine.lstrip())
                                 rowsInCurlyBrackets.append(cmd)
                                 continue
                             asPartOfWith = m.group(1) # the " as ..." part
@@ -558,42 +559,20 @@ class SSHScript(object):
                 # this is a comment line
                 if stripedLine[j] == '#': 
                     rows.append(stripedLine) 
-                
-                    ''' 這個功能取消，沒有意義
-                    # $.stdin = 
-                    elif pStdinEquals.search(stripedLine):
-                        #replace with cachedStdin
-                        m = pStdinEquals.search(stripedLine)
-                        remains = stripedLine[m.end():].lstrip()
-                        # de-triple-quote
-                        if remains.startswith('"""') or remains.startswith():
-                            # multiple lines
-                            tripleQoute = remains[:3]
-                            # find the end of triple-quote
-                            while True:
-                                try:
-                                    nextLine = lines.next()
-                                except StopIteration:
-                                    raise SSHScriptError('Can not find end of triple qoute',405)
-                                remains += nextLine
-                                p = nextLine.find(tripleQoute)
-                                if p >=0:break
-                            
-                            rows.append(f'{indent}SSHScript.inContext.cachedStdin={remains}')
-                        else:
-                            # single line (string or variable)
-                            rows.append(f'{indent}SSHScript.inContext.cachedStdin={remains}')
-                    '''
 
                 # support $shell-command or "with $shell-command"
                 # ＄,$$, ${, $${, $shell-command，但不是$.開頭
                 elif pDollarWithoutDot.search(stripedLine[j:]) or (asPartOfWith and stripedLine[j] == '$'):
-                    #codeStarted = True                       
                     # leading lines of ${} or $${} (multiple lines, and must multiple lines)
                     # in single line is not supported ("with ${} as fd" is not supported)
                     if stripedLine[j+1:].startswith('{') or  stripedLine[j+1:].startswith('${'):
-                        invokeShell = 1 if stripedLine[j+1:].startswith('${') else 0
                         
+                        ## invoke shell: $${
+                        #invokeShell = 1 if stripedLine[j+1:].startswith('${') else 0
+                        
+                        ## 改為只要有兩個 $$ 就是 invoke shell（不必是 $${), 但是不能是分開的 $  $
+                        invokeShell = 1 if stripedLine[j+1:].startswith('$') else 0
+
                         # first line is the content after ${ or $${ , aka omitting ${ or $${ 
                         inlineScript = [stripedLine[j+3:]] if invokeShell else [stripedLine[j+2:]]
                         if len(shellCommandLines):
@@ -621,8 +600,8 @@ class SSHScript(object):
                             indentOfTryBlock = '    '
                             rows.append(f'{indent}try:')
                             # strip triple-quote
-                            tripleQuote = '' if cmd.startswith('#____') else '"""'
-                            rows.append(f'{indent}{indentOfTryBlock}__b = r{tripleQuote}{cmd} {tripleQuote}')
+                            tripleQuote = '' if cmd.lstrip().startswith('#____') else '"""'
+                            rows.append(f'{indent}{indentOfTryBlock}__b = {tripleQuote}{cmd} {tripleQuote}')
                             rows.append(f'{indent}{indentOfTryBlock}__c = SSHScriptDollar(None,__b,locals(),globals(),inWith={1 if asPartOfWith else 0})')
                             rows.append(f'{indent}{indentOfTryBlock}__ret = __c({invokeShell})')
                             rows.append(f'{indent}finally:')
@@ -639,13 +618,14 @@ class SSHScript(object):
                         
                         # expand $.stdout, $.(var) etc in cmd
                         if pvar.search(stripedLine):
-                            cmd = pstd.sub('\\1_c\\2',cmd.lstrip())
+                            #cmd = pstd.sub('\\1_c\\2',cmd.lstrip())
+                            cmd = pstd.sub(pstdSub,cmd.lstrip())
                         
                         rows.append(f'{indent}try:')
                         indentOfTryBlock = '    '
                         # strip triple-quote
-                        tripleQuote = '' if cmd.startswith('#__') else '"""'
-                        rows.append(f'{indent}{indentOfTryBlock}__b = r{tripleQuote}{cmd} {tripleQuote}')
+                        tripleQuote = '' if cmd.lstrip().startswith('#____') else '"""'
+                        rows.append(f'{indent}{indentOfTryBlock}__b = {tripleQuote}{cmd} {tripleQuote}')
                         rows.append(f'{indent}{indentOfTryBlock}__c = SSHScriptDollar(None,__b,locals(),globals(),inWith={1 if asPartOfWith else 0})')
                         rows.append(f'{indent}{indentOfTryBlock}__ret = __c({invokeShell})')
                         rows.append(f'{indent}finally:')
@@ -658,7 +638,8 @@ class SSHScript(object):
                         raise SyntaxError(f'failed to parse "{stripedLine}" from "{[stripedLine[j:]]}"')
                 else:
                     # expand $.stdout, $.(var) etc
-                    rows.append(pstd.sub('\\1_c\\2',stripedLine))
+                    #rows.append(pstd.sub('\\1_c\\2',stripedLine))
+                    rows.append(pstd.sub(pstdSub,stripedLine))
 
         return rows
 
@@ -704,7 +685,7 @@ class SSHScript(object):
                 try:
                     exec(scriptChunk,_globals,_locals)
                 except SyntaxError as e:
-                    dumpScriptItem(scriptChunk)
+                    if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
                 except SystemExit as e:
                     if e.code != 0:
@@ -712,12 +693,12 @@ class SSHScript(object):
                     else:
                         raise
                 except SSHScriptError:
-                    dumpScriptItem(scriptChunk)
+                    if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
                 except SSHScriptExit:
                     break
                 except:
-                    dumpScriptItem(scriptChunk)
+                    if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
             elif isinstance(scriptChunk, self.__class__):
                 scriptChunk.run(None,_locals,_globals,showScript=showScript)

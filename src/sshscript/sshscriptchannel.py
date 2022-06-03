@@ -16,8 +16,10 @@ class GenericChannel(object):
         self._stdout = ''
         self._stderr = ''        
         self.dump2sys = os.environ.get('VERBOSE',sys.stdout.isatty())
-        self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','⚠').encode('utf8')
-        self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','┃').encode('utf8')
+        self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','▏').encode('utf8')
+        self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🐞').encode('utf8')
+        self.stdoutDumpBuf = []
+        self.stderrDumpBuf = []
         self.stdoutBuf = []
         self.stderrBuf = []
         self.lock = threading.Lock()
@@ -40,6 +42,15 @@ class GenericChannel(object):
         del self.stdoutBuf[:]
         del self.stderrBuf[:]
         self.lock.release()    
+
+        if self.dump2sys:
+            if len(self.stdoutDumpBuf):
+                sys.stdout.buffer.write(self.stdoutPrefix + b''.join(self.stdoutDumpBuf) + b'\n')
+                sys.stdout.buffer.flush()
+            if len(self.stderrDumpBuf):
+                sys.stderr.buffer.write(self.stderrPrefix + b''.join(self.stderrDumpBuf) + b'\n')
+                sys.stderr.buffer.flush()
+
         if self._stderr and self.owner.sshscript._paranoid:
             self.close()
             raise SSHScriptError(self.stderr)
@@ -108,7 +119,7 @@ class GenericChannel(object):
             self.recv(secondsToWaitResponse)
         return n
 
-    def addStdoutData(self,x):            
+    def addStdoutData(self,x):       
         self._lastIOTime = time.time()
         if not x: return
         # 不要讓self.lock.acquire()影響self._lastIOTime
@@ -117,8 +128,16 @@ class GenericChannel(object):
         self.allStdoutBuf.append(x)
         self.lock.release()
         if self.dump2sys:
-            sys.stdout.buffer.write(self.stdoutPrefix + x)
-            sys.stdout.buffer.flush()
+            if b'\n' in x:
+                lines = ((b''.join(self.stdoutDumpBuf))+x).split(b'\n')
+                for line in lines[:-1]:
+                    sys.stdout.buffer.write(self.stdoutPrefix + line + b'\n')
+                self.stdoutDumpBuf = [lines[-1]]
+                sys.stdout.buffer.flush()
+            else:
+                #print('add',[x])
+                self.stdoutDumpBuf.append(x)
+
         self._lastIOTime = time.time()
     
     def addStderrData(self,x):
@@ -130,8 +149,14 @@ class GenericChannel(object):
         self.allStderrBuf.append(x)
         self.lock.release()
         if self.dump2sys:
-            sys.stderr.buffer.write(self.stderrPrefix + x)
-            sys.stderr.buffer.flush()
+            if b'\n' in x:
+                lines = ((b''.join(self.stderrDumpBuf))+x).split(b'\n')
+                for line in lines[:-1]:
+                    sys.stderr.buffer.write(self.stderrPrefix + line + b'\n')
+                self.stderrDumpBuf = [lines[-1]]
+                sys.stderr.buffer.flush()
+            else:
+                self.stderrDumpBuf.append(x)
         self._lastIOTime = time.time()
 
 class POpenChannel(GenericChannel):
@@ -157,14 +182,14 @@ class POpenChannel(GenericChannel):
         self._lastIOTime = time.time()
     
     def _reading(self):
-                   
-        readable = {
-            self.masterFd[0]: self.addStdoutData,
-            self.masterFd[1]: self.addStderrData
+
+        buffer = {
+            self.masterFd[0]: self.addStdoutData, #stdout
+            self.masterFd[1]: self.addStderrData  #stderr
         }
-        while readable:           
+        while buffer:           
             try:
-                for fd in select(readable, [], [])[0]:
+                for fd in select(buffer, [], [])[0]:
                     try:
                         data = os.read(fd, 1024) # read available
                         
@@ -175,21 +200,26 @@ class POpenChannel(GenericChannel):
                             pass
                         else:
                             raise #XXX cleanup
-                        del readable[fd] # EIO means EOF on some systems
+                        del buffer[fd] # EIO means EOF on some systems
                     else:
                         #print('<<',data)
                         if not data: # EOF
-                            del readable[fd]
+                            del buffer[fd]
                         else:
                             self._lastIOTime = time.time()
-                            readable[fd](data)
+                            buffer[fd](data)
+                            
             except OSError as e:
                 if e.errno == errno.EBADF:
                     # being closed
                     break
                 else:
                     raise
-        
+        #if len(stdoutBuffer):
+        #    self.addStdoutData(b''.join(stdoutBuffer))
+        #if len(stderrBuffer):
+        #    self.addStdoutData(b''.join(stderrBuffer))
+
     def close(self):
         self.wait(1) # at least 1 seconds has no io
         if self.cp: # not dummy instance
