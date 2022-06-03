@@ -37,20 +37,20 @@ password = 'your-secret'
 opensslVersions = []
 for host in hosts:
     with $.open(f'{user}@{host}',password) as _:
-	$openssl version
+        $openssl version
         opensslVersions.append([host,$.stdout])
 # output
 from tabulate import tabulate
 print(tabulate(opensslVersions, headers=['host','version']))
 ```
 
-**Step 2: run the “check-openssl-version.spy”  in localhost**
+**Step 2: run the “check-openssl-version.spy”  in dev-host**
 
 ```jsx
 $ sshscript check-openssl-version.spy
 ```
 
-**Step 3: What you get in local console would be something like this:**
+**Step 3: What you get in dev-host console would be something like this:**
 
 ```jsx
 host     version
@@ -77,7 +77,7 @@ And the check-openssl-version.spy can be re-written like this:
 
 ```jsx
 # collect
-$.include('common.spy')  # <------- look here**
+$.include('common.spy')  # <------- look here
 opensslVersions = []
 for host in hosts:
     with $.open(f'{username}@{host}',password) as _:
@@ -92,9 +92,9 @@ When your password has changed, and you have about 100 pieces of scripts like th
 
 # Scenario II
 
-What if you feel unsafe that the common.spy is always there since it contains password of all hosts. You hope that the password could be omitted from the dev-host. Suppose you think that your notebook is safe place to keep the password, then you can do it by this way:
+What if you feel unsafe that the common.spy is always there since it contains password of all hosts. You hope that the password could be omitted from the dev-host. Suppose you have another trusted-host where is safe place to keep the password, then you can do it by this way:
 
-Let’s create a file named “secret.spy” in your notebook.
+Let’s create a file named “secret.spy” in the trusted-host.
 
 ```jsx
 #file: secret
@@ -110,7 +110,7 @@ user = 'your-name'
 $.include('secret')
 ```
 
-Let’s create a file named “run-check-openssl-version.spy” in your notebook
+Let’s create a file named “run-check-openssl-version.spy” in the trusted-host.
 
 ```jsx
 # ssh to dev-host
@@ -127,8 +127,8 @@ $rm /home/you/project/secret
 
 ```
 
-Then run the run-check-openssl-version.spy on your notebook
+Then run the run-check-openssl-version.spy on the trusted-host.
 
-```jsx
+```python
 $sshscript run-check-openssl-version.spy
 ```
