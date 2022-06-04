@@ -3,7 +3,7 @@ from paramiko import SSHClient,AutoAddPolicy
 from io import StringIO
 import paramiko
 import os, sys, traceback, time, re, random, glob
-import logging
+import logging, stat
 import hashlib
 import queue, threading
 import subprocess, shlex, socket
@@ -88,12 +88,12 @@ class LineGenerator:
 # replace $.stdout, $.stderr to _c.stdout, _c.stderr
 # replace $.open(), $.subopen() to SSHScript.inContext.
 pQuoted = re.compile('\(.*\)')
-# exported to $.<func>, such as $.open, $.close, $.exit
-SSHScriptExportedFuncs = set()
+# exported to $.<func>, such as $.open, $.close, $.exit, $.sftp,
+SSHScriptExportedNames = set(['sftp','client']) #
 #SSHScriptClsExportedFuncs = set() # "include" only, now.
 def pstdSub(m):
     pre,post = m.groups()
-    if post in SSHScriptExportedFuncs:
+    if post in SSHScriptExportedNames:
         return f'{pre}SSHScript.inContext.{post}'
     elif post in SSHScriptDollar.exportedProperties:
         return f'{pre}_c.{post}'
@@ -105,7 +105,7 @@ def pstdSub(m):
 
 def export2Dollar(func):
     try:
-        SSHScriptExportedFuncs.add(func.__name__)
+        SSHScriptExportedNames.add(func.__name__)
     except AttributeError:
         # classmethod
         #assert isinstance(func,classmethod)
@@ -130,9 +130,24 @@ class SSHScript(object):
         return client
     
     @classmethod
-    def include(cls,prefix,abspath):
+    def include(cls,prefix,abspath,alreadyIncluded=None):
+        if alreadyIncluded is None:
+            alreadyIncluded = {}
+        
         if not os.path.exists(abspath):
             raise SSHScriptError(f'{abspath} not fournd, @include("{abspath}") failed',401)
+        
+        # prevent infinite loop
+        try:
+            alreadyIncluded[abspath] += 1
+            maxInclude = int(os.environ.get('MAX_INCLUDE',100))
+            if alreadyIncluded[abspath] > maxInclude:
+                raise SSHScriptError(f'{abspath} have been included over {maxInclude} times, guessing this is infinite loop',404)
+        except KeyError:
+            alreadyIncluded[abspath] = 1
+        
+
+
         with open(abspath) as fd:
             content = fd.read()
         #find prefix
@@ -156,7 +171,7 @@ class SSHScript(object):
             def pAtIncludeSub(m):
                 prefix, path = m.groups()
                 abspath = os.path.join(os.path.dirname(scriptPath),eval(path))
-                content = SSHScript.include(prefix,abspath)
+                content = SSHScript.include(prefix,abspath,alreadyIncluded)
                 return content
             script = pAtInclude.sub(pAtIncludeSub,script)
 
@@ -331,7 +346,7 @@ class SSHScript(object):
 
     #def getRsaKeyAtPath(self,pathOfRsaPrivate):
     @export2Dollar
-    def getkey(self,pathOfRsaPrivate):
+    def pkey(self,pathOfRsaPrivate):
         #pathOfRsaPrivate = f'/home/{$.username}/.ssh/id_rsa'
         if self.host:
             _,stdout,_ = self._client.exec_command(f'cat "{pathOfRsaPrivate}"')
@@ -340,7 +355,6 @@ class SSHScript(object):
         else:
             with open(pathOfRsaPrivate) as fd:
                 return paramiko.RSAKey.from_private_key(fd)
-    
     
     @export2Dollar
     def timeout(self,v):
@@ -380,12 +394,27 @@ class SSHScript(object):
                     foldersToMake.append(dstDir)
                     return checking(dstDir,foldersToMake)
                 return foldersToMake
+            # 由下層往上層檢查哪些目錄不存在（假設最後一層是檔案名稱）
             foldersToMake = checking(dst,[])
             if len(foldersToMake):
                 foldersToMake.reverse()
                 for folder in foldersToMake:
                     self.sftp.mkdir(folder)
                     logger.debug(f'mkdir {folder}')
+        else:
+            # 如果都存在，則檢查是否最後一層也存在，而且是目錄
+            try:
+                dirDir = os.path.dirname(dst)
+                dstat = self.sftp.stat(dirDir)
+            except FileNotFoundError:
+                # 不是，最後一層視為檔案
+                pass
+            else:
+                # https://stackoverflow.com/questions/18205731/how-to-check-a-remote-path-is-a-file-or-a-directory
+                #if stat.S_ISDIR(dstat.st_mode):
+                #    # 如果是目錄,自動加上檔名
+                #    dst = os.path.join(dst,os.path.basename(src))
+                pass
         
         if not overwrite:
             try:
@@ -405,8 +434,13 @@ class SSHScript(object):
             raise SSHScriptError(f'downloading src "{src}" must be absolute path',505)
         
         if not dst.startswith('/'):
-            raise SSHScriptError(f'downloading dst "{dst}" must be absolute path',506)
+            #raise SSHScriptError(f'downloading dst "{dst}" must be absolute path',506)
+            dst = os.path.abspath(dst)
         
+        # if dst is a folder, append the filename of src to dst
+        if os.path.isdir(dst):
+            dst = os.path.join(dst,os.path.basename(src))
+
         logger.debug(f'downaload from {src} to {dst}')            
         
         self.sftp.get(src,dst)
