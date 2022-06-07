@@ -32,7 +32,7 @@ pDollarWithoutDot = re.compile('^\$[^\.][\{\w]?')
 # but not ${, $${
 pDollarCommand = re.compile('^\$(?!\$?\{)') # will match 
 # replace @open( to self.open( in Py
-pAtFuncS = re.compile('^([\t ]*?)\@(\w+\()',re.M)
+#pAtFuncS = re.compile('^([\t ]*?)\@(\w+\()',re.M)
 # find $.stdin =
 pStdinEquals = re.compile('^[\t ]*?(\$\.stdin[\t ]*=)',re.M)
 # find "with $shell-command"
@@ -120,13 +120,13 @@ class SSHScript(object):
     items = {}
 
     @classmethod
-    def connect(cls,host,port=22,username=None,password=None,**kw):
+    def connectClient(cls,host,username=None,password=None,port=22,**kw):
         client = SSHClient()
         #client.load_system_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
         # 允許連線不在know_hosts檔案中的主機
         client.set_missing_host_key_policy(AutoAddPolicy())
         #3.連線伺服器
-        client.connect(host,port=port,username=username,password=password,**kw)
+        client.connect(host,username=username,password=password,port=port,**kw)
         return client
     
     @classmethod
@@ -239,7 +239,7 @@ class SSHScript(object):
         raise SSHScriptExit(code)
     
     @export2Dollar
-    def open(self,host,username=None,password=None,port=22,**kw):
+    def connect(self,host,username=None,password=None,port=22,**kw):
         # host 可以是 username@hostname 的格式
         if '@' in host:
             username,host = host.split('@')
@@ -250,7 +250,7 @@ class SSHScript(object):
             if host == self.host:
                 raise SSHScriptError(f'Self connection from {host} to {host} is not allowed',502)
             else:
-                return self.subopen(host,username,password,port,**kw)
+                return self.subconnect(host,username,password,port,**kw)
         
         # self.host　是用來判斷有沒有ssh連線的依據（如果沒有則是subprocess)
         self.host = host
@@ -270,16 +270,16 @@ class SSHScript(object):
                 dest_addr = (host,port)
                 local_addr = (self.parentSession.host,self.parentSession.port)
                 self._sock = vmtransport.open_channel("direct-tcpip", dest_addr, local_addr)
-                self._client = SSHScript.connect(host,port,username,password,sock=self._sock,**kw)
+                self._client = SSHScript.connectClient(host,username,password,port,sock=self._sock,**kw)
         else:
             if 'proxyCommand' in kw:
                 logger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port} by {kw["proxyCommand"]}')
                 self._sock = self.getSocketWithProxyCommand(kw['proxyCommand'])
                 del kw['proxyCommand']
-                self._client = SSHScript.connect(host,port,username,password,sock=self._sock,**kw)
+                self._client = SSHScript.connectClient(host,username,password,port,sock=self._sock,**kw)
             else:
                 logger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port}')
-                self._client = SSHScript.connect(host,port,username,password,**kw)
+                self._client = SSHScript.connectClient(host,username,password,port,**kw)
 
         self._previousSshscriptInContext = SSHScript.inContext
         SSHScript.inContext = self
@@ -287,11 +287,15 @@ class SSHScript(object):
         return self
     
     @export2Dollar
-    def subopen(self,host,username=None,password=None,port=22,**kw):
+    def open(self,host,username=None,password=None,port=22,**kw):
+        return self.connect(host,username,password,port,**kw)
+    
+    @export2Dollar
+    def subconnect(self,host,username=None,password=None,port=22,**kw):
         # enter a new channel
         if '@' in host: username,host = host.split('@')
         nestedSession = SSHScript(self)
-        nestedSession.open(host,username,password,port,**kw)
+        nestedSession.connect(host,username,password,port,**kw)
         return nestedSession
     
     @export2Dollar
@@ -356,9 +360,9 @@ class SSHScript(object):
             with open(pathOfRsaPrivate) as fd:
                 return paramiko.RSAKey.from_private_key(fd)
     
-    @export2Dollar
-    def timeout(self,v):
-        self._timeout = float(v)
+    #@export2Dollar
+    #def timeout(self,v):
+    #    self._timeout = float(v)
     
 
     @property
@@ -375,8 +379,13 @@ class SSHScript(object):
         if self.subSession:
             return self.subSession.upload(src,dst)
 
-        if not src.startswith('/'):
-            raise SSHScriptError(f'uploading src "{src}" must be absolute path',503)
+        #if not src.startswith('/'):
+        #    raise SSHScriptError(f'uploading src "{src}" must be absolute path',503)
+        src = os.path.abspath(src)
+        if not os.path.exists(src):
+            raise FileNotFoundError(src)
+        if not os.path.isfile(src):
+            raise SSHScriptError(f'uploading src "{src}" must be a file',503)
         
         if not dst.startswith('/'):
             raise SSHScriptError(f'uploading dst "{dst}" must be absolute path',504)
@@ -385,7 +394,14 @@ class SSHScript(object):
         logger.debug(f'upload {src} to {dst}')
 
         # check exists of dst folders
+        srcbasename = os.path.basename(src)
+        dstbasename = os.path.basename(dst)
         if makedirs:
+            # 在此情形下，假設使用者給的是目錄，而非檔案名稱
+            # 如果需要產生目錄，需要全部給的目錄都產生
+            if not dstbasename == srcbasename:
+                dst = os.path.join(dst,srcbasename)
+
             def checking(dst,foldersToMake):
                 dstDir = os.path.dirname(dst)
                 try:
@@ -402,26 +418,35 @@ class SSHScript(object):
                     self.sftp.mkdir(folder)
                     logger.debug(f'mkdir {folder}')
         else:
-            # 如果都存在，則檢查是否最後一層也存在，而且是目錄
-            try:
-                dirDir = os.path.dirname(dst)
-                dstat = self.sftp.stat(dirDir)
-            except FileNotFoundError:
-                # 不是，最後一層視為檔案
+            # 1. basename 一樣：
+            # 2. basename 不一樣：
+            #    2.1 dst 為目錄： dst+= basename
+            #    2.2 dst 為檔案：
+            if dstbasename == srcbasename:
                 pass
             else:
-                # https://stackoverflow.com/questions/18205731/how-to-check-a-remote-path-is-a-file-or-a-directory
-                #if stat.S_ISDIR(dstat.st_mode):
-                #    # 如果是目錄,自動加上檔名
-                #    dst = os.path.join(dst,os.path.basename(src))
-                pass
+                try:
+                    dststat = self.sftp.stat(dst)
+                except FileNotFoundError:
+                    # 不是，dst 視為檔案
+                    pass
+                else:
+                    # https://stackoverflow.com/questions/18205731/how-to-check-a-remote-path-is-a-file-or-a-directory
+                    if stat.S_ISDIR(dststat.st_mode):
+                        # is folder
+                        dst = os.path.join(dst,srcbasename)
+                        try:
+                            dststat = self.sftp.stat(dst)
+                        except FileNotFoundError:
+                            pass
+                        else:
+                            if not overwrite:
+                                raise FileExistsError(f'{dst} already exists')
+                    else:
+                        # is file
+                        if not overwrite:
+                            raise FileExistsError(f'{dst} already exists')
         
-        if not overwrite:
-            try:
-                self.sftp.stat(dst)
-                raise SSHScriptError(f'{dst} already existed',403)
-            except FileNotFoundError:
-                pass
         self.sftp.put(src,dst)
 
     @export2Dollar
@@ -470,7 +495,7 @@ class SSHScript(object):
         # replace with @open( to "with open("
         script = pAtFuncSWith.sub('\\1with SSHScript.inContext.\\3',script)
         # replace @open( to open (example)
-        script = pAtFuncS.sub('\\1SSHScript.inContext.\\2',script)
+        #script = pAtFuncS.sub('\\1SSHScript.inContext.\\2',script)
         listOfLines = script.split('\n')
         # listOfLines: [string]
         lines = LineGenerator(listOfLines)
@@ -738,11 +763,15 @@ class SSHScript(object):
                 scriptChunk.run(None,_locals,_globals,showScript=showScript)
         return _locals
 
-def runPath(givenPaths,varGlobals=None,varLocals=None,showScript=False,showFilesOrder=False,unisession=True):
-    # @givenPaths:string 
+def runPath(args,varGlobals=None,varLocals=None,unisession=True):
+    #givenPaths,varGlobals=None,varLocals=None,showScript=False,showFilesOrder=False,unisession=True):
+    # @givenPaths:[string] 
     # @showScript:bool
     # @varGlobals:dict
     # @unisession:bool, if true, use the same session(an instance of SSHScript) for all files.
+    givenPaths = args.paths
+    showScript = args.showScript
+    showFilesOrder = args.showFilesOrder
     paths = []
     for path in givenPaths:
         path = os.path.abspath(path)
@@ -755,10 +784,12 @@ def runPath(givenPaths,varGlobals=None,varLocals=None,showScript=False,showFiles
             unsortedFilesInPath = glob.glob(path)
             if len(unsortedFilesInPath) == 0:
                 if not os.path.exists(path):
-                    # Don't raise exception, just ignore this path
-                    # Because in context of sshscript, this may be a argument to the script
-                    #raise RuntimeError(f'{os.path.abspath(path)} not found')
-                    pass
+                    # In context of sshscript, this may be a argument to the script.
+                    # If the script also wants to accept command line arguments,
+                    # it should assign the argument in form of
+                    # --arg=value , not in form of --arg value
+                    # otherwise, this exception would raised
+                    raise RuntimeError(f'{os.path.abspath(path)} not found')
                 elif os.path.isfile(path):
                     unsortedFilesInPath.append(path)
                 else:
@@ -835,11 +866,14 @@ def setupLogger(debug=None):
     logger.addHandler(handler)
 
 
-def main(topic,args):
+def main(args):
+    if args.debug:
+        os.environ['DEBUG'] = '1'
+
     if logger is None:
         setupLogger(args.debug)
-    if topic == '-f':
-        runPath(args.paths,showScript=args.showScript,showFilesOrder=args.showFilesOrder)
+
+    runPath(args)
 
 __main__.SSHScript = SSHScript
 __main__.logger = logger
@@ -850,18 +884,18 @@ def run():
     # REF: https://stackoverflow.com/questions/15753701/how-can-i-pass-a-list-as-a-command-line-argument-with-argparse
     parser = argparse.ArgumentParser(description='SSHScript')
 
-    parser.add_argument('--script', dest='showScript', action='store_const',
-                        const='1', default='',
+    parser.add_argument('--script', dest='showScript', action='store_true',
+                        default=False,
                         help='show the converted python script only, no execution.')
     
-    parser.add_argument('--file-order', dest='showFilesOrder', action='store_const',
-                        const='1', default='',
+    parser.add_argument('--file-order', dest='showFilesOrder', action='store_true',
+                        default=False,
                         help='show the files to run in order, no execution.')
 
 
     # set log level to debug
-    parser.add_argument('--debug', dest='debug', action='store_const',
-                        const='1', default='',
+    parser.add_argument('--debug', dest='debug', action='store_true',
+                        default=False,
                         help='set log level to debug')
 
     # multiple values (requires no flag)
@@ -872,7 +906,7 @@ def run():
     #args = parser.parse_args()
     args, unknown = parser.parse_known_args()
     if len(args.paths):
-        main('-f',args)
+        main(args)
     else:
         parser.print_help()
 
