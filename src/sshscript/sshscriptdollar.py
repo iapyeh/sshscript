@@ -83,22 +83,11 @@ class SSHScriptDollar(object):
         cmds = [x for x in cmds if (x and not x.startswith('#'))]
         hasMultipleLines = len(cmds) > 1
 
-        # prepare pre-assigned stdin
-        """
-        if self.cachedStdin:
-            if hasattr(self.cachedStdin,'read'):
-                input = self.cachedStdin.read()
-            else:
-                input = self.cachedStdin
-        else:
-            input = b''
-        """
-
         # 只要有with,一定是invokeShell(with ${} same as with $${})
         if self.inWith: invokeShell = True
 
         # implement stdin, and timeout (default to 60)
-        timeout = self.sshscript._timeout or 60    
+        timeout = float(os.environ.get('CMD_TIMEOUT',60))
         
         if invokeShell:
             self.invokeShell = True
@@ -203,8 +192,8 @@ class SSHScriptDollar(object):
                     stdin=subprocess.PIPE,stderr=subprocess.PIPE,stdout=subprocess.PIPE,
                     shell=invokeShell)
 
-                # implement stdin, and timeout (default to 600)
-                timeout = self.sshscript._timeout or 600
+                #  timeout (default to 60)
+                # timeout = float(os.environ.get('CMD_TIMEOUT',60))
 
                 # outs,errs are bytes
                 try:
@@ -245,7 +234,7 @@ class SSHScriptDollar(object):
         if self.inWith: invokeShell = True
 
         # implement stdin, and timeout (default to 60)
-        timeout = self.sshscript._timeout or 60            
+        timeout = float(os.environ.get('CMD_TIMEOUT',60))             
 
         client = self.sshscript.client if deepCall else self.sshscript._client
         if invokeShell:
@@ -272,7 +261,7 @@ class SSHScriptDollar(object):
                 # The paramiko documentation says:
                 # "using exec_command or invoke_shell without a pty will ever have data on the stderr stream."
                 # So, we always need not a pty.
-                stdin, stdout,stderr = client.exec_command(command,get_pty=0,timeout=self.sshscript._timeout)
+                stdin, stdout,stderr = client.exec_command(command,get_pty=0,timeout=timeout)
                 self.stdin = stdin
                 self.channel.addStdoutData(stdout.read())
                 self.channel.addStderrData(stderr.read())

@@ -1,5 +1,5 @@
 import time,subprocess
-import threading, os, sys
+import threading, os, sys, re
 from select import select
 import errno
 import asyncio
@@ -69,7 +69,7 @@ class GenericChannel(object):
         sys.stdout.flush()
         sys.stderr.flush()
 
-    def expect(self,s,timeout=60,stdout=True,stderr=True):
+    def expect(self,pat,timeout=60,stdout=True,stderr=True):
         # this is a blocking function
         # 只會搜尋目前還buffred的資料，如果要搜尋新收到的資料，
         # 須在執行命令(seld.sendline())前先呼叫 self.recv()
@@ -79,15 +79,21 @@ class GenericChannel(object):
             targets.append(0)
         if stderr:
             targets.append(1)
+        if isinstance(pat,bytes):
+            pat = re.compile(pat.decode('utf8'),re.I)
+        elif isinstance(pat,str):
+            pat = re.compile(pat,re.I)
+        elif isinstance(pat,re.Pattern):
+            pass
+        else:
+            raise ValueError('expect() only accept str or re.Pattern')
         async def _wait():
-            startIdx = 0
             startTime = time.time()
-            b = s.encode('utf8')
             while True:
                 if time.time() - startTime > timeout:
-                    raise TimeoutError(f'Not found: {s} ' + '\n')
+                    raise TimeoutError(f'Not found: {pat} ' + '\n')
                 for i in targets:
-                    if data[i]().find(s) >= 0:
+                    if pat.search(data[i]()):
                         await self.waitio(1)
                         return
                 await asyncio.sleep(0.1)
@@ -115,7 +121,7 @@ class GenericChannel(object):
         # 確保跟前面的一個指令有點「距離」，不要在還在接收資料時送出下一個指令
         self.wait()
         n = self.send(s)
-        if secondsToWaitResponse is not None:
+        if secondsToWaitResponse > 0:
             self.recv(secondsToWaitResponse)
         return n
 
