@@ -893,7 +893,7 @@ def setupLogger():
     
     if os.environ.get('SILENT'):
         pass
-    elif sys.stdout.isatty():
+    elif sys.stdout.isatty() or os.environ.get('VERBOSE'):
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter('%(asctime)s:: %(message)s',"%m-%d %H:%M:%S")) # or whatever
         sshscriptLogger.addHandler(handler)
@@ -906,7 +906,9 @@ def main(args):
 
     if args.silent:
         os.environ['SILENT'] = '1'
-
+    elif args.verbose:
+        os.environ['VERBOSE'] = '1'
+    
     runFile(args.paths,
         varGlobals=None,
         varLocals=None,
@@ -932,6 +934,10 @@ def run():
     parser.add_argument('--silent', dest='silent', action='store_true',
                         default=False,
                         help='when executing on tty, do not dump to console.')
+
+    parser.add_argument('--verbose', dest='verbose', action='store_true',
+                        default=False,
+                        help='dump stdout,stderr to console. "debug" implies "verbose". "silent" implies not "verbose".')   
 
     parser.add_argument('--ext', dest='sshscriptExt', action='store',
                         default='.spy',
