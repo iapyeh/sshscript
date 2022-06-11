@@ -23,7 +23,7 @@ class GenericChannel(object):
         self._lastIOTime = time.time()
 
         # dump-related
-        if os.environ.get('DEBUG'):
+        if os.environ.get('VERBOSE') or os.environ.get('DEBUG'):
             self.dump2sys = True
             self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','▏').encode('utf8')
             self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🐞').encode('utf8')
@@ -125,7 +125,7 @@ class GenericChannel(object):
         self.close()
     
     def sendline(self,s,secondsToWaitResponse=1):
-        __main__.logger.debug(f'sendline: {s}')
+        __main__.SSHScript.logger.debug(f'sendline: {s}')
         if not s[-1] == '\n': s += '\n'
         # 確保跟前面的一個指令有點「距離」，不要在還在接收資料時送出下一個指令
         self.wait()
