@@ -5,8 +5,6 @@ import paramiko
 import os, sys, traceback, time, re, random, glob
 import logging, stat
 import hashlib
-import queue, threading
-import subprocess, shlex, socket
 import __main__
 try:
     from sshscriptdollar import SSHScriptDollar
@@ -14,10 +12,7 @@ try:
 except ImportError:
     from .sshscriptdollar import SSHScriptDollar
     from .sshscripterror import SSHScriptError, SSHScriptExit
-"""
-# replace @{var} in py scripts
-pvarS = re.compile('(\b?)\@\{(.+?)\}',re.S)
-"""
+
 # replace @{var} in $shell-command
 pvar = re.compile('(\b?)\@\{(.+)\}')
 # replace $.stdout, $.stderr to _c.stdout, _c.stderr, $.host in $LINE
@@ -50,6 +45,7 @@ pCurlyBrackets = re.compile('^[ \t]*?\}')
 pqoute1 =re.compile('("{3})(.+?)"{3}',re.S)
 pqoute2 =re.compile("('{3})(.+?)'{3}",re.S)
 
+"""
 class DummyLogger:
     def __init__(self,level=2) -> None:
         # 1:debug, 2:info, 3:warning, 4:error
@@ -62,8 +58,11 @@ class DummyLogger:
         if self.level <= 3 : print(f'[WARNING]{msg}')        
     def error(self,msg):
         if self.level <= 4 : print(f'[ERROR]{msg}')        
-
 logger = DummyLogger()
+"""
+
+global sshscriptLogger
+sshscriptLogger = None
 
 class LineGenerator:
     def __init__(self,lines):
@@ -114,6 +113,7 @@ def export2Dollar(func):
     return func
 
 class SSHScript(object):
+    logger = sshscriptLogger
     # this SSHScript() which in context of @method in py
     inContext = None
     # a lookup table of instances of SSHScript by id
@@ -264,7 +264,7 @@ class SSHScript(object):
             if 'proxyCommand' in kw:
                 raise NotImplementedError('proxyCommand not support in nested session')
             else:
-                logger.debug(f'{self.id} nested openning {self.username}@{self.host}:{self.port}')
+                sshscriptLogger.debug(f'{self.id} nested openning {self.username}@{self.host}:{self.port}')
                 # REF: https://stackoverflow.com/questions/35304525/nested-ssh-using-python-paramiko
                 vmtransport = self.parentSession._client.get_transport()
                 dest_addr = (host,port)
@@ -273,12 +273,12 @@ class SSHScript(object):
                 self._client = SSHScript.connectClient(host,username,password,port,sock=self._sock,**kw)
         else:
             if 'proxyCommand' in kw:
-                logger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port} by {kw["proxyCommand"]}')
+                sshscriptLogger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port} by {kw["proxyCommand"]}')
                 self._sock = self.getSocketWithProxyCommand(kw['proxyCommand'])
                 del kw['proxyCommand']
                 self._client = SSHScript.connectClient(host,username,password,port,sock=self._sock,**kw)
             else:
-                logger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port}')
+                sshscriptLogger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port}')
                 self._client = SSHScript.connectClient(host,username,password,port,**kw)
 
         self._previousSshscriptInContext = SSHScript.inContext
@@ -321,7 +321,7 @@ class SSHScript(object):
             self._sock = None
         
         if self._client:
-            logger.debug(f'{self.id} closing {self.username}@{self.host}:{self.port}')
+            #sshscriptLogger.debug(f'{self.id} closing {self.username}@{self.host}:{self.port}')
             self._client.close()
             self._client = None
         
@@ -342,11 +342,15 @@ class SSHScript(object):
         self.username = None
 
         SSHScript.inContext = self._previousSshscriptInContext
-        logger.debug(f'restore  SSHScript.inContext to {SSHScript.inContext}')        
 
     def __del__(self):
         self.close(True)
-        del SSHScript.items[self.id]
+        try:
+            del SSHScript.items[self.id]
+        except KeyError:
+            # when calls $.exit in runScript() would cause this error
+            pass
+        
 
     #def getRsaKeyAtPath(self,pathOfRsaPrivate):
     @export2Dollar
@@ -391,7 +395,7 @@ class SSHScript(object):
             raise SSHScriptError(f'uploading dst "{dst}" must be absolute path',504)
         
         
-        logger.debug(f'upload {src} to {dst}')
+        sshscriptLogger.debug(f'upload {src} to {dst}')
 
         # check exists of dst folders
         srcbasename = os.path.basename(src)
@@ -416,7 +420,7 @@ class SSHScript(object):
                 foldersToMake.reverse()
                 for folder in foldersToMake:
                     self.sftp.mkdir(folder)
-                    logger.debug(f'mkdir {folder}')
+                    sshscriptLogger.debug(f'mkdir {folder}')
         else:
             # 1. basename 一樣：
             # 2. basename 不一樣：
@@ -466,7 +470,7 @@ class SSHScript(object):
         if os.path.isdir(dst):
             dst = os.path.join(dst,os.path.basename(src))
 
-        logger.debug(f'downaload from {src} to {dst}')            
+        sshscriptLogger.debug(f'downaload from {src} to {dst}')            
         
         self.sftp.get(src,dst)
 
@@ -727,7 +731,7 @@ class SSHScript(object):
         def dumpScriptItem(scriptChunk):
             for idx, line in enumerate(scriptChunk.split('\n')):
                 print(f'{str(idx+1).zfill(3)}:{line}')
-            traceback.print_exc()
+            #traceback.print_exc()
 
         for scriptChunk in self.blocksOfScript:
             if isinstance(scriptChunk, str):
@@ -747,15 +751,14 @@ class SSHScript(object):
                     if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
                 except SystemExit as e:
-                    if e.code != 0:
+                    if e.code:
                         traceback.print_exc()
-                    else:
-                        raise
+                    raise
                 except SSHScriptError:
                     if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
                 except SSHScriptExit:
-                    break
+                    raise
                 except:
                     if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
@@ -763,45 +766,52 @@ class SSHScript(object):
                 scriptChunk.run(None,_locals,_globals,showScript=showScript)
         return _locals
 
-def runPath(args,varGlobals=None,varLocals=None,unisession=True):
-    #givenPaths,varGlobals=None,varLocals=None,showScript=False,showFilesOrder=False,unisession=True):
-    # @givenPaths:[string] 
-    # @showScript:bool
-    # @varGlobals:dict
-    # @unisession:bool, if true, use the same session(an instance of SSHScript) for all files.
-    givenPaths = args.paths
-    showScript = args.showScript
-    showFilesOrder = args.showFilesOrder
+def runFile(givenPaths,
+        varGlobals=None,
+        varLocals=None,
+        showScript=False,
+        showRunOrder=False,
+        unisession=True):
+    """
+    @unisession:bool, if true, use the same session(an instance of SSHScript) 
+                for all files.
+    """
+    
+    if isinstance(givenPaths, str): givenPaths = [givenPaths]
+    
+    ext = os.environ.get('SSHSCRIPT_EXT','.spy')
+
     paths = []
     for path in givenPaths:
-        path = os.path.abspath(path)
+        abspath = os.path.abspath(path)
         # if path is a directory, add all *.spy files in it
-        if os.path.isdir(path):
+        if os.path.isdir(abspath):
             # files in folder are sorted by name
-            unsortedFilesInPath = list(filter(lambda x: x[-4:] == '.spy',[os.path.abspath(os.path.join(path,y)) for y in os.listdir(path)]))
+            unsortedFilesInPath = list(filter(lambda x: x[-4:] == ext,[os.path.abspath(os.path.join(path,y)) for y in os.listdir(path)]))
         else:
             # glob.glob returns a list of files, or empty list if no file matches
-            unsortedFilesInPath = glob.glob(path)
+            unsortedFilesInPath = list(filter(lambda x: os.path.splitext(x)[1] == ext ,glob.glob(abspath)))
             if len(unsortedFilesInPath) == 0:
-                if not os.path.exists(path):
+                if not os.path.exists(abspath):
                     # In context of sshscript, this may be a argument to the script.
                     # If the script also wants to accept command line arguments,
                     # it should assign the argument in form of
                     # --arg=value , not in form of --arg value
                     # otherwise, this exception would raised
                     raise RuntimeError(f'{os.path.abspath(path)} not found')
-                elif os.path.isfile(path):
-                    unsortedFilesInPath.append(path)
+                elif os.path.isfile(abspath):
+                    unsortedFilesInPath.append(abspath)
                 else:
-                    raise RuntimeError(f'{os.path.abspath(path)} not supported')
+                    raise RuntimeError(f'{abspath} not supported')
+        
         unsortedFilesInPath.sort()
         for p in unsortedFilesInPath:
             if p in paths:
-                logger.debug('ignore duplicate path: %s' % p)
+                sshscriptLogger.debug('ignore duplicate path: %s' % p)
                 continue
             paths.append(p)
 
-    if showFilesOrder:
+    if showRunOrder:
         for path in paths:
             print(path)
         return
@@ -818,21 +828,33 @@ def runPath(args,varGlobals=None,varLocals=None,unisession=True):
         # 每一個檔案產生一個sshscript物件
         if not unisession:
             session = SSHScript()
-        logger.debug(f'run {file}')
+
+        sshscriptLogger.debug(f'run {file}')
+
         absfile = os.path.abspath(file)
         with open(absfile) as fd:
             script = fd.read()
 
-        _locals['__file__'] = absfile
-        newlocals = session.run(script,_locals.copy(),_globals.copy(),showScript=showScript)
-        if newlocals.get('__export__'):
-            # __export__ = ['*'] will export all
-            if '*' in newlocals['__export__']:
-                _locals.update(newlocals)
+        try:
+            _locals['__file__'] = absfile
+            newglobals = session.run(script,_locals.copy(),_globals.copy(),showScript=showScript)
+        except SSHScriptExit:
+            sshscriptLogger.debug('exit by receiving SSHScriptExit')
+            break
+        
+        exported = newglobals.get('__export__')        
+        if exported:
+            # __export__ = '*' will export all
+            if '*' == exported:
+                #_locals.update(newlocals)
+                _globals.update(newglobals)
             else:
-                for key in newlocals['__export__']:
-                    logger.debug(f'{absfile} export {key}')
-                    _locals[key] = newlocals[key]
+                basename = os.path.basename(file)
+                for key in exported:
+                    sshscriptLogger.debug(f'{basename} export {key}')
+                    #_locals[key] = newlocals[key]
+                    _globals[key] = newglobals[key]
+        
         if not unisession:    
             session.close()
             del session
@@ -840,7 +862,7 @@ def runPath(args,varGlobals=None,varLocals=None,unisession=True):
     if unisession:    
         session.close()
         del session
-
+"""
 def runScript(script,varGlobals=None,varLocals=None,showScript=False):
     session = SSHScript()
     _locals = locals()
@@ -848,35 +870,50 @@ def runScript(script,varGlobals=None,varLocals=None,showScript=False):
     if varGlobals: _globals.update(varGlobals)
     if varLocals: _locals.update(varLocals)
     session.run(script,varGlobals=_globals,varLocals=_locals,showScript=showScript)
+"""
 
-def setupLogger(debug=None):
-    global logger
+def runScript(script,varGlobals=None,varLocals=None):
+    
+    session = SSHScript()
+    session.run(script,varGlobals,varLocals,showScript=False)
+
+def setupLogger():
+    global sshscriptLogger
+
     # silent paramiko
-    logging.getLogger("paramiko").setLevel(logging.WARNING)
+    #logging.getLogger("paramiko").setLevel(logging.WARNING)
 
-    logger = logging.getLogger('SSHScript')
-    if debug:
-        logger.setLevel(logging.DEBUG) 
+    sshscriptLogger = logging.getLogger('sshscript')
+    SSHScript.logger = sshscriptLogger    
+
+    if os.environ.get('DEBUG'):
+        sshscriptLogger.setLevel(logging.DEBUG) 
     else:
-        logger.setLevel(logging.INFO) 
-    handler = logging.StreamHandler(sys.stdout)
-    #handler.setLevel(logging.DEBUG)    
-    #handler = logging.FileHandler('test.log', 'w', 'utf-8') # or whatever
-    #handler.setFormatter(logging.Formatter('%(name)s %(message)s')) # or whatever
-    logger.addHandler(handler)
+        sshscriptLogger.setLevel(logging.INFO) 
+    
+    if os.environ.get('SILENT'):
+        pass
+    elif sys.stdout.isatty():
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter('%(asctime)s:: %(message)s',"%m-%d %H:%M:%S")) # or whatever
+        sshscriptLogger.addHandler(handler)
 
 
 def main(args):
+   
     if args.debug:
         os.environ['DEBUG'] = '1'
 
-    if logger is None:
-        setupLogger(args.debug)
+    if args.silent:
+        os.environ['SILENT'] = '1'
 
-    runPath(args)
+    runFile(args.paths,
+        varGlobals=None,
+        varLocals=None,
+        showScript=args.showScript,
+        showRunOrder=args.showRunOrder,
+        unisession=True)
 
-__main__.SSHScript = SSHScript
-__main__.logger = logger
 
 def run():
     import argparse
@@ -884,31 +921,53 @@ def run():
     # REF: https://stackoverflow.com/questions/15753701/how-can-i-pass-a-list-as-a-command-line-argument-with-argparse
     parser = argparse.ArgumentParser(description='SSHScript')
 
+    parser.add_argument('--run-order', dest='showRunOrder', action='store_true',
+                        default=False,
+                        help='show the files to run in order, no execution.')
+
     parser.add_argument('--script', dest='showScript', action='store_true',
                         default=False,
                         help='show the converted python script only, no execution.')
     
-    parser.add_argument('--file-order', dest='showFilesOrder', action='store_true',
+    parser.add_argument('--silent', dest='silent', action='store_true',
                         default=False,
-                        help='show the files to run in order, no execution.')
+                        help='when executing on tty, do not dump to console.')
 
+    parser.add_argument('--ext', dest='sshscriptExt', action='store',
+                        default='.spy',
+                        help='the extension of sshscript file. default is .spy')
 
-    # set log level to debug
     parser.add_argument('--debug', dest='debug', action='store_true',
                         default=False,
                         help='set log level to debug')
 
-    # multiple values (requires no flag)
-    # path or folder, ex. python3 sshscript unitest
     parser.add_argument(dest='paths', action='store', nargs='*',
-                        help='the script file or folder of .spy files')
+                        help='path of .spy files or folders')
 
-    #args = parser.parse_args()
     args, unknown = parser.parse_known_args()
+    __main__.args = unknown
+
+    os.environ['SSHSCRIPT_EXT'] = args.sshscriptExt
+
     if len(args.paths):
         main(args)
+
     else:
+        try:
+            from __init__ import __version__
+        except ImportError:
+            try:
+                from . import __version__
+            except ImportError:
+                __version__ = 'unknown'
+        print(f'SSHScript Version:{__version__}')
         parser.print_help()
+
+# SSHScriptDollar need this value to work 
+# when sshscript is imported as a module (main() not been called)
+__main__.SSHScript = SSHScript
+
+setupLogger()
 
 if __name__ == '__main__':
     run()

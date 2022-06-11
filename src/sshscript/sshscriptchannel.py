@@ -1,3 +1,4 @@
+import __main__
 import time,subprocess
 import threading, os, sys, re
 from select import select
@@ -15,16 +16,22 @@ class GenericChannel(object):
         self.lock = threading.Lock()
         self._stdout = ''
         self._stderr = ''        
-        self.dump2sys = os.environ.get('VERBOSE',sys.stdout.isatty())
-        self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','▏').encode('utf8')
-        self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🐞').encode('utf8')
-        self.stdoutDumpBuf = []
-        self.stderrDumpBuf = []
         self.stdoutBuf = []
         self.stderrBuf = []
         self.lock = threading.Lock()
         # 不要0，這樣可以讓一開始就先等一等
         self._lastIOTime = time.time()
+
+        # dump-related
+        if os.environ.get('DEBUG'):
+            self.dump2sys = True
+            self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','▏').encode('utf8')
+            self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🐞').encode('utf8')
+            self.stdoutDumpBuf = []
+            self.stderrDumpBuf = []
+        else:
+            #self.dump2sys = os.environ.get('VERBOSE',sys.stdout.isatty())
+            self.dump2sys = False
 
     @property
     def stdout(self):
@@ -112,11 +119,13 @@ class GenericChannel(object):
 
     def __enter__(self):
         return self
+    
     def __exit__(self,*args):
         self.wait(1)
         self.close()
     
     def sendline(self,s,secondsToWaitResponse=1):
+        __main__.logger.debug(f'sendline: {s}')
         if not s[-1] == '\n': s += '\n'
         # 確保跟前面的一個指令有點「距離」，不要在還在接收資料時送出下一個指令
         self.wait()
