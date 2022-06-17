@@ -1,3 +1,17 @@
+# Copyright (C) 2022-2026  Hsin Yuan Yeh <iapyeh@gmail.com>
+#
+# This file is part of Sshscript.
+#
+# Sshscript is free software; you can redistribute it and/or modify it under the
+# terms of the MIT License.
+#
+# Sshscript is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE.  See the MIT License for more details.
+#
+# You should have received a copy of the MIT License along with Sshscript;
+# if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 import __main__
 import time,subprocess
 import threading, os, sys, re
@@ -66,9 +80,6 @@ class GenericChannel(object):
         if waitingInterval is None:
             waitingInterval = float(os.environ.get('CMD_INTERVAL',0.5))
         remain = waitingInterval - (time.time() - self._lastIOTime)
-        #如果有螢幕輸出的化，幫助它順序維持正確的順序
-        #sys.stdout.flush()
-        #sys.stderr.flush()
         while remain > 0:
             await asyncio.sleep(remain)    
             remain = waitingInterval - (time.time() - self._lastIOTime)
@@ -80,7 +91,12 @@ class GenericChannel(object):
         # this is a blocking function
         # 只會搜尋目前還buffred的資料，如果要搜尋新收到的資料，
         # 須在執行命令(seld.sendline())前先呼叫 self.recv()
-        data = [lambda:self._stdout, lambda:self._stderr]
+        def checkStdout():
+            return self._stdout + (b''.join(self.stdoutBuf)).decode('utf8')
+        def checkStderr():
+            return self._stderr + (b''.join(self.stderrBuf)).decode('utf8')            
+        #data = [lambda:self._stdout, lambda:self._stderr]
+        data = [checkStdout, checkStderr]
         targets = []
         if stdout:
             targets.append(0)
@@ -100,6 +116,7 @@ class GenericChannel(object):
                 if time.time() - startTime > timeout:
                     raise TimeoutError(f'Not found: {pat} ' + '\n')
                 for i in targets:
+                    print('searching',data[i]())
                     if pat.search(data[i]()):
                         await self.waitio(1)
                         return
@@ -134,7 +151,7 @@ class GenericChannel(object):
             self.recv(secondsToWaitResponse)
         return n
 
-    def addStdoutData(self,x):       
+    def addStdoutData(self,x):  
         self._lastIOTime = time.time()
         if not x: return
         # 不要讓self.lock.acquire()影響self._lastIOTime
