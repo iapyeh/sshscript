@@ -43,6 +43,7 @@ class SSHScriptDollar(object):
     def __call__(self,invokeShell=False,deepCall=True):
         ssId = self.args[0]
         self.sshscript = __main__.SSHScript.items[ssId] if ssId else __main__.SSHScript.inContext
+        # reset self.sshscript's stdout and stderr
         if self.sshscript.host:
             self.execBySSH(invokeShell,deepCall)
             # necessary for this instance to be put in "with context"

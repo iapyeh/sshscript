@@ -45,21 +45,6 @@ pCurlyBrackets = re.compile('^[ \t]*?\}')
 pqoute1 =re.compile('("{3})(.+?)"{3}',re.S)
 pqoute2 =re.compile("('{3})(.+?)'{3}",re.S)
 
-"""
-class DummyLogger:
-    def __init__(self,level=2) -> None:
-        # 1:debug, 2:info, 3:warning, 4:error
-        self.level = level
-    def debug(self,msg):
-        if self.level == 1 : print(f'[DEBUG]{msg}')
-    def info(self,msg):
-        if self.level <= 2 : print(f'[INFO]{msg}')
-    def warning(self,msg):
-        if self.level <= 3 : print(f'[WARNING]{msg}')        
-    def error(self,msg):
-        if self.level <= 4 : print(f'[ERROR]{msg}')        
-logger = DummyLogger()
-"""
 
 global sshscriptLogger
 sshscriptLogger = None
@@ -363,7 +348,7 @@ class SSHScript(object):
         else:
             with open(pathOfRsaPrivate) as fd:
                 return paramiko.RSAKey.from_private_key(fd)
-    
+     
     #@export2Dollar
     #def timeout(self,v):
     #    self._timeout = float(v)
@@ -452,9 +437,13 @@ class SSHScript(object):
                             raise FileExistsError(f'{dst} already exists')
         
         self.sftp.put(src,dst)
+        
+        return (src,dst)
 
     @export2Dollar
-    def download(self,src,dst):
+    def download(self,src,dst=None):
+        if dst is None:
+            dst = os.getcwd()
 
         if self.subSession:
             return self.subSession.downaload(src,dst)
@@ -473,6 +462,8 @@ class SSHScript(object):
         sshscriptLogger.debug(f'downaload from {src} to {dst}')            
         
         self.sftp.get(src,dst)
+        
+        return (src,dst)
 
     def parseScript(self,script,initLine=None,_locals=None,quotes=None):
         # parse script at top-level session
@@ -951,7 +942,7 @@ def run():
                         help='path of .spy files or folders')
 
     args, unknown = parser.parse_known_args()
-    __main__.args = unknown
+    __main__.unknown_args = unknown
 
     os.environ['SSHSCRIPT_EXT'] = args.sshscriptExt
 
