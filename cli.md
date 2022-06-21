@@ -1,3 +1,5 @@
+<div style="text-align:right"><a href="./index">Index</a></div>
+
 # sshscript CLI
 
 If you install the sshscript package by “pip install”. A CLI “sshcript” is also installed by the setuptools. To check it, please open a terminal and type “sshscript”[ENTER].
