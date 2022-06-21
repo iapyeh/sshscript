@@ -1,3 +1,5 @@
+<div style="text-align:right"><a href="./index">Index</a></div>
+
 # sshscript module
 
 You can import sshscript in regular python script. For example:
