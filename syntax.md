@@ -1,4 +1,4 @@
--[Index](https://iapyeh.github.io/sshscript/index)
+<div style="text-align:right"><a href="./index">Index</a></div>
  
 # Syntax
 
