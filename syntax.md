@@ -1,3 +1,5 @@
+-[Index](https://iapyeh.github.io/sshscript/index)
+ 
 # Syntax
 
 ## $
