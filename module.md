@@ -1,5 +1,4 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
-
 # sshscript module
 
 You can import sshscript in regular python script. For example:
@@ -10,14 +9,14 @@ paths = []
 for filename in os.listdir('my-project'):
     if filename.endswith('.spy'):
         paths.append('my-project/'+filename)
-sshscript.runPath(paths)
+sshscript.runFile(paths)
 ```
 
-## sshscript.runPath()
+## sshscript.runFile()
 
 This function executes .spy files, it has following parameters:
 
-- paths: filepath(str) or list of filepath, this is required. The list item could be file, folder or wildcard. You can find more details in “sshscript CLI”.
+- paths: a file path(str) or a list of file path, this is required. List items could be path of file, folder or wildcard. You can find more details in the “[sshscript CLI](https://www.notion.so/sshscript-CLI-15576bb54f5d45cca7860e26caea0612)”.
 - varGlobals: a dict to update the globals(), the default is None.
 - varLocals: a dict to update the locals(), the default is None.
 - showScript: if True, show converted script. No execution. The default is False.
@@ -57,7 +56,7 @@ sshscript.runScript(script,globals(),locals())
 
 ## Logger
 
-You can get the logger of sshscript by either of the following methods
+You can get the logger of sshscript by 
 
 ```python
 import logging
