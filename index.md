@@ -6,8 +6,6 @@
 - [CLI](https://iapyeh.github.io/sshscript/cli){:target="_blank"}
 - [Module](https://iapyeh.github.io/sshscript/module){:target="_blank"}
 
-
-
 The sshscript let you embed shell commands in python script. It is like writing shell-script in python. For example
 
 ```python
