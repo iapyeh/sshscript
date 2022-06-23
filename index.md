@@ -26,6 +26,8 @@ $.open('username@host',password=password)
 $ifconfig | grep inet
 # third: collect the output
 conten = $.stdout
+# close the connection, not required but good boys always do.
+$.close()
 
 # below is regular python script
 def remove_control_characters(s):
