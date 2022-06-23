@@ -1,3 +1,4 @@
 theme: jekyll-theme-cayman
 title: [sshscript]
 description: [Shell Script in Python]
+highlighter: none
