@@ -4,57 +4,44 @@
 
 # Scenario I
 
-Suppose that there is a security issue about some version of the openssl. You got to check the version number of the openssl on your all hosts. What you have to do is ssh into each of them and execute command, like this:
-
-**Step 1: in dev-host**
+Suppose that there is a security issue about some version of the openssl package. You got to check the version of openssl on all servers. You must ssh into servers from your maintaining host one by one, like this:
 
 ```jsx
-$ssh user@host
-```
+# **Step 1: from your maintaining host ssh to host1**
+$ssh user@host1
 
-**Step 2:  in ssh console**
-
-```jsx
+# **Step 2:  on host1, execute command to get openssl's version 
+# and collect its output**
 $openssl version
-
-```
-
-**Step 3: collect the output** 
-
-```jsx
 OpenSSL 1.1.1f  31 Mar 2020
+
+**# Step 3: repeat above steps for host2, host3, ...**
 ```
 
-If you have 5 hosts, you have to repeat step1, step2, step3 for 5 times.
+The **SSHScript** let you do the jobs in this way:
 
-The **SSHScript** let you do that jobs in this way:
-
-**Step 1: in dev-host, create "check-openssl-version.spy" with content:**
+**Step 1: create a file named "check-openssl-version.spy" on the maintaining host**
 
 ```jsx
-# collect
+# content of file: check-openssl-version.spy
+
 hosts = ['host1','host2','host3','host4','host5']
 user = 'your-name'
 password = 'your-secret'
 opensslVersions = []
 for host in hosts:
     with $.open(f'{user}@{host}',password) as _:
-        $openssl version  # ⬅ the command to run  
+        $openssl version  # ⬅ the shell command to run  
         opensslVersions.append([host,$.stdout])
 # output
 from tabulate import tabulate
 print(tabulate(opensslVersions, headers=['host','version']))
 ```
 
-**Step 2: run the “check-openssl-version.spy”  in dev-host**
+**Step 2: run the “check-openssl-version.spy”** 
 
 ```jsx
 $ sshscript check-openssl-version.spy
-```
-
-**Step 3: What you get in dev-host console would be something like this:**
-
-```jsx
 host     version
 -------  --------------------------------
 host1    OpenSSL 1.0.2k-fips  26 Jan 2017
@@ -75,9 +62,11 @@ user = 'your-name'
 password = 'your-secret'
 ```
 
-And the check-openssl-version.spy can be re-written like this:
+Then, re-write the check-openssl-version.spy 
 
 ```jsx
+# content of file: check-openssl-version.spy
+
 # collect
 $.include('common.spy')  # ⬅ look here
 opensslVersions = []
@@ -95,6 +84,8 @@ When your password has changed, and you have about 100 pieces of scripts like th
 Further more, python code can be put into $command. Which mean with little modification, check-openssl-version.spy can check version of many others. Let’s do it like this:
 
 ```python
+# content of file: check-openssl-version.spy
+
 # collect
 $.include('common.spy')  
 opensslVersions = []
@@ -104,53 +95,74 @@ for host in hosts:
         # ⬇ look below, appName would be replaced by "openssl"
         $@{appName} version    
         opensslVersions.append([host,$.stdout])
+            
 # output
 from tabulate import tabulate
 print(tabulate(opensslVersions, headers=['host','version']))
 ```
 
+Of course, you can run any other commands, like this:
+
+```python
+# collect
+$.include('common.spy')  
+for host in hosts:
+    # connect to this host
+    with $.open(f'{username}@{host}',password) as _:
+        # execute the shell command "df"
+        $df
+        # parse the result in python
+        for line in $.stdout.split('\n'):
+            cols = line.split()
+            partition = cols[0]
+            capacity = cols[4][:-1] # drop "%"
+            if int(capacity) > 80:
+                print(f'Caution:{partition} need help')
+
+```
+
 # Scenario II
 
-What if you feel unsafe that the common.spy is always there since it contains password of all hosts. You hope that the password could be omitted from the dev-host. Suppose you have another trusted-host where is safe place to keep the password, then you can do it by this way:
+Suppose that your maintaining host is in cloud. Now you think that the common.spy should not be there since it contains password of all servers. You hope that those passwords could keep in your office. And you already have a safe host in your office. Then you can do it by this way:
 
-Let’s create a file named “secret.spy” in the trusted-host.
+Let’s create a file named “secret.spy” on the safe host, and put passwords there
 
 ```jsx
-#file: secret.spy
+#file: secret.spy on the safe host (in office)
 password = ‘your-secret’
 ```
 
-And modify the common.spy in dev-host to be like this:
+Then, modify the common.spy on the maintaining host to be like this:
 
 ```jsx
-#file: common.spy
+#file: common.spy on the maintaining host in cloud
 hosts = ['host1','host2','host3','host4','host5']
 user = 'your-name'
 $.include('secret.spy')
 ```
 
-Let’s create a file named “run-from-trusted-host.spy” in the trusted-host.
+Let’s create a file named “run-from-trusted-host.spy” on the safe host.
 
 ```jsx
-# file: run-from-trusted-host.spy
+# file: run-from-safe-host.spy on the safe host (in office)
 
-# ssh to dev-host.
-$.open('you@dev-host','password')
+# ssh to maintaining host.
+$.open('you@maintaining-host','password')
 
-# suppose secret.spy is in /home/my/ on the trusted-host.
-# suppose common.spy is in /home/you/project/ on dev-host.
+# suppose secret.spy is in /home/my/ on the safe-host.
+# suppose common.spy is in /home/you/project/ on the maintaining-host.
 $.upload('/home/my/secret.spy','/home/you/project/secret')
 
-# run the check-openssl-version.spy on dev-host
+# run the check-openssl-version.spy on the maintaining-host
 $sshscript check-openssl-version.spy
 
-# remove the secret from dev-host
+# remove the secret from the maintaining-host
 $rm /home/you/project/secret
 
 ```
 
-Then run the run-from-trusted-host.spy on the trusted-host.
+Then run the run-from-safe-host.spy on the safe host.
 
 ```python
-$sshscript run-from-trusted-host.spy
+$sshscript run-from-safe-host.spy
 ```
