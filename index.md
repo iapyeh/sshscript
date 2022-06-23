@@ -43,7 +43,7 @@ for line in content.split('\n'):
         cols = line.split()
         if cols[0] == 'inet':
             ip = cols[1].split(':')[-1]
-            myIp.append(ip)
+            myIp.add(ip)
 
 print(myIp)
 ```
