@@ -1,4 +1,10 @@
 # SSHScript Documents
+
+- [Tutorial](https://iapyeh.github.io/sshscript/tutorial)
+- [Syntax](https://iapyeh.github.io/sshscript/syntax)
+- [sshscript CLI](https://iapyeh.github.io/sshscript/cli)
+- [sshscript Module](https://iapyeh.github.io/sshscript/module) 
+
 ## Introduction
 
 The sshscript let you embed shell commands in python script. It is like writing shell-script in python. Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
