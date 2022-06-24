@@ -21,7 +21,7 @@ with $.connect('username1@host1') as _:
 Put the three lines into a file, say “hello.spy”, then execute it on your console by
 
 ```bash
-**sshscript hello.spy**
+sshscript hello.spy
 ```
 
 If you did not “ssh-copy-id” to the host1 and host2, then just give the password like this
