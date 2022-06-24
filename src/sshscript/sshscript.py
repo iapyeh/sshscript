@@ -13,7 +13,6 @@
 # You should have received a copy of the MIT License along with Sshscript;
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
-
 from io import StringIO
 import paramiko
 import os, sys, traceback, time, re, random, glob
@@ -120,10 +119,10 @@ class SSHScript(object):
 
     @classmethod
     def connectClient(cls,host,username=None,password=None,port=22,**kw):
-        client = SSHClient()
+        client = paramiko.SSHClient()
         #client.load_system_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
         # 允許連線不在know_hosts檔案中的主機
-        client.set_missing_host_key_policy(AutoAddPolicy())
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         #3.連線伺服器
         client.connect(host,username=username,password=password,port=port,**kw)
         return client
@@ -896,9 +895,7 @@ def setupLogger():
     else:
         sshscriptLogger.setLevel(logging.INFO) 
     
-    if os.environ.get('SILENT'):
-        pass
-    elif sys.stdout.isatty() or os.environ.get('VERBOSE'):
+    if os.environ.get('VERBOSE'):
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter('%(asctime)s:: %(message)s',"%m-%d %H:%M:%S")) # or whatever
         sshscriptLogger.addHandler(handler)
@@ -908,10 +905,14 @@ def main(args):
    
     if args.debug:
         os.environ['DEBUG'] = '1'
-
-    if args.silent:
+        os.environ['VERBOSE'] = '1'
+    # debug suppress silent
+    elif args.silent:
         os.environ['SILENT'] = '1'
+    # silent suppress verbose
     elif args.verbose:
+        os.environ['VERBOSE'] = '1'
+    elif sys.stdout.isatty():
         os.environ['VERBOSE'] = '1'
     
     runFile(args.paths,
