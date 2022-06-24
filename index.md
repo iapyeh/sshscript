@@ -9,27 +9,59 @@
 
 ## Introduction
 
-The sshscript let you embed shell commands in python script. It is like writing shell-script in python. For example
+The sshscript let you embed shell commands in python script. It is like writing shell-script in python. Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
+
+```python
+$.connect('username1@host1')
+$.connect('username2@host2')
+$netstat -antu
+
+```
+
+Or, be explicitly
+
+```python
+with $.connect('username1@host1') as _:
+    with $.connect('username2@host2') as _:
+        $netstat -antu
+```
+
+If you did not “ssh-copy-id” to the host1 and host2, then just do it like this:
+
+```python
+$.connect('username1@host1', password='secret')
+```
+
+Doing nested-scp is simple too. Below script would download the /var/log/message from the host2 and upload config.ini on [localhost](http://localhost) to  /tmp on the host2.
+
+```python
+with $.connect('username1@host1') as _:
+    with $.connect('username2@host2') as _:
+        $.download('/var/log/message')
+        $.upload('config.ini','/tmp')
+```
+
+Your script is full-powered by the Python.
 
 ```python
 # This script would ssh to a remote server.
 # Then print out all its IP addresses.
 
-# below is regular python script
+# Below is regular python script
 from getpass import getpass
 password = getpass()
 
-# below is sshscript-style syntax
-# first: ssh to username@host with password
-$.open('username@host',password=password)
-# second: execute command "ifconfig | grep inet"
+# Below is sshscript-style syntax
+# First: ssh to username@host with password
+$.connect('username@host',password=password)
+# Second: execute command "ifconfig | grep inet"
 $ifconfig | grep inet
-# third: collect the output
+# Third: collect the output
 conten = $.stdout
-# close the connection, not required but good boys always do.
+# Close the connection, not required but good boys always do.
 $.close()
 
-# below is regular python script
+# Below is regular python script
 def remove_control_characters(s):
     global unicodedata,re
     s = re.sub(r'[\x00-\x1f\x7f-\x9f]', '',s)
