@@ -47,26 +47,37 @@ Your script is full-powered by the Python.
 # This script would ssh to a remote server.
 # Then print out all its IP addresses.
 
+#
 # Below is regular python script
+#
+import unicodedata,re
 from getpass import getpass
 password = getpass()
 
+#
 # Below is sshscript-style syntax
+#
 # First: ssh to username@host with password
 $.connect('username@host',password=password)
+
 # Second: execute command "ifconfig | grep inet"
 $ifconfig | grep inet
+
 # Third: collect the output
 conten = $.stdout
-# Close the connection, not required but good boys always do.
+
+# Close the connection, not required but my bose always hopes me to do.
 $.close()
 
+#
 # Below is regular python script
+#
 def remove_control_characters(s):
     global unicodedata,re
     s = re.sub(r'[\x00-\x1f\x7f-\x9f]', '',s)
     s = re.sub(r'\[.*?[a-zA-Z]', '',s)
     return s
+
 myIp = set()
 for line in content.split('\n'):
     line = line.strip()
