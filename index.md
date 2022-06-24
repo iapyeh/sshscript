@@ -1,21 +1,13 @@
-# SSHScript
-
-## index
-
-- [Tutorial](https://iapyeh.github.io/sshscript/tutorial){:target="_blank"}
-- [Syntax](https://iapyeh.github.io/sshscript/syntax){:target="_blank"}
-- [CLI](https://iapyeh.github.io/sshscript/cli){:target="_blank"}
-- [Module](https://iapyeh.github.io/sshscript/module){:target="_blank"}
+# SSHScript Documents
 
 ## Introduction
 
-The sshscript let you embed shell commands in python script. It is like writing shell-script in python. Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
+The SSHScript let you embed shell commands in python script. It is like writing shell-script in python. Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
 
 ```python
 $.connect('username1@host1')
 $.connect('username2@host2')
 $netstat -antu
-
 ```
 
 Or, be explicitly
@@ -26,7 +18,13 @@ with $.connect('username1@host1') as _:
         $netstat -antu
 ```
 
-If you did not “ssh-copy-id” to the host1 and host2, then just do it like this:
+Put the three lines into a file, say “hello.spy”, then execute it on your console by
+
+```bash
+**sshscript hello.spy**
+```
+
+If you did not “ssh-copy-id” to the host1 and host2, then just give the password like this
 
 ```python
 $.connect('username1@host1', password='secret')
@@ -59,14 +57,11 @@ password = getpass()
 #
 # First: ssh to username@host with password
 $.connect('username@host',password=password)
-
 # Second: execute command "ifconfig | grep inet"
 $ifconfig | grep inet
-
 # Third: collect the output
 conten = $.stdout
-
-# Close the connection, not required but my bose always hopes me to do.
+# Close the connection, not required but my boss always hopes me to do.
 $.close()
 
 #
@@ -102,5 +97,5 @@ pip install sshscript
 ## Disclaimer
 
 - Developing and testing on MacOS, Linux only.
-- This project is still on beta phase. I will do my best to keep its interface stable, but subject to change without notice.
+- This project is still on beta phase. I’d like to keep stable, but subject to change without notice.
 - Please use it at your own risk.
