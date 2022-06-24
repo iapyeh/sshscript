@@ -19,7 +19,7 @@ The sshscript is an integration of subprocess and \ |LINK1|\ . It provides an un
 .. code:: 
 
     # execute a command on remote host and parse the output 
-    $.open('user@host')
+    $.connect('user@host')
     $ls -l
     for line in $.stdout.split('\n'):
        if line.startswith('d'): continue
@@ -37,20 +37,8 @@ Installation
 
 .. _h36711971261f3518968783337294a20:
 
-Tutorial
-========
 
-.. _h2c1d74277104e41780968148427e:
-
-
-
-Please see \ |LINK3|\  .
-
-
-
-.. _h6e172a227d553419513e7a1117648072:
-
-Syntax
+Documents
 ======
 
 Please see \ |LINK2|\  .
@@ -68,12 +56,8 @@ Disclaimer
 
 .. |LINK1| raw:: html
 
-    <a href="https://www.paramiko.org/" target="_blank">paramiko</a>
+    <a href="https://www.paramiko.org/" target="_blank">Paramiko</a>
 
 .. |LINK2| raw:: html
     
-    <a href="https://iapyeh.github.io/sshscript/syntax"  target="_blank">SSHScript Syntax</a>
-
-.. |LINK3| raw:: html
-    
-    <a href="https://iapyeh.github.io/sshscript/tutorial"  target="_blank">Tutorial</a>
+    <a href="https://iapyeh.github.io/sshscript/index"  target="_blank">Documents</a>
