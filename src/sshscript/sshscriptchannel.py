@@ -37,14 +37,13 @@ class GenericChannel(object):
         self._lastIOTime = time.time()
 
         # dump-related
-        if os.environ.get('VERBOSE') or os.environ.get('DEBUG'):
+        if os.environ.get('VERBOSE'):
             self.dump2sys = True
             self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','▏').encode('utf8')
             self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🐞').encode('utf8')
             self.stdoutDumpBuf = []
             self.stderrDumpBuf = []
         else:
-            #self.dump2sys = os.environ.get('VERBOSE',sys.stdout.isatty())
             self.dump2sys = False
 
     @property
