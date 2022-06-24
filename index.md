@@ -98,3 +98,9 @@ The sshscript is based on subprocess and [Paramiko](https://www.paramiko.org/). 
 ```python
 pip install sshscript
 ```
+
+## Disclaimer
+
+- Developing and testing on MacOS, Linux only.
+- This project is still on beta phase. I'd like to keep stable, but subject to change without notice.
+- Please use it at your own risk.
