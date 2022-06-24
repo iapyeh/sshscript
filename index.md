@@ -1,8 +1,7 @@
 # SSHScript Documents
-
 ## Introduction
 
-The SSHScript let you embed shell commands in python script. It is like writing shell-script in python. Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
+The sshscript let you embed shell commands in python script. It is like writing shell-script in python. Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
 
 ```python
 $.connect('username1@host1')
@@ -10,7 +9,7 @@ $.connect('username2@host2')
 $netstat -antu
 ```
 
-Or, be explicitly
+Or, to be explicit,
 
 ```python
 with $.connect('username1@host1') as _:
@@ -30,7 +29,7 @@ If you did not “ssh-copy-id” to the host1 and host2, then just give the pass
 $.connect('username1@host1', password='secret')
 ```
 
-Doing nested-scp is simple too. The script below downloads the /var/log/message from the host2 and uploads config.ini on the [localhost](http://localhost) to  /tmp on the host2.
+Doing nested-scp is simple too. The script below downloads the /var/log/message from the host2 and uploads config.ini on the localhost to  /tmp on the host2.
 
 ```python
 with $.connect('username1@host1') as _:
@@ -39,7 +38,7 @@ with $.connect('username1@host1') as _:
         $.upload('config.ini','/tmp')
 ```
 
-Your script is full-powered by the Python.
+Your script is full-powered by Python.
 
 ```python
 # This script would ssh to a remote server.
@@ -53,7 +52,7 @@ from getpass import getpass
 password = getpass()
 
 #
-# Below is sshscript-style syntax
+# Below is python script with content of sshscript syntax
 #
 # First: ssh to username@host with password
 $.connect('username@host',password=password)
@@ -86,7 +85,7 @@ for line in content.split('\n'):
 print(myIp)
 ```
 
-The sshscript is based on subprocess and [Paramiko](https://www.paramiko.org/). You can embed commands to run and get its output on localhost. As well as, you can embed commands to run and get its output on remote host.
+The SSHScript is based on subprocess and [Paramiko](https://www.paramiko.org/). You can embed commands to run and get its output on localhost. As well as, you can embed commands to run and get its output on a remote host.
 
 ## Installation
 
@@ -97,5 +96,5 @@ pip install sshscript
 ## Disclaimer
 
 - Developing and testing on MacOS, Linux only.
-- This project is still on beta phase. I’d like to keep stable, but subject to change without notice.
+- This project is still on the beta phase. I’d like to keep stable, but subject to change without notice.
 - Please use it at your own risk.
