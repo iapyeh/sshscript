@@ -32,7 +32,7 @@ If you did not “ssh-copy-id” to the host1 and host2, then just do it like th
 $.connect('username1@host1', password='secret')
 ```
 
-Doing nested-scp is simple too. Below script would download the /var/log/message from the host2 and upload config.ini on [localhost](http://localhost) to  /tmp on the host2.
+Doing nested-scp is simple too. The script below downloads the /var/log/message from the host2 and uploads config.ini on the [localhost](http://localhost) to  /tmp on the host2.
 
 ```python
 with $.connect('username1@host1') as _:
