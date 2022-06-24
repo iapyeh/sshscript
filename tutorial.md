@@ -4,26 +4,25 @@
 
 # Scenario I
 
-Suppose that there is a security issue about some version of the openssl package. You got to check the version of openssl on all servers. You must ssh into servers from your maintaining host one by one, like this:
+Suppose that there is a security issue about some version of the openssl package. You have to check the version of openssl on all servers. You must ssh into servers from your maintaining host one by one, like this:
 
 ```jsx
-# **Step 1: from your maintaining host ssh to host1**
+# **Step 1: from the development host ssh to the production host1**
 $ssh user@host1
 
-# **Step 2:  on host1, execute command to get openssl's version 
-# and collect its output**
+# **Step 2: on the host1, execute a command to get openssl's version and collect its output**
 $openssl version
 OpenSSL 1.1.1f  31 Mar 2020
 
-# **Step 3: repeat above steps for host2, host3, ...**
+**# Step 3: repeat the above steps for production host2, host3, ...**
 ```
 
 The **SSHScript** let you do the jobs in this way:
 
-**Step 1: create a file named "check-openssl-version.spy" on the maintaining host**
+**Step 1: create a file named "check-openssl-version.spy" on the development host**
 
 ```jsx
-# content of file: check-openssl-version.spy
+# file: check-openssl-version.spy
 
 hosts = ['host1','host2','host3','host4','host5']
 user = 'your-name'
@@ -38,7 +37,7 @@ from tabulate import tabulate
 print(tabulate(opensslVersions, headers=['host','version']))
 ```
 
-**Step 2: run the “check-openssl-version.spy”** 
+**Step 2: run the “check-openssl-version.spy”   on the development host**
 
 ```jsx
 $ sshscript check-openssl-version.spy
@@ -51,7 +50,7 @@ host4    OpenSSL 1.1.1o  3 May 2022
 host4    OpenSSL 1.0.2g  1 Mar 2016
 ```
 
-Further more, you can store common settings in a separated file:
+Furthermore, you can store common settings in a separated file:
 
 Let’s create a new file named “common.spy”
 
@@ -65,7 +64,7 @@ password = 'your-secret'
 Then, re-write the check-openssl-version.spy 
 
 ```jsx
-# content of file: check-openssl-version.spy
+# file: check-openssl-version.spy
 
 # collect
 $.include('common.spy')  # ⬅ look here
@@ -79,12 +78,12 @@ from tabulate import tabulate
 print(tabulate(opensslVersions, headers=['host','version']))
 ```
 
-When your password has changed, and you have about 100 pieces of scripts like the  check-openssl-version.spy . Only the common.spy need to be updated.
+When your password has changed, and you have about 100 pieces of scripts like the  check-openssl-version.spy . Only the common.spy needs to be updated.
 
-Further more, python code can be put into $command. Which mean with little modification, check-openssl-version.spy can check version of many others. Let’s do it like this:
+Furthermore, python code can be put into $command. Which means with little modification, check-openssl-version.spy can check versions of many others. Let’s do it like this:
 
 ```python
-# content of file: check-openssl-version.spy
+# file: check-openssl-version.spy
 
 # collect
 $.include('common.spy')  
@@ -123,7 +122,7 @@ for host in hosts:
 
 # Scenario II
 
-Suppose that your maintaining host is in cloud. Now you think that the common.spy should not be there since it contains password of all servers. You hope that those passwords could keep in your office. And you already have a safe host in your office. Then you can do it by this way:
+Suppose that your development host is in the cloud. Now you think that the common.spy should not be there since it contains passwords of all servers. You hope that those passwords could be kept in your office. And you already have a safe host in your office. Then you can do it by this way:
 
 Let’s create a file named “secret.spy” on the safe host, and put passwords there
 
@@ -132,7 +131,7 @@ Let’s create a file named “secret.spy” on the safe host, and put passwords
 password = ‘your-secret’
 ```
 
-Then, modify the common.spy on the maintaining host to be like this:
+Then, modify the common.spy on the development host to be like this:
 
 ```jsx
 #file: common.spy on the maintaining host in cloud
@@ -146,17 +145,17 @@ Let’s create a file named “run-from-trusted-host.spy” on the safe host.
 ```jsx
 # file: run-from-safe-host.spy on the safe host (in office)
 
-# ssh to maintaining host.
+# ssh to development host.
 $.connect('you@maintaining-host','password')
 
-# suppose secret.spy is in /home/my/ on the safe-host.
-# suppose common.spy is in /home/you/project/ on the maintaining-host.
+# suppose secret.spy is in /home/my/ on the safe host.
+# suppose common.spy is in /home/you/project/ on the development ost.
 $.upload('/home/my/secret.spy','/home/you/project/secret')
 
-# run the check-openssl-version.spy on the maintaining-host
+# run the check-openssl-version.spy on the development host
 $sshscript check-openssl-version.spy
 
-# remove the secret from the maintaining-host
+# remove the secret from the development host
 $rm /home/you/project/secret
 
 ```
