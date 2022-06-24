@@ -37,7 +37,7 @@ $"""
 """
 ```
 
-Every single line are executed individually. The output of stdout or stderr are put together.
+Every single line is executed individually. The output of stdout or stderr are put together.
 
 Every command is executed one by one.
 
@@ -49,16 +49,16 @@ Sometimes, we need a shell to work, for example:
 $$ echo “1234” | sudo -S rm -rf /goodbye-root
 ```
 
-Because the “sudo” requires a “pty” to work. The other reason is that environment works only in shell mode. For example:
+Because the “sudo” requires a “pty” to work. The other reason is that the environment works only in shell mode. For example:
 
 ```jsx
+# You will get the value of $PATH. 
 $$ echo $PATH
 
-#You will get the value of $PATH. But In a non-shell command, like:
-
+# But in a non-shell command,
+# the output is $PATH, not the value of $PATH
 $echo $PATH
 
-#the output is $PATH, not the value of $PATH
 ```
 
 The inline command also requires a shell to work.
@@ -68,11 +68,11 @@ The inline command also requires a shell to work.
 $$ echo `pwd` 
 ```
 
-Commands will be executed in shell. For subprocess, it means with “shell=True” for popen(). For paramiko, it means client.invoke_shell()
+$$-commands will be executed in a shell. For the subprocess, it is implemented by popen(shell=True). For the Paramiko, it is implemented by client.invoke_shell()
 
 ## $$”””
 
-Many commands can put together, for example:
+Many commands can be put together, for example:
 
 ```jsx
 $$"""
@@ -83,14 +83,14 @@ $$"""
 
 They are executed in a single session of shell. 
 
-- For subprocess, it means popen(”bash”) and commands are written to its stdin one by one.
-- For paramiko, it means client.invoke_shell() and commands are written to its stdin one by one.
+- For the subprocess, it means popen(”bash”), and commands are written to its stdin one by one.
+- For the Paramiko, it means client.invoke_shell(), and commands are written to its stdin one by one.
 
-For multiple commands, the output of stdout or stderr are put together in $.stdout and $.stderr respectively.
+For multiple commands, their output of stdout or stderr are put together in $.stdout and $.stderr respectively.
 
 ## with $
 
-This syntax would invoking an interactive shell. Commands are executed in a shell and you can interactive with it.
+This syntax would invoke an interactive shell. Commands are executed in a shell and you can interact with it.
 
 ```jsx
 # Example of subprocess:
@@ -108,28 +108,28 @@ with $sudo -S su as console:
 print($.stdout) # the outputs of all lines of execution.
 ```
 
-About the “console” in above example. It is an instance of POpenChannel,POpenPipeChannel or ParamikoChannel. Which one does not matter, the following methods and properties are available for your interaction:
+About the “console” in the above example. It is an instance of POpenChannel,POpenPipeChannel or ParamikoChannel. Which one does not matter, the following methods and properties are available for your interaction:
 
 - sendline(command, waitingSeconds=1)
     - command: str
-        - a line of command to input to the console (no tailing newline required)
+        - command to input to the console (no tailing newline required)
     - waitingSeconds: int, default is 1
-        - at least, how many seconds to wait for data after submitting the seconds.
+        - seconds to wait for data after submitting the seconds.
 - stdout
-    - you can get the stdout output of just executed command from this property.
+    - you can get the stdout output of last executed command from this property.
 - stderr
-    - you can get the stderr output of just executed command from this property.
+    - you can get the stderr output of last executed command from this property.
 - expect(keyword, timeout=60)
     - keyword: str, case insensitive.
-        - blocks the execution until given keyword appears in stdout or stderr.
+        - blocks the execution until the given keyword appears in stdout or stderr.
         - keyword can also be a string re.Pattern.
-    - timeout: seconds to wait. If it reaches overtime, raises a TimeoutError.
+    - timeout: seconds to wait. If time is over, raises a TimeoutError.
 - expectStderr(keyword, timeout=60)
-    - blocks the execution until given keyword appears in stderr.
-    - timeout: seconds to wait. If it reaches overtime, raises a TimeoutError.
+    - blocks the execution until the given keyword appears in stderr.
+    - timeout: seconds to wait. If time is over, raises a TimeoutError.
 - expectStdout(keyword, timeout=60)
-    - blocks the execution until given keyword appears in stdout.
-    - timeout: seconds to wait. If it reaches overtime, raises a TimeoutError.
+    - blocks the execution until the given keyword appears in stdout.
+    - timeout: seconds to wait. If time is over, raises a TimeoutError.
 
 Example of using the “waitingSeconds” parameter:
 
@@ -173,7 +173,7 @@ if sys.stdout.isatty():
 
 ### os.environ[’CMD_INTERVAL’] = “0.5”
 
-The interval between two commands. Default is 0.5 seconds. Interval is count from the latest time when having data received from stdout or stderr.  This value can be changed by os.environ[’CMD_INTERVAL’]. For example:
+The interval between two commands. Default is 0.5 seconds. Interval is counted from the latest time when having data received from stdout or stderr.  This value can be changed by os.environ[’CMD_INTERVAL’]. For example:
 
 ```jsx
 os.environ[’CMD_INTERVAL’] = "2"
@@ -187,7 +187,7 @@ $$"""
 
 The output of stdout or stderr are put together in $.stdout and $.stderr respectively.
 
-Reset this value by
+You can reset this value by
 
 ```jsx
 del os.environ[’CMD_INTERVAL’]
@@ -195,7 +195,7 @@ del os.environ[’CMD_INTERVAL’]
 
 ### os.environ[’CMD_TIMEOUT’] = “60”
 
-The max time spent for execution a command in seconds. Default is 60 seconds.
+The max time spent for executing a command in seconds. Default is 60 seconds.
 
 ## $.stdout
 
@@ -210,19 +210,19 @@ assert $.stdout.find('this is a book') >= 0
 assert $.stdout.find('that is a pen') >= 0
 ```
 
-Well, for invoking shell, you would get much more.
+Please be noted, when shell is invoked, terminal control characters might be mixed in the content of stdout and stderr.
 
 ```python
 $$"""
    echo "this is a book"
    echo "that is a pen"
 """
-# the $.stdout would have many control charecator.
+# the $.stdout would have many control characters.
 ```
 
 ## $.stderr
 
-If your command execution dumps something from stderr, you can get them by $.stderr.
+If your command execution dumps something in stderr, you can get them by $.stderr.
 
 ```python
 $"""
@@ -231,19 +231,19 @@ cat /non-existing-file
 assert $.stderr.find("No such file or directory") > 0
 ```
 
-There is a special note for $.stderr. Please consider the example in 3 cases:
+There is a special note for $.stderr. Please consider the three examples below:
 
-- A. $cat /non-existed-file
-- B. $$cat /non-existed-file
-- C. with $$cat /non-existed-file
+- A: $cat /non-existed-file
+- B: $$cat /non-existed-file
+- C: with $$cat /non-existed-file
 
-For local subprocess, $.stderr would have value “No such file or directory” in A, B and C.
+On the localhost (subprocess), $.stderr would have value “No such file or directory” in A, B and C.
 
-For remote ssh session, $.stderr would have value “No such file or directory” for A only.  Since for remote ssh session, case B and C, It would be **$.stdout** have the error message “No such file or directory”, not the $.stderr. This is the behavior of the paramiko invoke_shell() which implicitly set get_pty=True.
+On a remote server (ssh connection), $.stderr would have value “No such file or directory” for A only. Since for remote ssh sessions, case B and C, It would be $.stdout that has the error message “No such file or directory”, not the $.stderr. This is the behavior of the Paramiko invoke_shell() which implicitly sets get_pty=True.
 
 ## @{python-expression}  in command
 
-You can embed python in command. It would be eval() before execution. For example:
+You can embed a  python expression in $-command. It would be evaluated before executing the command. For example:
 
 ```python
 import datetime
@@ -254,7 +254,7 @@ $tar -zcvf @{now.strftime("%m%d")}.tgz /var/log/system.@{now.strftime("%Y-%m-%d"
 $tar -zcvf 64.tgz /var/log/system.1989-06-04
 ```
 
-It also works for command in multiple lines
+It also works in commands of multiple lines:
 
 ```python
 # last folder name is "c<space>d"
@@ -265,7 +265,7 @@ $"""
     ls -l "@{os.path.dirname(path)}"
 """
 
-# is the same as
+# is evaluated to be:
 $"""
     ls -l "/a/b/c d"
     ls -l "/a/b"
@@ -278,34 +278,36 @@ If you know what you are doing, you can get the instance of paramiko.client.SSHC
 
 ## $.close()
 
-This is the counterpart of $.connect(). Please see examples in $.connect() section. Actually, you don’t need to call this in context of “with $.connect()”. But you do need this sometimes.
+This is the counterpart of $.connect(). Please see examples in the $.connect() section. Actually, you don’t need to call this in the context of “with $.connect()”. But you do need this sometimes.
 
 ## $.connect(host,**kw)
 
-- host: the host name to connect by ssh. This could also be in form of “username@host”.  eg. ‘tim@140.119.20.90’
+This function open a ssh connection to remote host.
+
+- host: the host name to connect by ssh. This could also be in the form of “username@host”.  eg. ‘tim@140.119.20.90’
 
 Other keyword arguments were sent to [paramiko.client.SSHClient.connect()](https://docs.paramiko.org/en/stable/api/client.html)**.**  Some of them are:
 
-- username: the username to login ssh server. If this is not given in “host” parameter.
+- username: the username to login ssh server. If this is not given in the “host” parameter.
 - password:  the password to login ssh server.
 - port: the  port number to connect ssh server. default is 22.
-- pkey: the RSA key to login. Please see $.pkey() section for details.
+- pkey: the RSA key to login. Please see the $.pkey() section for details.
 - proxyCommand.
 - timeout
 
-Example:
+Example: connect to hosts one-by-one.
 
 ```python
 def save(hostname, content):
     with open(f'{hostname}.top') as fd:
         fd.write($.stdout)
 
-user = 'user'
+user = 'john'
 host1 = '1.1.1.1'
 host2 = '2.2.2.2'
 
-# If you have did "ssh-copy-id" to host1.
-# Usually you don't need to give password again.
+# If you have did "ssh-copy-id" to the host1.
+# Usually you don't need to give the password again.
 $.connect(user+'@'+host1) 
 $top -b -n1
 save(host1, $.stdout)
@@ -318,14 +320,14 @@ $.close()
 
 ```
 
-Example of nested ssh.
+Example: connect to a host behind another host.
 
 ```python
 def save(hostname, content):
     with open(f'{hostname}.top') as fd:
         fd.write($.stdout)
 
-user = 'user'
+user = 'pauline'
 host1 = '1.1.1.1'
 host2 = '2.2.2.2'
 
@@ -334,7 +336,7 @@ $top -b -n1
 save(host1, $.stdout)
 #⬇ If you do not $.close() this connection.
 #⬇ The next $.connect would be a nested ssh.
-#⬇ You would ssh to host2 from host1, not from the localhost.
+#⬇ You are ssh to host2 from host1, not from the localhost.
 #$.close() 
 
 pkey = $.pkey('/home/user/.ssh/id_rsa')
@@ -344,14 +346,14 @@ save(host2, $.stdout)
 $.close()
 ```
 
-The example below would be more clear for showing nested ssh scenario.
+The next example below is also a scenario of nested ssh.
 
 ```python
 def save(hostname, content):
     with open(f'{hostname}.top') as fd:
         fd.write($.stdout)
 
-user = 'user'
+user = 'pauline'
 host1 = '1.1.1.1'
 host2 = '2.2.2.2'
 
@@ -367,14 +369,14 @@ with $.connect(user+'@'+host1) as _:
 
 ```
 
-For security reason, you can use key file in [localhost](http://localhost), thus the key file in host1 could be removed. for example:
+For security reason, you could use key file in the [localhost](http://localhost), and the key file in the host1 could be removed. For example:
 
 ```python
 def save(hostname, content):
     with open(f'{hostname}.top') as fd:
         fd.write($.stdout)
 
-user = 'user'
+user = 'george'
 host1 = '1.1.1.1'
 host2 = '2.2.2.2'
 pkey = $.pkey('/home/user/.ssh/id_rsa') #⬅ key path in localhost
@@ -411,14 +413,14 @@ with $.connect(host,proxyCommand=proxyCommand) as _:
 
 ## $.download(src, dst=None)
 
+This function downloads a file from the remote host.
+
 - src: str, remote file to download in absolute path
 - dst: str; optional, local path to save the file
-    - If the dst is a relative path, then os.path.abspath() would be applied to it.
+    - If the dst is a relative path,  os.path.abspath() would be called to get its absolute path.
     - The dst could be a folder. The downloaded filename would be the same as the src.
-    - If dst is None, default is saving to the folder of os.getcwd().
-- Return: tuple (src, dst)
-
-The would download files from remote host.
+    - If dst is None, file would be saved to the os.getcwd().
+- Return: tuple (src, dst), where the dst is the evaluated path of downloaded file.
 
 ```python
 # suppose this script is executing on host-A
@@ -440,7 +442,7 @@ assert os.path.exists(os.path.join(myfolder,'message'))
 
 ## $.exit()
 
-break the execution of the sshscript script.
+This function breaks the execution of SSHScript script.
 
 ```python
 $uname -a
@@ -454,7 +456,7 @@ if $.stdout.find('Darwin') == -1:
 $rm -rf /Users/jobs
 ```
 
-Example:
+For example:
 
 ```python
 import argparse
@@ -471,10 +473,12 @@ $mysqladmin -uroot -p "@{args.password}" create girlfriends
 
 ## $.include(filepath)
 
+This function inserts content in another SSHScript file into place. 
+
 - filepath: str, the path of a sshscript file.
     - The path could be absolute or relative to the current file which doing the including.
 
-This would include the content of another sshscript file into the position with same indent. For example:
+For example:
 
 ```python
 #file: a.spy
@@ -505,9 +509,9 @@ if True:
     $.close()
 ```
 
-The b.spy could be include as many times as you like in a.spy. Also, in b.spy, you can include another c.spy.
+The b.spy could be inserted into a.spy as many times as you like. Also, in the b.spy, you can insert another file.
 
-For preventing infinite loop of cycling including. The max times of a file to be included is 100. If you know what you are doing. You can change it by setting os.environ[’MAX_INCLUDE’]. eg.
+To prevent an infinite loop of cycling including. The max times of a file to be included is 100. If you know what you are doing. You can change it by setting os.environ[’MAX_INCLUDE’]. eg.
 
 ```python
 os.environ['MAX_INCLUDE'] = 999
@@ -515,14 +519,14 @@ os.environ['MAX_INCLUDE'] = 999
 
 ## $.panaroid(yes)
 
-- yes: boolean. If True, stop the execution if there is any data received from stderr. Default is false.
+- yes: boolean. If True, raises a SSHScriptError if there is data received from stderr. Default is false.
 
 ## $.pkey(filepath)
 
+This function returns a RSA key from a file path. This works in context of local and remote.
+
 - filepath: path of the RSA key.
 - Return: an instance of paramiko.pkey.PKey
-
-get the RSA key for a file path. This works both in local and remote.
 
 ```python
 # implement "multi-hop scp"
@@ -544,13 +548,13 @@ If you know what you are doing, you can get the instance of paramiko.sftp_client
 
 ## $.upload(src, dst, makedirs=0, overwrite=1)
 
-- src: str, the file path in [localhost](http://localhost) to upload.
-    - if this value is a relative path, os.path.abspath() is applied.
-- dst: str, the file path in remote to save the uploaded file, must be absolute path
+- src: str, the file path in the localhost to upload.
+    - if the value is a relative path, os.path.abspath() is applied.
+- dst: str, the file path in remote host to save the uploaded file, must be a absolute path
 - makedirs: boolean; optional, default is False.
-    - create intermediate folders of the dst path. default is False. If the destination folder is not existed, a FileNotFound exception would be raised.
+    - if True, intermediate folders of the dst path would be created if necessary.
 - overwrite: boolean; optional, default is True.
-    - if True, overwrites the destination file if it is already there, otherwise raises a FileExistsError.
+    - if True, the destination file would be overridden if it is already existed, otherwise raises a FileExistsError.
 - Return: tuple (src, dst)
 
 ```python
@@ -570,12 +574,8 @@ $upload('/home/user/mysql.cnf','/etc/mysql/master/backup/',makedirs=1)
 ```
 
 <aside>
-💡 If the behavior of $.upload is not what you expected, you can access the $.sftp for better control.
+💡 If you are not satisfied by the $.upload , you can use the $.sftp for better control.
 
 </aside>
-
-## __export__ = [’name’,...]
-
-## __export__ = [’*’]
 
 ##
