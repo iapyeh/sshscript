@@ -1,4 +1,5 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
+
 # sshscript CLI
 
 If you install the sshscript package by “pip install”. A CLI “sshcript” is also installed by the setuptools. To check it, please open a terminal then type “sshscript[ENTER]”.
@@ -33,24 +34,6 @@ If you have many files to run, you can put them into a folder, and run them all 
 # there are many files like hello.spy and world.spy in the folder "unittest"
 $sshscript unittest
 ```
-
-## sshscript **╌silent**
-
-with --silent, you can suppress stdout and stderr dumping to console
-
-```python
-# suppress dumping of stdout and stderr
-$sshscript hello.spy --silent
-```
-
-“Dumping stdout and stderr to console” is automatically turned-on when sys.stdout.isatty() is True. In python script, you can set os.environ[’VERBOSE’]=”1” to enable it, or set os.environ[’VERBOSE’]=””  to empty string to disable it.
-
-<aside>
-💡 You can set the prefix of dumping lines for stdout or stderr:
-For stdout, it is os.environ[’VERBOSE_STDOUT_PREFIX’] , default is ▏.
-For stderr, it is os.environ[’VERBOSE_STDERR_PREFIX’] , default is 🐞.
-
-</aside>
 
 ## sshscript **╌run-order**
 
@@ -121,13 +104,23 @@ With this argument, the sshscript would  dump stdout and stderr to console.
 $sshscript hello.spy --verbose
 ```
 
-## sshscript  **╌silent**
+## sshscript **╌silent**
 
-With this argument, the sshscript would not dump stdout and stderr to console. This argument would suppress “--verbose”.
+with --silent, you can suppress dumping stdout and stderr to console
 
 ```python
+# suppress dumping of stdout and stderr
 $sshscript hello.spy --silent
 ```
+
+“Dumping stdout and stderr to console” is automatically turned-on when sys.stdout.isatty() is True. In python script, you can set os.environ[’VERBOSE’]=”1” to enable it, or set os.environ[’VERBOSE’]=””  to empty string to disable it.
+
+<aside>
+💡 You can set the prefix of dumping lines for stdout or stderr:
+For stdout, it is os.environ[’VERBOSE_STDOUT_PREFIX’] , default is ▏.
+For stderr, it is os.environ[’VERBOSE_STDERR_PREFIX’] , default is 🐞.
+
+</aside>
 
 ## sshscript  **╌**debug
 
