@@ -15,7 +15,7 @@ $ssh user@host1
 $openssl version
 OpenSSL 1.1.1f  31 Mar 2020
 
-**# Step 3: repeat above steps for host2, host3, ...**
+# **Step 3: repeat above steps for host2, host3, ...**
 ```
 
 The **SSHScript** let you do the jobs in this way:
@@ -30,7 +30,7 @@ user = 'your-name'
 password = 'your-secret'
 opensslVersions = []
 for host in hosts:
-    with $.open(f'{user}@{host}',password) as _:
+    with $.connect(f'{user}@{host}',password) as _:
         $openssl version  # ⬅ the shell command to run  
         opensslVersions.append([host,$.stdout])
 # output
@@ -71,7 +71,7 @@ Then, re-write the check-openssl-version.spy
 $.include('common.spy')  # ⬅ look here
 opensslVersions = []
 for host in hosts:
-    with $.open(f'{username}@{host}',password) as _:
+    with $.connect(f'{username}@{host}',password) as _:
         $openssl version
         opensslVersions.append([host,$.stdout])
 # output
@@ -91,7 +91,7 @@ $.include('common.spy')
 opensslVersions = []
 appName = 'openssl'  # ⬅ look here
 for host in hosts:
-    with $.open(f'{username}@{host}',password) as _:
+    with $.connect(f'{username}@{host}',password) as _:
         # ⬇ look below, appName would be replaced by "openssl"
         $@{appName} version    
         opensslVersions.append([host,$.stdout])
@@ -108,7 +108,7 @@ Of course, you can run any other commands, like this:
 $.include('common.spy')  
 for host in hosts:
     # connect to this host
-    with $.open(f'{username}@{host}',password) as _:
+    with $.connect(f'{username}@{host}',password) as _:
         # execute the shell command "df"
         $df
         # parse the result in python
@@ -147,7 +147,7 @@ Let’s create a file named “run-from-trusted-host.spy” on the safe host.
 # file: run-from-safe-host.spy on the safe host (in office)
 
 # ssh to maintaining host.
-$.open('you@maintaining-host','password')
+$.connect('you@maintaining-host','password')
 
 # suppose secret.spy is in /home/my/ on the safe-host.
 # suppose common.spy is in /home/you/project/ on the maintaining-host.
