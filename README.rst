@@ -48,7 +48,7 @@ Disclaimer
 
 * Developing and testing on MacOS, Linux only.
 
-* This project is still on beta phase. I'd like to keep stable, but subject to change without notice.
+* This project is still on beta phase. I will do my best to keep its interface stable, but subject to change without notice.
 
 * Please use it at your own risk.
 
