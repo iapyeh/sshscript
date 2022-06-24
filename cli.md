@@ -1,113 +1,148 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
-
 # sshscript CLI
 
-If you install the sshscript package by “pip install”. A CLI “sshcript” is also installed by the setuptools. To check it, please open a terminal and type “sshscript”[ENTER].
+If you install the sshscript package by “pip install”. A CLI “sshcript” is also installed by the setuptools. To check it, please open a terminal then type “sshscript[ENTER]”.
 
 ## sshscript [filepath …]
 
-This is the classic way to execute a SSHScript-style python script. e.g.
+This is the typical method to execute a sshscript-style python script. e.g.
 
-Suppose that there is a hello.spy :
+Suppose that we have is a file named hello.spy :
 
 ```python
-#file: hello.spy
+#content of hello.spy
 $hostname
 print(f'hello, this is {$.stdout}')
 ```
 
-You can run it by:
+You can run the hello.spy in console by:
 
 ```python
-# This would also dump stdout and stderr to screen
 $sshscript hello.spy
 ```
 
-If there is another world.spy, you can run both files by 
+Suppose that there is another file named world.spy, you can run both by: 
 
 ```python
 $sshscript hello.spy world.spy
 ```
 
-Suppose that you have many files, you can put them into the same folder, and run them all by 
+If you have many files to run, you can put them into a folder, and run them all by:
 
 ```python
-# hello.spy and world.spy are moved into folder "unittest"
+# there are many files like hello.spy and world.spy in the folder "unittest"
 $sshscript unittest
 ```
 
 ## sshscript **╌silent**
 
-with --silent, you can prohibit the screen dump of stdout and stderr.
+with --silent, you can suppress stdout and stderr dumping to console
 
 ```python
-# prohibit dumps stdout and stderr to terminal
+# suppress dumping of stdout and stderr
 $sshscript hello.spy --silent
 ```
 
-In fact, this behavior is automatically turned-on when sys.stdout.isatty() is True. You can also specify os.environ[’VERBOSE’]=”1” or os.environ[’VERBOSE’]=”” to turn it on and off in your script to control it manually.
+“Dumping stdout and stderr to console” is automatically turned-on when sys.stdout.isatty() is True. In python script, you can set os.environ[’VERBOSE’]=”1” to enable it, or set os.environ[’VERBOSE’]=””  to empty string to disable it.
 
 <aside>
-💡 When dump of stdout and stderr is enabled, you can change the following two variables to change the prefix of every single line.
-For stdout, it is os.environ[’VERBOSE_STDOUT_PREFIX’] , its default is ▏.
-For stderr, it is os.environ[’VERBOSE_STDERR_PREFIX’] , its default is 🐞.
+💡 You can set the prefix of dumping lines for stdout or stderr:
+For stdout, it is os.environ[’VERBOSE_STDOUT_PREFIX’] , default is ▏.
+For stderr, it is os.environ[’VERBOSE_STDERR_PREFIX’] , default is 🐞.
 
 </aside>
 
 ## sshscript **╌run-order**
 
-When there are many files to run, the execution order does matter, you can check it by 
+When many files are running sequentially, there execution order matters, you can check the running order by
 
 ```python
-# this only shows a list of *.spy files, no execution.
 $sshscript unittest --run-order
+# this option would shows the running order of files, no execution.
 ```
 
-You would find that files in the same folder are simply sorted by “sort” of a string list. But you can change their order by specifying some file as an argument. e.g.
+The running order is simply a string-sorting result of filenames. If some file has to be the first file, you can specify it explicitly.
 
 ```python
 # Suppose that in the unittest folder,
-# we have files a0.spy, a1.spy and a2.spy.
-# They are run in oder of: a0.spy, a1.spy and a2.spy
-# If you run them in this way:
+# There are files a0.spy, a1.spy and a2.spy.
+# Normally, they run in oder of: a0.spy, a1.spy and a2.spy
+
+# When the a2.spy has to be the 1st to run:
 $sshscript unittest/a2.spy unittest
-# They would run in oder of: a2.spy, a0.spy and a1.spy
-# You can check it by:
+
+# You can check the running order by:
 $sshscript unittest/a2.spy unittest --run-order
 
 # Suppose that in the unittest folder,
-# we also have files b0.spy, b1.spy and b3.spy.
-# This command:
-$sshscript "unittest/b*" "unittest/a*"
-# It would run files in order of:
-# b0.spy, b1.spy , b2.spy, a0.spy, a1.spy, a2.spy.
-# Because it puts the "unittest/b*" in front of the "unittest/a*".
+# There are files a0.spy, a1.spy and a2.spy.
+# as well as b0.spy, b1.spy and b2.spy.
+# Normally, they run in order of: a0,a1,a2,b0,b1,b2.spy
 
-# Please note the double-quote in the above command.
+# When b-series have to run before a-series:
+$sshscript "unittest/b*" "unittest/a*"
+
+# Please note the double-quote is necessary in the above command.
 # If they are not double-quoted. For example:
 $sshscript unittest/b*
-# It would contain unittest/b.sh 
-# when there is a b.sh in the unittest folder.
-# Since shell would expand "b*" to all the files which are prefixed by "b".
+# It might be expanded to all files with prefix "b", eg. "b.sh", by shell.
 
+```
+
+A usage senario:
+
+```python
+# Support in the unittest folder,
+# File 0.spy would ssh to a remote server 
+# File a0.spy, a1.spy are testing files for Feature-A
+# File b0.spy, b1.spy are testing files for Feature-B
+
+# Then, would doing testing of Feature-A on remote server
+$sshscript unittest/0.spy "unittest/a*"
+
+# Then, would doing testing of Feature-B on remote server
+$sshscript unittest/0.spy "unittest/b*"
 ```
 
 ## sshscript  **╌script**
 
 With this argument, the sshscript would dump the converted script. No execution. This is helpful for debugging.
 
+```python
+$sshscript hello.spy --script
+# output is converted "regular python script" of hello.spy, no execution.
+```
+
+## sshscript **╌verbose**
+
+With this argument, the sshscript would  dump stdout and stderr to console. 
+
+```python
+$sshscript hello.spy --verbose
+```
+
+## sshscript  **╌silent**
+
+With this argument, the sshscript would not dump stdout and stderr to console. This argument would suppress “--verbose”.
+
+```python
+$sshscript hello.spy --silent
+```
+
 ## sshscript  **╌**debug
 
-With this argument, the sshscript would dump the executing script where there is exception raise during execution. Also the level of logger would be set to “DEBUG”.
+With this argument, the sshscript would dump the executing script where there is exception raise during execution. Also the level of logger would be set to “DEBUG”. This argument would suppress “--silent”.
 
-## 
+```python
+$sshscript hello.spy --debug
+```
 
 ## _ _export_ _ = [str …]
 
-When you have  many *.spy files to run. You can export local variables in a file to those files after it. For example:
+When you have  many *.spy files to run. You can export local variables in a file to files after it. For example:
 
 ```python
-#file: 0.spy
+#content of file: 0.spy
 import json, pickle
 
 myfolder = os.path.dirname(__file__)
@@ -131,11 +166,12 @@ __export__ = ['savetoJson','myfolder']
 ```
 
 ```python
-#file: 1.spy
-# saveToJson is available
+#content of file: 1.spy
+
+# "saveToJson" is available in 1.spy because it is exported by 0.spy
 saveToJson({'hello':'world'})
 
-# But saveToPickle is not available
+# But "saveToPickle" is undefined
 try:
     saveToPickle({'hello':'world'})
 except NameError:
@@ -143,12 +179,8 @@ except NameError:
 ```
 
 ```python
-# the command to run
+# You can test above 0.spy and 1.spy by
 $sshscript 0.spy 1.spy
-
-# or put 0.spy and 1.spy into the same folder, say "testFolder".
-# then, run this command:
-$sshscript testFolder
 ```
 
 ## _ _export_ _ = ‘*’
@@ -156,7 +188,7 @@ $sshscript testFolder
 When __export__  is ‘*’, then all locals() are exported. For example:
 
 ```python
-#file: 0.spy
+#content of file: 0.spy
 import json, pickle
 
 def saveToJson(obj,filename):
@@ -173,7 +205,7 @@ __export__ = '*'  #⬅ look here
 ```
 
 ```python
-#file: 1.spy
+#content of file: 1.spy
 # saveToJson is available
 saveToJson({'hello':'world'})
 
@@ -181,33 +213,38 @@ saveToJson({'hello':'world'})
 saveToPickle({'hello':'world'})
 ```
 
+```python
+# You can test above 0.spy and 1.spy by
+$sshscript 0.spy 1.spy
+```
+
 The __export__ can help to organize files better. You can put utilization functions or common variables in 0.spy and use them from 1.spy to 9.spy.
 
-## Unisession
+## Single Session of Execution
 
-If you run many files at once. They are run in the same ssh session. Which means that if it has connected to a ssh server in 0.spy, then 1.spy was run under the same context. For example:
+If you run many files sequentially. They would run in a single ssh session. Which means that if it has ssh-connected to a remote host in 0.spy, then 1.spy would also run in the same remote host. For example:
 
 ```python
-#file: 0.spy
+#content of file: 0.spy
 $hostname
 print($.stdout) #⬅ would be the localhost
 
 # let's connect to "host"
-$.open(’user@host’)
+$.connect(’user@host’)
 
 # Please note that 
 # we do not __export__ anything at the end of 0.spy.
 ```
 
 ```python
-#file:1.spy
+#content of file:1.spy
 $hostname
 print($.stdout) #⬅ would be the "host"
 $.close()  #⬅ would close the connetion to "user@host"
 ```
 
 ```python
-# The command to run 0.spy and 1.spy:
+# You can test above 0.spy and 0.spy by
 $sshscript 0.spy 1.spy
 
 ```
