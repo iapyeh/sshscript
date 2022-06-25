@@ -1,5 +1,7 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
  
+# Syntax, Variables and Functions
+
 # Syntax
 
 ## $
@@ -162,40 +164,38 @@ print($.stdout)
 
 </aside>
 
-## os.environ
+## @{python-code}  in command
 
-### os.environ[’VERBOSE] = “1”
+You can embed python variables in $-command. It would be evaluated before executing the command. For example:
 
-```jsx
-if sys.stdout.isatty():
-    os.environ['VERBOSE'] = "1"
+```python
+import datetime
+now = datetime.datetime.now()
+$tar -zcvf @{now.strftime("%m%d")}.tgz /var/log/system.@{now.strftime("%Y-%m-%d")} 
+
+# if today is June 4, 1989. the command would be:
+$tar -zcvf 64.tgz /var/log/system.1989-06-04
 ```
 
-### os.environ[’CMD_INTERVAL’] = “0.5”
+It also works in commands of multiple lines:
 
-The interval between two commands. Default is 0.5 seconds. Interval is counted from the latest time when having data received from stdout or stderr.  This value can be changed by os.environ[’CMD_INTERVAL’]. For example:
-
-```jsx
-os.environ[’CMD_INTERVAL’] = "2"
-$$"""
-    hostname
-    cd /tmp
-    pwd
+```python
+# last folder name is "c<space>d"
+import os
+path = '/a/b/c d'
+$"""
+    ls -l "@{path}"
+    ls -l "@{os.path.dirname(path)}"
 """
-# the three commands would be submitted every 2 seconds.
+
+# is evaluated to be:
+$"""
+    ls -l "/a/b/c d"
+    ls -l "/a/b"
+"""
 ```
 
-The output of stdout or stderr are put together in $.stdout and $.stderr respectively.
-
-You can reset this value by
-
-```jsx
-del os.environ[’CMD_INTERVAL’]
-```
-
-### os.environ[’CMD_TIMEOUT’] = “60”
-
-The max time spent for executing a command in seconds. Default is 60 seconds.
+# Variables
 
 ## $.stdout
 
@@ -241,61 +241,70 @@ On the localhost (subprocess), $.stderr would have value “No such file or dire
 
 On a remote server (ssh connection), $.stderr would have value “No such file or directory” for A only. Since for remote ssh sessions, case B and C, It would be $.stdout that has the error message “No such file or directory”, not the $.stderr. This is the behavior of the Paramiko invoke_shell() which implicitly sets get_pty=True.
 
-## @{python-expression}  in command
-
-You can embed a  python expression in $-command. It would be evaluated before executing the command. For example:
-
-```python
-import datetime
-now = datetime.datetime.now()
-$tar -zcvf @{now.strftime("%m%d")}.tgz /var/log/system.@{now.strftime("%Y-%m-%d")} 
-
-# if today is June 4, 1989. the command would be:
-$tar -zcvf 64.tgz /var/log/system.1989-06-04
-```
-
-It also works in commands of multiple lines:
-
-```python
-# last folder name is "c<space>d"
-import os
-path = '/a/b/c d'
-$"""
-    ls -l "@{path}"
-    ls -l "@{os.path.dirname(path)}"
-"""
-
-# is evaluated to be:
-$"""
-    ls -l "/a/b/c d"
-    ls -l "/a/b"
-"""
-```
-
 ## $.client
 
-If you know what you are doing, you can get the instance of paramiko.client.SSHClient for your own purpose. Before accessing this value, “$.connect()” should be called to open a ssh session.
+The instance of paramiko.client.SSHClient of current ssh session. If you know what you are doing, you can get the instance of paramiko.client.SSHClient for your own purpose. Before accessing this value, “$.connect()” should be called to open a ssh session.
+
+## $.sftp
+
+If you know what you are doing, you can get the instance of paramiko.sftp_client.SFTP for your own purpose. Before accessing this value, “$.connect()” should be called to open a ssh session.
+
+## os.environ
+
+### os.environ[’VERBOSE] = “1”
+
+```jsx
+if sys.stdout.isatty():
+    os.environ['VERBOSE'] = "1"
+```
+
+### os.environ[’CMD_INTERVAL’] = “0.5”
+
+The interval between two commands. Default is 0.5 seconds. Interval is counted from the latest time when having data received from stdout or stderr.  This value can be changed by os.environ[’CMD_INTERVAL’]. For example:
+
+```jsx
+os.environ[’CMD_INTERVAL’] = "2"
+$$"""
+    hostname
+    cd /tmp
+    pwd
+"""
+# the three commands would be submitted every 2 seconds.
+```
+
+The output of stdout or stderr are put together in $.stdout and $.stderr respectively.
+
+You can reset this value by
+
+```jsx
+del os.environ[’CMD_INTERVAL’]
+```
+
+### os.environ[’CMD_TIMEOUT’] = “60”
+
+The max time spent for executing a command in seconds. Default is 60 seconds.
+
+# Functions
 
 ## $.close()
 
-This is the counterpart of $.connect(). Please see examples in the $.connect() section. Actually, you don’t need to call this in the context of “with $.connect()”. But you do need this sometimes.
+To close the current ssh connection. This is the counterpart of $.connect(). Please see examples in the $.connect() section. Actually, you don’t need to call this in the context of “with $.connect()”. But you do need this in some context.
 
-## $.connect(host,**kw)
+## $.connect(host,username=,password=,port=,policy=,**kw)
 
 This function open a ssh connection to remote host.
 
-- host: the host name to connect by ssh. This could also be in the form of “username@host”.  eg. ‘tim@140.119.20.90’
+- host(str): the host name to connect. It also accepts  “username@host” format.  eg. ‘tim@140.119.20.90’
+- username(str): optional, the username to login ssh server. If this is not given in the “host” parameter.
+- password(str): optional, the password to login ssh server.
+- port(int): optional, the  port number to connect ssh server. default is 22.
+- policy: optional, the policy for SSHClient.set_missing_host_key_policy.  The default is "paramiko.client.AutoAddPolicy”.  If this value is False, there is no policy been applied. For other values, please see [more details](https://docs.paramiko.org/en/stable/api/client.html).
+- **kw: other keyword arguments would be sent to [paramiko.client.SSHClient.connect()](https://docs.paramiko.org/en/stable/api/client.html)**.**  For example, some of them are:
+    - pkey(paramiko.pkey.PKey): the RSA key to login. Please see the $.pkey() section for details.
+    - proxyCommand.
+    - timeout
 
-Other keyword arguments were sent to [paramiko.client.SSHClient.connect()](https://docs.paramiko.org/en/stable/api/client.html)**.**  Some of them are:
-
-- username: the username to login ssh server. If this is not given in the “host” parameter.
-- password:  the password to login ssh server.
-- port: the  port number to connect ssh server. default is 22.
-- pkey: the RSA key to login. Please see the $.pkey() section for details.
-- proxyCommand.
-- timeout
-
-Example: connect to hosts one-by-one.
+Example: connect to two hosts one-by-one.
 
 ```python
 def save(hostname, content):
@@ -369,7 +378,7 @@ with $.connect(user+'@'+host1) as _:
 
 ```
 
-For security reason, you could use key file in the [localhost](http://localhost), and the key file in the host1 could be removed. For example:
+For security reason, you could use key file in the localhost, and the key file in the host1 could be removed. For example:
 
 ```python
 def save(hostname, content):
@@ -415,8 +424,8 @@ with $.connect(host,proxyCommand=proxyCommand) as _:
 
 This function downloads a file from the remote host.
 
-- src: str, remote file to download in absolute path
-- dst: str; optional, local path to save the file
+- src(str): remote file path to download, should be in absolute path
+- dst(str): optional, local path to save the file
     - If the dst is a relative path,  os.path.abspath() would be called to get its absolute path.
     - The dst could be a folder. The downloaded filename would be the same as the src.
     - If dst is None, file would be saved to the os.getcwd().
@@ -475,7 +484,7 @@ $mysqladmin -uroot -p "@{args.password}" create girlfriends
 
 This function inserts content in another SSHScript file into place. 
 
-- filepath: str, the path of a sshscript file.
+- filepath(str): the path of a sshscript file.
     - The path could be absolute or relative to the current file which doing the including.
 
 For example:
@@ -519,14 +528,14 @@ os.environ['MAX_INCLUDE'] = 999
 
 ## $.panaroid(yes)
 
-- yes: boolean. If True, raises a SSHScriptError if there is data received from stderr. Default is false.
+- yes(boolean): If True, raises a SSHScriptError if there is data received from stderr. Default is false.
 
 ## $.pkey(filepath)
 
 This function returns a RSA key from a file path. This works in context of local and remote.
 
-- filepath: path of the RSA key.
-- Return: an instance of paramiko.pkey.PKey
+- filepath(str): file path of the RSA key.
+- Returns: an instance of paramiko.pkey.PKey
 
 ```python
 # implement "multi-hop scp"
@@ -542,20 +551,16 @@ with open('user@host',pkey=pkey) as _:
         $.download(f'/var/log/nginx/log-{today.strftime("%m-%d")}')
 ```
 
-## $.sftp
-
-If you know what you are doing, you can get the instance of paramiko.sftp_client.SFTP for your own purpose. Before accessing this value, “$.connect()” should be called to open a ssh session.
-
 ## $.upload(src, dst, makedirs=0, overwrite=1)
 
-- src: str, the file path in the localhost to upload.
+- src(str): the file path in the localhost to upload.
     - if the value is a relative path, os.path.abspath() is applied.
-- dst: str, the file path in remote host to save the uploaded file, must be a absolute path
-- makedirs: boolean; optional, default is False.
+- dst(str): the file path in remote host to save the uploaded file, must be a absolute path
+- makedirs(boolean): optional, default is False.
     - if True, intermediate folders of the dst path would be created if necessary.
-- overwrite: boolean; optional, default is True.
+- overwrite(boolean): optional, default is True.
     - if True, the destination file would be overridden if it is already existed, otherwise raises a FileExistsError.
-- Return: tuple (src, dst)
+- Returns: tuple (src, dst)
 
 ```python
 $.connect('root@host')
