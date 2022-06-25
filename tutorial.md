@@ -1,5 +1,4 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
-
 # Tutorial
 
 # Scenario I
@@ -7,19 +6,19 @@
 Suppose that there is a security issue about some version of the openssl package. You have to check the version of openssl on all servers. You must ssh into servers from your maintaining host one by one, like this:
 
 ```jsx
-# **Step 1: from the development host ssh to the production host1**
-$ssh user@host1
+# Step 1: from the development host ssh to the production host1
+****$ssh user@host1
 
-# **Step 2: on the host1, execute a command to get openssl's version and collect its output**
-$openssl version
+# Step 2: on the host1, execute a command to get openssl's version and collect its output
+****$openssl version
 OpenSSL 1.1.1f  31 Mar 2020
 
-**# Step 3: repeat the above steps for production host2, host3, ...**
+# Step 3: repeat the above steps for production host2, host3, ...
 ```
 
-The **SSHScript** let you do the jobs in this way:
+The SSHScript let you do the jobs in this way:
 
-**Step 1: create a file named "check-openssl-version.spy" on the development host**
+Step 1: create a file named "check-openssl-version.spy" on the development host
 
 ```jsx
 # file: check-openssl-version.spy
@@ -29,7 +28,7 @@ user = 'your-name'
 password = 'your-secret'
 opensslVersions = []
 for host in hosts:
-    with $.connect(f'{user}@{host}',password) as _:
+    with $.connect(f'{user}@{host}',password=password) as _:
         $openssl version  # ⬅ the shell command to run  
         opensslVersions.append([host,$.stdout])
 # output
@@ -37,7 +36,7 @@ from tabulate import tabulate
 print(tabulate(opensslVersions, headers=['host','version']))
 ```
 
-**Step 2: run the “check-openssl-version.spy”   on the development host**
+Step 2: run the “check-openssl-version.spy”   on the development host
 
 ```jsx
 $ sshscript check-openssl-version.spy
@@ -70,7 +69,7 @@ Then, re-write the check-openssl-version.spy
 $.include('common.spy')  # ⬅ look here
 opensslVersions = []
 for host in hosts:
-    with $.connect(f'{username}@{host}',password) as _:
+    with $.connect(f'{username}@{host}',password=password) as _:
         $openssl version
         opensslVersions.append([host,$.stdout])
 # output
@@ -90,7 +89,7 @@ $.include('common.spy')
 opensslVersions = []
 appName = 'openssl'  # ⬅ look here
 for host in hosts:
-    with $.connect(f'{username}@{host}',password) as _:
+    with $.connect(f'{username}@{host}',password=password) as _:
         # ⬇ look below, appName would be replaced by "openssl"
         $@{appName} version    
         opensslVersions.append([host,$.stdout])
@@ -107,7 +106,7 @@ Of course, you can run any other commands, like this:
 $.include('common.spy')  
 for host in hosts:
     # connect to this host
-    with $.connect(f'{username}@{host}',password) as _:
+    with $.connect(f'{username}@{host}',password=password) as _:
         # execute the shell command "df"
         $df
         # parse the result in python
@@ -146,7 +145,7 @@ Let’s create a file named “run-from-trusted-host.spy” on the safe host.
 # file: run-from-safe-host.spy on the safe host (in office)
 
 # ssh to development host.
-$.connect('you@maintaining-host','password')
+$.connect('you@maintaining-host',password='password')
 
 # suppose secret.spy is in /home/my/ on the safe host.
 # suppose common.spy is in /home/you/project/ on the development ost.
