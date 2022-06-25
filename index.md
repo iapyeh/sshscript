@@ -1,7 +1,7 @@
 # SSHScript Documents
 
 - [Tutorial](https://iapyeh.github.io/sshscript/tutorial)
-- [Syntax](https://iapyeh.github.io/sshscript/syntax)
+- [Syntax, Variables and Functions](https://iapyeh.github.io/sshscript/syntax)
 - [sshscript CLI](https://iapyeh.github.io/sshscript/cli)
 - [sshscript Module](https://iapyeh.github.io/sshscript/module) 
 
