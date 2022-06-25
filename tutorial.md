@@ -7,10 +7,10 @@ Suppose that there is a security issue about some version of the openssl package
 
 ```jsx
 # Step 1: from the development host ssh to the production host1
-****$ssh user@host1
+$ssh user@host1
 
 # Step 2: on the host1, execute a command to get openssl's version and collect its output
-****$openssl version
+$openssl version
 OpenSSL 1.1.1f  31 Mar 2020
 
 # Step 3: repeat the above steps for production host2, host3, ...
