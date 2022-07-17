@@ -46,7 +46,7 @@ class SSHScriptDollar(object):
         self.args = (ssId,cmd,globals,locals)
         self.sshscript = None #執行的脈絡下的 sshscript instance
         self.inWith = inWith
-        self.hasExit = False # True if user calls exit()
+        #self.hasExit = False # True if user calls exit()
         self.invokeShell = False
         self.wrapper = None
         self.bufferedOutputData = b''
@@ -120,15 +120,19 @@ class SSHScriptDollar(object):
                     # ref: https://errorsfixing.com/run-interactive-bash-in-dumb-terminal-using-python-subprocess-popen-and-pty/
                     # ref: https://stackoverflow.com/questions/19880190/interactive-input-output-using-python
                     masterFd,slaveFd = zip(pty.openpty(),pty.openpty())                
+                    #masterFd,slaveFd = zip([subprocess.PIPE,subprocess.PIPE],[subprocess.PIPE,subprocess.PIPE])       
+                    #masterFd,slaveFd = zip(os.pipe(),os.pipe())
                     cp = subprocess.Popen(args,
                         # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
                         #bufsize=1,
-                        stdin=slaveFd[0],stdout=slaveFd[0],stderr=slaveFd[1],
+                        # 會導致  cannot set terminal process group (-1)
+                        #stdin=slaveFd[0],stdout=slaveFd[0],stderr=slaveFd[1],
+                        stdin=subprocess.PIPE,stdout=slaveFd[0],stderr=slaveFd[1],
                         # Run in a new process group to enable bash's job control.
                         preexec_fn=os.setsid,
                         # Run in "dumb" terminal.
                         env=dict(os.environ, TERM='vt100'),
-                        )                    
+                        )
                     self.channel = POpenChannel(self,cp,timeout,masterFd,slaveFd)                    
                 else:
                     #windows
