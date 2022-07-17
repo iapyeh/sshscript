@@ -27,7 +27,6 @@ class GenericChannel(object):
     def __init__(self):
         self.allStdoutBuf = []
         self.allStderrBuf = [] 
-        self.lock = threading.Lock()
         self._stdout = ''
         self._stderr = ''        
         self.stdoutBuf = []
@@ -142,7 +141,8 @@ class GenericChannel(object):
     
     def sendline(self,s,secondsToWaitResponse=1):
         __main__.SSHScript.logger.debug(f'sendline: {s}')
-        if not s[-1] == '\n': s += '\n'
+        if not s: s = '\n'
+        elif not s[-1] == '\n': s += '\n'
         # 確保跟前面的一個指令有點「距離」，不要在還在接收資料時送出下一個指令
         self.wait()
         n = self.send(s)
@@ -218,9 +218,9 @@ class POpenPipeChannel(GenericChannel):
             self.masterFd[0]: self.addStdoutData, #stdout
             self.masterFd[1]: self.addStderrData  #stderr
         }
-        while buffer:           
+        while buffer :           
             try:
-                for fd in select(buffer, [], [])[0]:
+                for fd in select(buffer, [], [],1)[0]:
                     try:
                         # diff of read and read1:
                         # See: https://stackoverflow.com/questions/57726771/what-the-difference-between-read-and-read1-in-python
@@ -246,10 +246,6 @@ class POpenPipeChannel(GenericChannel):
                     break
                 else:
                     raise
-        #if len(stdoutBuffer):
-        #    self.addStdoutData(b''.join(stdoutBuffer))
-        #if len(stderrBuffer):
-        #    self.addStdoutData(b''.join(stderrBuffer))
 
     def close(self):
         self.wait(1) # at least 1 seconds has no io
@@ -257,6 +253,7 @@ class POpenPipeChannel(GenericChannel):
             self.masterFd[0].close()
             self.masterFd[1].close()
             self.slaveFd[0].close()
+            self.cp.stdin.close()
 
             while self.cp.poll() is None:
                 try:
@@ -283,11 +280,13 @@ class POpenChannel(GenericChannel):
             threading.Thread(target=self._reading).start()
 
     def send(self,s):
-        self._lastIOTime = time.time()
+        #self._lastIOTime = time.time()
         b = s.encode('utf-8')
         # write to popen's stdin
-        os.write(self.masterFd[0],b)
-        os.fsync(self.masterFd[0])
+        #os.write(self.masterFd[0],b)
+        #os.fsync(self.masterFd[0])
+        self.cp.stdin.write(b)
+        self.cp.stdin.flush()
         self._lastIOTime = time.time()
     
     def _reading(self):
@@ -296,9 +295,9 @@ class POpenChannel(GenericChannel):
             self.masterFd[0]: self.addStdoutData, #stdout
             self.masterFd[1]: self.addStderrData  #stderr
         }
-        while buffer:           
+        while buffer:
             try:
-                for fd in select(buffer, [], [])[0]:
+                for fd in select(buffer, [], [],1)[0]:
                     try:
                         data = os.read(fd, 1024) # read available
                         
@@ -324,10 +323,6 @@ class POpenChannel(GenericChannel):
                     break
                 else:
                     raise
-        #if len(stdoutBuffer):
-        #    self.addStdoutData(b''.join(stdoutBuffer))
-        #if len(stderrBuffer):
-        #    self.addStdoutData(b''.join(stderrBuffer))
 
     def close(self):
         self.wait(1) # at least 1 seconds has no io
@@ -336,7 +331,7 @@ class POpenChannel(GenericChannel):
             os.close(self.masterFd[1])
             os.close(self.slaveFd[0])
             os.close(self.slaveFd[1])
-
+            self.cp.stdin.close()
             while self.cp.poll() is None:
                 try:
                     self.cp.wait(self.timeout)

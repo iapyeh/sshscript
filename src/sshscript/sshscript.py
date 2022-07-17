@@ -118,12 +118,14 @@ class SSHScript(object):
     items = {}
 
     @classmethod
-    def connectClient(cls,host,username=None,password=None,port=22,**kw):
+    def connectClient(cls,host,username,password,port,policy,**kw):
         client = paramiko.SSHClient()
-        #client.load_system_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
-        # 允許連線不在know_hosts檔案中的主機
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        #3.連線伺服器
+        # client.load_system_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
+
+        if policy:
+            client.set_missing_host_key_policy(policy)
+
+        # 3.連線伺服器
         client.connect(host,username=username,password=password,port=port,**kw)
         return client
     
@@ -237,7 +239,7 @@ class SSHScript(object):
         raise SSHScriptExit(code)
     
     @export2Dollar
-    def connect(self,host,username=None,password=None,port=22,**kw):
+    def connect(self,host,username=None,password=None,port=22,policy=None,**kw):
         # host 可以是 username@hostname 的格式
         if '@' in host:
             username,host = host.split('@')
@@ -255,6 +257,11 @@ class SSHScript(object):
         self.port = port
         self.username = username
         
+        # user can set policy=0 to disable client.set_missing_host_key_policy
+        if policy is None:
+            # 允許連線不在known_hosts檔案中的主機
+            policy = paramiko.AutoAddPolicy()
+
         # 必須也檢查 self.parentSession.client，因為在同一個script中，可能上一個session已經關掉，
         # 但是在parse時，將此段放在不同的 sshscript instance中，如unittest6()的情況
         # (這樣的結構在此情況下不是很漂亮，可能有未知的情況)
@@ -268,22 +275,23 @@ class SSHScript(object):
                 dest_addr = (host,port)
                 local_addr = (self.parentSession.host,self.parentSession.port)
                 self._sock = vmtransport.open_channel("direct-tcpip", dest_addr, local_addr)
-                self._client = SSHScript.connectClient(host,username,password,port,sock=self._sock,**kw)
+                self._client = SSHScript.connectClient(host,username,password,port,policy,sock=self._sock,**kw)
         else:
             if 'proxyCommand' in kw:
                 sshscriptLogger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port} by {kw["proxyCommand"]}')
                 self._sock = self.getSocketWithProxyCommand(kw['proxyCommand'])
                 del kw['proxyCommand']
-                self._client = SSHScript.connectClient(host,username,password,port,sock=self._sock,**kw)
+                self._client = SSHScript.connectClient(host,username,password,port,policy,sock=self._sock,**kw)
             else:
                 sshscriptLogger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port}')
-                self._client = SSHScript.connectClient(host,username,password,port,**kw)
+                self._client = SSHScript.connectClient(host,username,password,port,policy,**kw)
 
         self._previousSshscriptInContext = SSHScript.inContext
         SSHScript.inContext = self
     
         return self
     
+    # alias of connect, would be removed later
     @export2Dollar
     def open(self,host,username=None,password=None,port=22,**kw):
         return self.connect(host,username,password,port,**kw)
@@ -350,10 +358,8 @@ class SSHScript(object):
             pass
         
 
-    #def getRsaKeyAtPath(self,pathOfRsaPrivate):
     @export2Dollar
     def pkey(self,pathOfRsaPrivate):
-        #pathOfRsaPrivate = f'/home/{$.username}/.ssh/id_rsa'
         if self.host:
             _,stdout,_ = self._client.exec_command(f'cat "{pathOfRsaPrivate}"')
             keyfile = StringIO(stdout.read().decode('utf8'))
@@ -362,11 +368,6 @@ class SSHScript(object):
             with open(pathOfRsaPrivate) as fd:
                 return paramiko.RSAKey.from_private_key(fd)
      
-    #@export2Dollar
-    #def timeout(self,v):
-    #    self._timeout = float(v)
-    
-
     @property
     def sftp(self):
         if self._sftp is None:
@@ -381,8 +382,6 @@ class SSHScript(object):
         if self.subSession:
             return self.subSession.upload(src,dst)
 
-        #if not src.startswith('/'):
-        #    raise SSHScriptError(f'uploading src "{src}" must be absolute path',503)
         src = os.path.abspath(src)
         if not os.path.exists(src):
             raise FileNotFoundError(src)
@@ -391,7 +390,6 @@ class SSHScript(object):
         
         if not dst.startswith('/'):
             raise SSHScriptError(f'uploading dst "{dst}" must be absolute path',504)
-        
         
         sshscriptLogger.debug(f'upload {src} to {dst}')
 
@@ -433,7 +431,7 @@ class SSHScript(object):
                     # 不是，dst 視為檔案
                     pass
                 else:
-                    # https://stackoverflow.com/questions/18205731/how-to-check-a-remote-path-is-a-file-or-a-directory
+                    # REF: https://stackoverflow.com/questions/18205731/how-to-check-a-remote-path-is-a-file-or-a-directory
                     if stat.S_ISDIR(dststat.st_mode):
                         # is folder
                         dst = os.path.join(dst,srcbasename)
@@ -502,8 +500,6 @@ class SSHScript(object):
         script = pqoute2.sub(pqouteSub,script)
         # replace with @open( to "with open("
         script = pAtFuncSWith.sub('\\1with SSHScript.inContext.\\3',script)
-        # replace @open( to open (example)
-        #script = pAtFuncS.sub('\\1SSHScript.inContext.\\2',script)
         listOfLines = script.split('\n')
         # listOfLines: [string]
         lines = LineGenerator(listOfLines)
@@ -528,8 +524,6 @@ class SSHScript(object):
                 # 尋找 } (必須在單獨一行的開頭；前面有space, tabOK)
                 m = pCurlyBrackets.search(nextLine)
                 if m:  break
-                # expand $.stdout, $.(var) etc
-                #cmd = pstd.sub('\\1_c\\2',nextLine.lstrip())
                 cmd = pstd.sub(pstdSub,nextLine.lstrip())
                 rowsInCurlyBrackets.append(cmd)
             return self.parseScript('\n'.join(rowsInCurlyBrackets),_locals=_locals,quotes=quotes)
@@ -633,10 +627,7 @@ class SSHScript(object):
                     # leading lines of ${} or $${} (multiple lines, and must multiple lines)
                     # in single line is not supported ("with ${} as fd" is not supported)
                     if stripedLine[j+1:].startswith('{') or  stripedLine[j+1:].startswith('${'):
-                        
-                        ## invoke shell: $${
-                        #invokeShell = 1 if stripedLine[j+1:].startswith('${') else 0
-                        
+                                                
                         ## 改為只要有兩個 $$ 就是 invoke shell（不必是 $${), 但是不能是分開的 $  $
                         invokeShell = 1 if stripedLine[j+1:].startswith('$') else 0
 
@@ -657,24 +648,23 @@ class SSHScript(object):
                                     raise e
                             inlineScript.extend(shellCommandLines)
                         
-                        if len(inlineScript): # 廢話？看起來是一定成立
-                            cmd = '\n'.join(inlineScript)
-                            # 分成先建立SSHScriptDollar物件,再執行的2步驟。先取名為 __c 而不是 _c ，
-                            # 此__c執行之後，再指定成為 _c 
-                            # 因為命令中可能會呼叫 _c（例如 $.stdout)，係指前次執行後的_c,這樣才不會混淆。
-                            # 但是__c執行有錯的時候，_c 又必須為本次執行的__c，所以放到try:finally當中
-                            # 這樣可以在SSHScriptError丟出之前把_c設定為__c
-                            indentOfTryBlock = '    '
-                            rows.append(f'{indent}try:')
-                            # strip triple-quote
-                            tripleQuote = '' if cmd.lstrip().startswith('#____') else '"""'
-                            rows.append(f'{indent}{indentOfTryBlock}__b = {tripleQuote}{cmd} {tripleQuote}')
-                            rows.append(f'{indent}{indentOfTryBlock}__c = SSHScriptDollar(None,__b,locals(),globals(),inWith={1 if asPartOfWith else 0})')
-                            rows.append(f'{indent}{indentOfTryBlock}__ret = __c({invokeShell})')
-                            rows.append(f'{indent}finally:')
-                            rows.append(f'{indent}{indentOfTryBlock}_c = __c')
-                            if asPartOfWith:
-                                rows.append(f'{indent}with __ret {asPartOfWith}')
+                        cmd = '\n'.join(inlineScript)
+                        # 分成先建立SSHScriptDollar物件,再執行的2步驟。先取名為 __c 而不是 _c ，
+                        # 此__c執行之後，再指定成為 _c 
+                        # 因為命令中可能會呼叫 _c（例如 $.stdout)，係指前次執行後的_c,這樣才不會混淆。
+                        # 但是__c執行有錯的時候，_c 又必須為本次執行的__c，所以放到try:finally當中
+                        # 這樣可以在SSHScriptError丟出之前把_c設定為__c
+                        indentOfTryBlock = '    '
+                        rows.append(f'{indent}try:')
+                        # strip triple-quote
+                        tripleQuote = '' if cmd.lstrip().startswith('#____') else '"""'
+                        rows.append(f'{indent}{indentOfTryBlock}__b = {tripleQuote}{cmd} {tripleQuote}')
+                        rows.append(f'{indent}{indentOfTryBlock}__c = SSHScriptDollar(None,__b,locals(),globals(),inWith={1 if asPartOfWith else 0})')
+                        rows.append(f'{indent}{indentOfTryBlock}__ret = __c({invokeShell})')
+                        rows.append(f'{indent}finally:')
+                        rows.append(f'{indent}{indentOfTryBlock}_c = __c')
+                        if asPartOfWith:
+                            rows.append(f'{indent}with __ret {asPartOfWith}')
 
                     # single line $shell-comand or $$shell-command
                     # this is always run by SSHScript.inContext (an instance of SSHScript)
@@ -699,7 +689,7 @@ class SSHScript(object):
                         rows.append(f'{indent}{indentOfTryBlock}_c = __c')
 
                         if asPartOfWith:
-                            # 注意：此處還沒寫完，因為moreIndent必須是下一行的indent才行
+                            # 注意：此處還沒寫完，因為moreIndent必須是下一行的indent才行??
                             rows.append(f'{indent}with __ret {asPartOfWith}')
                     else:
                         raise SyntaxError(f'failed to parse "{stripedLine}" from "{[stripedLine[j:]]}"')
@@ -729,7 +719,6 @@ class SSHScript(object):
                 self.blocksOfScript.append('\n'.join(rows))        
         
         assert  self.blocksOfScript is not None
-        #print([type(item) for item in self.blocksOfScript])        
         
         assert _locals.get('self')
         def dumpScriptItem(scriptChunk):
@@ -866,18 +855,8 @@ def runFile(givenPaths,
     if unisession:    
         session.close()
         del session
-"""
-def runScript(script,varGlobals=None,varLocals=None,showScript=False):
-    session = SSHScript()
-    _locals = locals()
-    _globals = globals()
-    if varGlobals: _globals.update(varGlobals)
-    if varLocals: _locals.update(varLocals)
-    session.run(script,varGlobals=_globals,varLocals=_locals,showScript=showScript)
-"""
 
 def runScript(script,varGlobals=None,varLocals=None):
-    
     session = SSHScript()
     session.run(script,varGlobals,varLocals,showScript=False)
 
