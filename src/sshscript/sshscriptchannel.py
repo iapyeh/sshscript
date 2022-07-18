@@ -36,12 +36,12 @@ class GenericChannel(object):
         self._lastIOTime = time.time()
 
         # dump-related
+        self.stdoutDumpBuf = []
+        self.stderrDumpBuf = []
         if os.environ.get('VERBOSE'):
             self.dump2sys = True
             self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','▏').encode('utf8')
             self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🐞').encode('utf8')
-            self.stdoutDumpBuf = []
-            self.stderrDumpBuf = []
         else:
             self.dump2sys = False
 
@@ -60,6 +60,8 @@ class GenericChannel(object):
         self.lock.acquire()
         del self.stdoutBuf[:]
         del self.stderrBuf[:]
+        del self.stdoutDumpBuf[:]
+        del self.stderrDumpBuf[:]
         self.lock.release()    
 
         if self.dump2sys:
@@ -114,7 +116,6 @@ class GenericChannel(object):
                 if time.time() - startTime > timeout:
                     raise TimeoutError(f'Not found: {pat} ' + '\n')
                 for i in targets:
-                    print('searching',data[i]())
                     if pat.search(data[i]()):
                         await self.waitio(1)
                         return

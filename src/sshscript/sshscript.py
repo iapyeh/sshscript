@@ -828,6 +828,13 @@ def runFile(givenPaths,
         with open(absfile) as fd:
             script = fd.read()
 
+        # add folder to sys.path,so "import <module in the same folder of __file__>" works
+        scriptFolder = os.path.dirname(abspath)
+        scriptFolderInsertedToSysPath = False
+        if not scriptFolder in sys.path:
+            scriptFolderInsertedToSysPath = True
+            sys.path.insert(0,scriptFolder)
+
         try:
             _locals['__file__'] = absfile
             newglobals = session.run(script,_locals.copy(),_globals.copy(),showScript=showScript)
@@ -835,6 +842,11 @@ def runFile(givenPaths,
             sshscriptLogger.debug('exit by receiving SSHScriptExit')
             break
         
+        # restore sys.path
+        if scriptFolderInsertedToSysPath:
+            sys.path.remove(scriptFolder)
+
+
         exported = newglobals.get('__export__')        
         if exported:
             # __export__ = '*' will export all

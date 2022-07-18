@@ -110,87 +110,66 @@ class SSHScriptDollar(object):
                 shCmd = shutil.which('bash')
                 if shCmd is None:
                     raise RuntimeError('no shell command found')
-                        
-            #if self.inWith or hasMultipleLines:
-            if 1:
-                # prepare popen command
-                args = shlex.split(shCmd)
-                logger.debug(f'subprocess.Popen {args}')
-                if self.usePty:
-                    # ref: https://errorsfixing.com/run-interactive-bash-in-dumb-terminal-using-python-subprocess-popen-and-pty/
-                    # ref: https://stackoverflow.com/questions/19880190/interactive-input-output-using-python
-                    masterFd,slaveFd = zip(pty.openpty(),pty.openpty())                
-                    #masterFd,slaveFd = zip([subprocess.PIPE,subprocess.PIPE],[subprocess.PIPE,subprocess.PIPE])       
-                    #masterFd,slaveFd = zip(os.pipe(),os.pipe())
-                    cp = subprocess.Popen(args,
-                        # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
-                        #bufsize=1,
-                        # 會導致  cannot set terminal process group (-1)
-                        #stdin=slaveFd[0],stdout=slaveFd[0],stderr=slaveFd[1],
-                        stdin=subprocess.PIPE,stdout=slaveFd[0],stderr=slaveFd[1],
-                        # Run in a new process group to enable bash's job control.
-                        preexec_fn=os.setsid,
-                        # Run in "dumb" terminal.
-                        env=dict(os.environ, TERM='vt100'),
-                        )
-                    self.channel = POpenChannel(self,cp,timeout,masterFd,slaveFd)                    
-                else:
-                    #windows
-                    cp = subprocess.Popen(args,
-                        # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
-                        #bufsize=1,
-                        stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
-                        # Run in a new process group to enable bash's job control.
-                        preexec_fn=os.setsid,
-                        # Run in "dumb" terminal.
-                        env=dict(os.environ, TERM='vt100'),
-                        )                
-                    self.channel = POpenPipeChannel(self,cp,timeout)
 
-                # value is None. for what? 
-                self.stdin = cp.stdin
+            # arguments for shell, such as '-r --login'
+            shArgs = os.environ.get('SHELL_ARGUMENTS')
+            if shArgs is not None:
+                shCmd += ' ' + shArgs
 
-                # wait for bash to start up
-                try:
-                    # 等到初始IO結束後0.5second才繼續
-                    self.channel.wait(0.5)
-                except TimeoutError:
-                    pass
-                
-                for command in cmds:
-                    self.channel.sendline(command)
-                    #loop.run_until_complete(self.channel.waitio())
-                    self.channel.wait()
-                
-                if not self.inWith:
-                    self.channel.close()
-            """
-            else:
-                # inVokeShell, but only single line and not in with
-                # prepare popen command
-                if self.usePty:
-                    self.channel = POpenChannel(self,None,timeout)
-                else:
-                    self.channel = POpenPipeChannel(self,None,timeout)
-                
-                args = shlex.split(shCmd)
+            # prepare popen command
+            args = shlex.split(shCmd)
+            logger.debug(f'subprocess.Popen {args}')
+            if self.usePty:
+                # ref: https://errorsfixing.com/run-interactive-bash-in-dumb-terminal-using-python-subprocess-popen-and-pty/
+                # ref: https://stackoverflow.com/questions/19880190/interactive-input-output-using-python
+                masterFd,slaveFd = zip(pty.openpty(),pty.openpty())                
+                #masterFd,slaveFd = zip([subprocess.PIPE,subprocess.PIPE],[subprocess.PIPE,subprocess.PIPE])       
+                #masterFd,slaveFd = zip(os.pipe(),os.pipe())
                 cp = subprocess.Popen(args,
+                    # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
+                    #bufsize=1,
+                    # 會導致  cannot set terminal process group (-1)
+                    #stdin=slaveFd[0],stdout=slaveFd[0],stderr=slaveFd[1],
+                    stdin=subprocess.PIPE,stdout=slaveFd[0],stderr=slaveFd[1],
+                    # Run in a new process group to enable bash's job control.
                     preexec_fn=os.setsid,
-                    stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
-                    shell=True,
+                    # Run in "dumb" terminal.
+                    env=dict(os.environ, TERM='vt100'),
                     )
-                
-                try:
-                    input = cmds[0].encode('utf-8')
-                    outs, errs = cp.communicate(input=input,timeout=timeout)
-                except subprocess.TimeoutExpired:
-                    cp.kill()
-                    outs, errs = cp.communicate()
+                self.channel = POpenChannel(self,cp,timeout,masterFd,slaveFd)                    
+            else:
+                #windows
+                masterFd,slaveFd = zip(os.pipe(),os.pipe())
+                cp = subprocess.Popen(args,
+                    # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
+                    #bufsize=1,
+                    #stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+                    stdin=subprocess.PIPE,stdout=slaveFd[0],stderr=slaveFd[1],
+                    # Run in a new process group to enable bash's job control.
+                    preexec_fn=os.setsid,
+                    # Run in "dumb" terminal.
+                    env=dict(os.environ, TERM='vt100'),
+                    )                
+                self.channel = POpenChannel(self,cp,timeout,masterFd,slaveFd)
 
-                self.channel.addStdoutData(outs)
-                self.channel.addStderrData(errs)                
+            # value is None. for what? 
+            self.stdin = cp.stdin
+
+            # wait for bash to start up
+            try:
+                # 等到初始IO結束後0.5second才繼續
+                self.channel.wait(0.5)
+            except TimeoutError:
+                pass
+            
+            for command in cmds:
+                self.channel.sendline(command)
+                #loop.run_until_complete(self.channel.waitio())
+                self.channel.wait()
+            
+            if not self.inWith:
                 self.channel.close()
-            """
+
         else:
             
             # not invoke shell
