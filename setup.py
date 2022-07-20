@@ -21,10 +21,13 @@ setuptools.setup(
     install_requires=['paramiko'],                  # list all packages that your package uses
     keywords=["pypi", "sshscript", "ssh", "paramiko", "subprocess","shell script"], #descriptive meta-data
     classifiers=[                                   # https://pypi.org/classifiers
-        'Development Status :: 3 - Beta',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
-        'Topic :: Software Development :: Documentation',
+        'Intended Audience :: System Administrators',
+        'Topic :: Software Development :: Code Generators',
+        'Topic :: Utilities',
         'License :: OSI Approved :: MIT License',
+        'Operating System :: POSIX',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3 :: Only',
         'Programming Language :: Python :: 3.7',
