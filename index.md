@@ -1,9 +1,10 @@
 # SSHScript Documents
 
-- [Tutorial](https://iapyeh.github.io/sshscript/tutorial)
+- [Tutorial](https://iapyeh.github.io/sshscript/tutorial) 
 - [Syntax, Variables and Functions](https://iapyeh.github.io/sshscript/syntax)
 - [sshscript CLI](https://iapyeh.github.io/sshscript/cli)
 - [sshscript Module](https://iapyeh.github.io/sshscript/module) 
+- [導覽  （繁體中文）] (https://iapyeh.github.io/sshscript/tutorial.zh-tw)
 
 ## Introduction
 
