@@ -37,6 +37,6 @@ setuptools.setup(
     ],
     entry_points='''
         [console_scripts]
-        sshscript=sshscript.sshscript:run
+        sshscript=sshscript.sshscript:main
     ''',    
 )

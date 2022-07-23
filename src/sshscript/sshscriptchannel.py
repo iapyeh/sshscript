@@ -87,46 +87,55 @@ class GenericChannel(object):
         sys.stdout.flush()
         sys.stderr.flush()
 
-    def expect(self,pat,timeout=60,stdout=True,stderr=True):
+    def expect(self,rawpat,timeout=60,stdout=True,stderr=True):
+        # rawpat:bytes,str,re.Pattern or list of them
+
         # this is a blocking function
-        # 只會搜尋目前還buffred的資料，如果要搜尋新收到的資料，
-        # 須在執行命令(seld.sendline())前先呼叫 self.recv()
         def checkStdout():
             return self._stdout + (b''.join(self.stdoutBuf)).decode('utf8')
         def checkStderr():
             return self._stderr + (b''.join(self.stderrBuf)).decode('utf8')            
-        #data = [lambda:self._stdout, lambda:self._stderr]
-        data = [checkStdout, checkStderr]
+
+        #data = [checkStdout, checkStderr]
         targets = []
         if stdout:
-            targets.append(0)
+            targets.append(checkStdout)
         if stderr:
-            targets.append(1)
-        if isinstance(pat,bytes):
-            pat = re.compile(pat.decode('utf8'),re.I)
-        elif isinstance(pat,str):
-            pat = re.compile(pat,re.I)
-        elif isinstance(pat,re.Pattern):
-            pass
-        else:
-            raise ValueError('expect() only accept str or re.Pattern')
+            targets.append(checkStderr)
+        
+        pats = []
+        if not (isinstance(rawpat,list) or isinstance(rawpat,tuple)):
+            rawpat = [rawpat]
+        for pat in rawpat:
+            if isinstance(pat,bytes):
+                pat = re.compile(pat.decode('utf8'),re.I)
+            elif isinstance(pat,str):
+                pat = re.compile(pat,re.I)
+            elif isinstance(pat,re.Pattern):
+                pass
+            else:
+                raise ValueError('expect() only accept bytes,str,re.Pattern or list of them')
+            pats.append(pat)
+
         async def _wait():
             startTime = time.time()
             while True:
                 if time.time() - startTime > timeout:
                     raise TimeoutError(f'Not found: {pat} ' + '\n')
-                for i in targets:
-                    if pat.search(data[i]()):
-                        await self.waitio(1)
-                        return
+                for dataSource in targets:
+                    di = dataSource()
+                    for pat in pats:
+                        if pat.search(di):
+                            await self.waitio(1)
+                            return
                 await asyncio.sleep(0.1)
         return loop.run_until_complete(_wait())    
     
-    def expectStderr(self,s,timeout=60):
-        return self.expect(s,timeout,stdout=False,stderr=True)
+    def expectStderr(self,rawpat,timeout=60):
+        return self.expect(rawpat,timeout,False,True)
 
-    def expectStdout(self,s,timeout=60):
-        return self.expect(s,timeout,stdout=True,stderr=False)
+    def expectStdout(self,rawpat,timeout=60):
+        return self.expect(rawpat,timeout,True,False)
     
     def wait(self,seconds=None):
         async def _wait(seconds):
@@ -140,10 +149,9 @@ class GenericChannel(object):
         self.wait(1)
         self.close()
     
-    def sendline(self,s,secondsToWaitResponse=1):
+    def sendline(self,s='\n',secondsToWaitResponse=1):
         __main__.SSHScript.logger.debug(f'sendline: {s}')
-        if not s: s = '\n'
-        elif not s[-1] == '\n': s += '\n'
+        if not s[-1] == '\n': s += '\n'
         # 確保跟前面的一個指令有點「距離」，不要在還在接收資料時送出下一個指令
         self.wait()
         n = self.send(s)
