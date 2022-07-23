@@ -4,7 +4,7 @@
 - [Syntax, Variables and Functions](https://iapyeh.github.io/sshscript/syntax)
 - [sshscript CLI](https://iapyeh.github.io/sshscript/cli)
 - [sshscript Module](https://iapyeh.github.io/sshscript/module) 
-- [導覽  （繁體中文）] (https://iapyeh.github.io/sshscript/tutorial.zh-tw)
+- [導覽(Tutorial in zh-TW)](https://iapyeh.github.io/sshscript/tutorial.zh-tw)
 
 ## Introduction
 
