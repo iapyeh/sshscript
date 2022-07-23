@@ -144,18 +144,18 @@ Let’s create a file named “run-from-trusted-host.spy” on the safe host.
 ```jsx
 # file: run-from-safe-host.spy on the safe host (in office)
 
-# ssh to development host.
+# ssh to the development host.
 $.connect('you@maintaining-host',password='password')
 
 # suppose secret.spy is in /home/my/ on the safe host.
 # suppose common.spy is in /home/you/project/ on the development ost.
-$.upload('/home/my/secret.spy','/home/you/project/secret')
+$.upload('/home/my/secret.spy','/home/you/project/secret.spy')
 
 # run the check-openssl-version.spy on the development host
 $sshscript check-openssl-version.spy
 
 # remove the secret from the development host
-$rm /home/you/project/secret
+$rm /home/you/project/secret.spy
 
 ```
 
@@ -164,3 +164,13 @@ Then run the run-from-safe-host.spy on the safe host.
 ```python
 $sshscript run-from-safe-host.spy
 ```
+
+Because the secret.spy file is actually a Python script, we can modify it to be like this:
+
+```
+#file: secret.spy on the safe host (in office)
+from getpass import getpass
+password = getpass()
+```
+
+By doing so, your password is under your mind only.
