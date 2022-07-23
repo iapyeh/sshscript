@@ -886,35 +886,15 @@ def setupLogger():
     else:
         sshscriptLogger.setLevel(logging.INFO) 
     
+    print('os.environ.get(VERBOSE=',os.environ.get('VERBOSE'))
     if os.environ.get('VERBOSE'):
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter('%(asctime)s:: %(message)s',"%m-%d %H:%M:%S")) # or whatever
         sshscriptLogger.addHandler(handler)
 
-
-def main(args):
    
-    if args.debug:
-        os.environ['DEBUG'] = '1'
-        os.environ['VERBOSE'] = '1'
-    # debug suppress silent
-    elif args.silent:
-        os.environ['SILENT'] = '1'
-    # silent suppress verbose
-    elif args.verbose:
-        os.environ['VERBOSE'] = '1'
-    elif sys.stdout.isatty():
-        os.environ['VERBOSE'] = '1'
-    
-    runFile(args.paths,
-        varGlobals=None,
-        varLocals=None,
-        showScript=args.showScript,
-        showRunOrder=args.showRunOrder,
-        unisession=True)
 
-
-def run():
+def main():
     import argparse
 
     # REF: https://stackoverflow.com/questions/15753701/how-can-i-pass-a-list-as-a-command-line-argument-with-argparse
@@ -953,8 +933,26 @@ def run():
     os.environ['SSHSCRIPT_EXT'] = args.sshscriptExt
 
     if len(args.paths):
-        main(args)
+        if args.debug:
+            os.environ['DEBUG'] = '1'
+            os.environ['VERBOSE'] = '1'
+        # debug suppress silent
+        elif args.silent:
+            os.environ['SILENT'] = '1'
+        # silent suppress verbose
+        elif args.verbose:
+            os.environ['VERBOSE'] = '1'
+        elif sys.stdout.isatty():
+            os.environ['VERBOSE'] = '1'
 
+        setupLogger()
+
+        runFile(args.paths,
+            varGlobals=None,
+            varLocals=None,
+            showScript=args.showScript,
+            showRunOrder=args.showRunOrder,
+            unisession=True)
     else:
         try:
             from __init__ import __version__
@@ -970,7 +968,5 @@ def run():
 # when sshscript is imported as a module (main() not been called)
 __main__.SSHScript = SSHScript
 
-setupLogger()
-
 if __name__ == '__main__':
-    run()
+    main()
