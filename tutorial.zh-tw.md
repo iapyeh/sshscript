@@ -1,3 +1,5 @@
+<div style="text-align:right"><a href="./index">Index</a></div>
+
 # 導覽
 
 # 應用情境一
