@@ -50,7 +50,7 @@ host1    OpenSSL 1.0.2k-fips  26 Jan 2017
 host2    OpenSSL 1.1.1k  FIPS 25 Mar 2021
 host3    OpenSSL 1.1.1n  15 Mar 2022
 host4    OpenSSL 1.1.1o  3 May 2022
-host4    OpenSSL 1.0.2g  1 Mar 2016
+host5    OpenSSL 1.0.2g  1 Mar 2016
 ```
 
 進一步,你可以把常用的設定獨立成另一個檔案。以下演示這個作法。
