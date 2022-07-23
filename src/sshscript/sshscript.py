@@ -886,7 +886,6 @@ def setupLogger():
     else:
         sshscriptLogger.setLevel(logging.INFO) 
     
-    print('os.environ.get(VERBOSE=',os.environ.get('VERBOSE'))
     if os.environ.get('VERBOSE'):
         handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(logging.Formatter('%(asctime)s:: %(message)s',"%m-%d %H:%M:%S")) # or whatever

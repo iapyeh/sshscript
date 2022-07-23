@@ -6,7 +6,7 @@ with open("README.rst", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    download_url="https://github.com/iapyeh/sshscript/archive/refs/tags/0.94.tar.gz",
+    #download_url="https://github.com/iapyeh/sshscript/archive/refs/tags/0.94.tar.gz",
     name='sshscript',                           # should match the package folder
     packages=['sshscript'],                     # should match the package folder
     license='MIT',                                  # should match your chosen license
@@ -35,8 +35,9 @@ setuptools.setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
     ],
-    entry_points='''
-        [console_scripts]
-        sshscript=sshscript.sshscript:main
-    ''',    
+    entry_points={
+        'console_scripts':[
+            'sshscript=sshscript.sshscript:main',
+        ]
+    }
 )
