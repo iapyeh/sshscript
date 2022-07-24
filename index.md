@@ -5,6 +5,8 @@
 - [sshscript CLI](https://iapyeh.github.io/sshscript/cli)
 - [sshscript Module](https://iapyeh.github.io/sshscript/module) 
 - [導覽(Tutorial in zh-TW)](https://iapyeh.github.io/sshscript/tutorial.zh-tw)
+- [使用SSHScript教學一(Learning SSHScript Chapter 1 in zh-TW)](https://iapyeh.github.io/sshscript/learn-chap01.zh-tw)
+- [使用SSHScript教學二(Learning SSHScript Chapter 2 in zh-TW)](https://iapyeh.github.io/sshscript/learn-chap02.zh-tw)
 
 ## Introduction
 
