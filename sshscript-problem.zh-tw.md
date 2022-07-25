@@ -1,4 +1,4 @@
-<div style="text-align:right"><a href="./index">Index</a></div>
+<div style="text-align:right"><a href="./learn-chap01.zh-tw">SSHScript使用教學第一章</a></div>
 
 # sshscript執行檔的安裝
 
