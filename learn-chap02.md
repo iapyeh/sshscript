@@ -34,7 +34,7 @@ print($.stdout)
 
 The syntax is to just give your commands two $$.
 
-In fact, “|” (pipe), “>” (redirect) and environment variables like $PATH are all dependent on the shell. If your commands utilize them, then just give them a shell by using $$ syntax.
+In fact, “\|” (pipe), “\>” (redirect) and environment variables like "\$PATH" are all dependent on the shell. If your commands utilize them, then just give them a shell by using $$ syntax.
 
 I usually use $$ when calling “sudo”. eg.
 
