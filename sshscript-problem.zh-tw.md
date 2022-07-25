@@ -1,0 +1,1 @@
+sshscript執行檔的安裝
