@@ -1,5 +1,4 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
-
 # SSHScript使用教學 第一章
 
 SSHScript 是純Python寫的模組，它所能做的事情用Paramiko跟subprocess都做得到。但是SSHScript提供比較簡易的語法使用Paramiko及subprocess的功能。
@@ -105,32 +104,32 @@ $ sshscript hello.spy --script
 
 轉換過的script是什麼不是很容易閱讀，但實際上你並不需要讀懂它。通常只有偶爾在Debug時會想要知道報錯的那行的內容是什麼時會用到 —script的這個參數。
 
-你只需要注意到，你寫了一行的程式碼:
+重點是，你只須寫一行程式:
 
 ```
 $echo hello world
 ```
 
-這是一行常見的Shell指令。它呼叫 echo 指令，印出 hello world。你把它寫在.spy裡面，SSHScript就會把它轉成subprocess的呼叫，並且把結果放在$.stdout當中讓你在Python中使用:
+看起來就像是一行常見的Shell指令呼叫 echo印出 hello world。你把它寫在.spy裡面，SSHScript就會把它轉成subprocess的呼叫，並且把結果放在$.stdout當中讓你在其他的Python程式碼中使用，例如第二行：
 
 ```
 print($.stdout) 
 ```
 
-上面這一行是典型的Python的程式碼，只是他列印了一個SSHScript才有的特殊變數。接下來讓我們來瞭解這個SSHScript特殊的變數： $.stdout
+這一行是典型的Python的程式碼，它列印了一個SSHScript才有的特殊變數 $.stdout。接下來讓我們來瞭解這個SSHScript特殊的變數： 
 
 ## $.stdout
 
 請注意有一個小數點在＄後面。
 
-這是一個str變數。內容是最近執行的＄指令從stdout的輸出。例如：
+這個變數的內容是str字串。內容來自於最近執行的＄指令在stdout的輸出。例如：
 
 ```
 $echo hello world
 assert $.stdout.strip() == 'hello world'
 ```
 
-“echo”程式會從stdout輸出”hello word”，因此$.stdout的內容是 “hello world”. 因為它是一個str變數，你可以直接接上 .strip()。你也可以這樣：
+“echo”程式會從stdout輸出”hello word”，因此$.stdout的內容是 “hello world\n”（帶有換行符號）. 因為它是一個str變數，你可以直接接上 .strip()。你也可以這樣：
 
 ```
 $ls -l 
@@ -143,7 +142,7 @@ for line in $.stdout.split('\n'):
 
 既然有$.stdout，也就有$.stderr。請注意有一個小數點在＄後面。
 
-這是一個str變數。內容是最近執行的＄指令從stderr的輸出。例如
+這個變數的內容是str字串。內容來自於最近執行的＄指令在stderr的輸出。例如
 
 ```
 $ls -l /not-found-folder
@@ -157,7 +156,7 @@ Error: ls: /not-found-folder: No such file or directory
 
 ## Hello World @Host
 
-上一節的內容中所執行的指令都是在本機localhost上執行的。如果要ssh到遠端主機做相同的事情要怎麼做呢？只要加上一行指令就可以做到。例如：
+上一節的內容中所執行的指令都是在本機localhost上執行的。如果要ssh到遠端主機做相同的事情要怎麼做呢？只要在第一行加上連線到遠端主機的指令$.connect就完成了。例如：
 
 ```
 $.connect('yourname@host',password='password')
@@ -165,23 +164,23 @@ $ echo hello world
 print($.stdout)
 ```
 
-只要在第一行加上連線到遠端主機的指令$.connect就完成了。
-
-如果你有2台，你可以這麼做：
+如果你有2台主機要做，你可以這麼做：
 
 ```
+# ssh 到 host-a
 $.connect('yourname@host-a',password='password-a')
 $ echo hello world @host-a
 print($.stdout)
 $.close() # 離開 host-a
 
+# ssh 到 host-b
 $.connect('yourname@host-b',password='password-b')
 $ echo hello world @host-b
 print($.stdout)
-$.close() # 最後這一個$.close()可有可無
+$.close() # 離開 host-b. 最後這一個$.close()可有可無
 ```
 
-如果不幸，你實在命苦，host-b躲在host-a之後，你得跳2次才能到達host-b執行工作的主機。沒問題，那就不要關掉host-a的連線，繼續 $.connect 到host-b
+如果不幸，你實在命苦，host-b躲在host-a之後，你得透過host-a當跳板到host-b執行工作。沒問題，那就不要關掉host-a的連線，繼續 $.connect 到host-b
 
 ```
 $.connect('yourname@host-a',password='password-a')
@@ -192,7 +191,7 @@ print($.stdout)
 
 只要這4行，你完成了ssh到host-a，再從host-a ssh 到host-b去say hello的任務。
 
-當然，你不只可以say hello, 你還可以做各種你想做的事。
+當然，你不只可以say hello, 你可以做各種你想做的事。例如
 
 ```
 $.connect('yourname@host-a',password='password-a')
@@ -232,6 +231,15 @@ for line in $.stdout.split('\n'):
 
 說穿了，.spy就是一個.py，Python的函式你想怎麼用就怎麼用。
 
+$.connect()支援with的語法，如果你想讓程式比較容易讀一點，你也可以這麼寫：
+
+```
+with $.connect('yourname@host-a',password='password-a') as _:
+    with $.connect('yourname@host-b',password='password-b') as _:
+        $ echo hello world
+        print($.stdout)
+```
+
 ## ssh with key
 
 如果你不是使用密碼連線，而是用key的話，你可以這樣連線：
@@ -257,8 +265,7 @@ keypath = '/home/yourname/.ssh/id_rsa'
 $.connect('yourname@host-b',pkey=$.pkey(keypath))
 ```
 
-當然，如果你不覺得麻煩的話，你可以把遠端主機上的key file複製到本機，
-然後把它從遠端主機上刪除。相對來講，這樣是比較安全。在此情況下，連線可以這樣做：
+如果你不覺得麻煩的話，你可以把遠端主機上的key file複製到本機，然後把它從遠端主機上刪除。相對來講，這樣是比較安全。在此情況下，連線可以這樣做：
 
 ```
 keyA = $.pkey('keys/host-a/id_rsa')
@@ -281,4 +288,4 @@ last -30
 '''
 ```
 
-在多行字串當中的每一行指令會一個接一個執行（不是同時）。所有的輸出會集合起來放在 $.stdout或$.stderr當中。
+在多行字串當中的每一行指令會一個接一個執行（不是同時）。所有的輸出會集合起來一起放在 $.stdout或$.stderr當中。
