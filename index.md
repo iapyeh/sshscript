@@ -3,8 +3,8 @@
 ## en
 
 - [Tutorial](https://iapyeh.github.io/sshscript/tutorial) 
-- [Learning SSHScript Chapter 1)](https://iapyeh.github.io/sshscript/learn-chap01)
-- [Learning SSHScript Chapter 2)](https://iapyeh.github.io/sshscript/learn-chap02)
+- [Learning SSHScript Chapter 1](https://iapyeh.github.io/sshscript/learn-chap01)
+- [Learning SSHScript Chapter 2](https://iapyeh.github.io/sshscript/learn-chap02)
 - [Syntax, Variables and Functions](https://iapyeh.github.io/sshscript/syntax)
 - [sshscript CLI](https://iapyeh.github.io/sshscript/cli)
 - [sshscript Module](https://iapyeh.github.io/sshscript/module) 
