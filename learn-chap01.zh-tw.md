@@ -2,11 +2,13 @@
 
 # SSHScript使用教學 第一章
 
-SSHScript 是純Python寫的模組，它所能做的事情用Paramiko跟subprocess都做得到。但是SSHScript提供一種比較簡潔、直觀的語法讓你使用Paramiko及subprocess的功能。因為SSHScript可讓程式看起來像是把Shell命令嵌入Python程式中，甚至可以把它看成是一種用Python寫Shell Script的方法。
+SSHScript 是純Python寫的模組，它所能做的事情用Paramiko跟subprocess都做得到。但是SSHScript提供比較簡易的語法使用Paramiko及subprocess的功能。
+
+SSHScript可讓程式看起來像是把Shell命令嵌入Python程式中，你甚至可以把它看成是一種用Python寫Shell Script的工具。
 
 ## 安裝方式
 
-以下兩種方式都可以
+安裝給自己用的話，以下兩種方式都可以
 
 ```
 $pip install sshscript
@@ -14,7 +16,7 @@ $pip install sshscript
 $python3 -m pip install sshscript
 ```
 
-或者是
+安裝給所有主機上的帳號都能用的話，加上sudo就行。
 
 ```
 $sudo pip install sshscript
@@ -30,9 +32,11 @@ $sudo python3 -m pip install sshscript
 $pip install sshscript --upgrade
 ```
 
+因為SSHScript是一個很年輕的模組，還在熱烈發展中，或許你偶爾可以檢查一下有沒有更新的版本。
+
 ## 檢查安裝是否成功
 
-一般而言如果pip安裝成功，則在程式內import sshscript不會有問題。但因為SSHScript模組會額外安裝一個可執行檔，名為 sshscript，由於某些緣故可能執行會有問題。本使用教學需依靠sshscript執行檔進行，所以在繼續下去之前，讓我們先檢查sshscript是否安裝成功。檢查sshscript是否可成功執行的方法是在console中，輸入sshscript (小寫）：
+本使用教學需依靠sshscript執行檔進行，所以在繼續下去之前，讓我們先檢查sshscript是否可以執行。檢查sshscript是否可執行的方法是在console（命令列）中，輸入sshscript (小寫）：
 
 ```
 $ sshscript
@@ -42,7 +46,7 @@ $ sshscript
 
 ```
 SSHScript Version:1.102
-usage: sshscript [-h] [--run-order] [--script]...
+usage: sshscript [-h] [--run-order] [--script]...(省略）
 
 SSHScript
 
@@ -56,40 +60,14 @@ optional arguments:
 (以下省略）
 ```
 
-## 如果安裝不成功
-
-目前已知在某些情況下，setuptools會產生的python執行檔的路徑是錯誤的。當你執行sshscript時會有 bad interpreter的錯誤。輸出可能是這樣：
-
-```
--bash: ... bad interpreter: No such file or directory
-```
-
-解決的方法是找到sshscript安裝的路徑：
-
-```
-$ which sshscript
-```
-
-然後改掉他的第一行。例如第一行可能是這樣：
-
-```
-#!/usr/local/bin/python
-```
-
-會有"bad interpreter"是因為/usr/local/bin/pytho不存在，可將它改成
-
-```
-#!/usr/bin/env python3 
-```
-
-或者你那台機器上的python3的路徑。
+如果不是上述的畫面，請參考「[sshscript執行檔的安裝](https://iapyeh.github.io/sshscript/sshscript-problem.zh-tw)」一文。
 
 ## SSHScript的使用方式
 
-1. 你編寫含有SSHScript語法的Python程式碼，假設附檔名為.spy，然後執行 “sshscript [你的.spy檔]”。你的程式碼內的SSHScript語法部分替換成可運作的一般Python 語法之後被Python執行。
-2. 在你的.py程式中，import sshscript，使用sshscript.runFile() 或 sshscript.runScript()執行含有SSHScript語法的程式碼。
+1. 編寫含有SSHScript語法的Python程式碼，假設附檔名為.spy，然後執行 “sshscript [你的.spy檔]”。sshscript會你的.spy程式內的SSHScript語法部分替換成平常可運作的一般語法，再由Python執行。
+2. 在.py程式中，import sshscript，使用sshscript.runFile() 或 sshscript.runScript()執行含有SSHScript語法的程式碼。
 
-本使用教學的內容說明的是第一種用法。
+本使用教學的內容說明的是第一種用法。如果你會了第一種用法，那麼第二種用法自然也就會用了。
 
 ## Hello World
 
