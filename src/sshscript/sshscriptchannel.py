@@ -23,6 +23,29 @@ try:
 except ImportError:
     from .sshscripterror import SSHScriptError
 loop = asyncio.get_event_loop()
+
+class WithChannelWrapper(object):
+    def __init__(self,channel):
+        self.c = channel
+    def sendline(self,s='\n',secondsToWaitResponse=1):
+        return self.c.sendline(s,secondsToWaitResponse)
+    def expect(self,rawpat,timeout=60,stdout=True,stderr=True):
+        return self.c.expect(rawpat,timeout,stdout,stderr)
+    def expectStderr(self,rawpat,timeout=60):
+        return self.c.expect(rawpat,timeout,False,True)
+    def expectStdout(self,rawpat,timeout=60):
+        return self.c.expect(rawpat,timeout,True,False)
+    def wait(self,seconds=None):
+        return self.c.wait(seconds)
+
+    @property
+    def stdout(self):
+        return self.c.stdout
+    @property
+    def stderr(self):
+        return self.c.stderr
+
+
 class GenericChannel(object):
     def __init__(self):
         self.allStdoutBuf = []
@@ -44,7 +67,6 @@ class GenericChannel(object):
             self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🐞').encode('utf8')
         else:
             self.dump2sys = False
-
     @property
     def stdout(self):
         return self._stdout
@@ -130,20 +152,14 @@ class GenericChannel(object):
                             return
                 await asyncio.sleep(0.1)
         return loop.run_until_complete(_wait())    
-    
-    def expectStderr(self,rawpat,timeout=60):
-        return self.expect(rawpat,timeout,False,True)
-
-    def expectStdout(self,rawpat,timeout=60):
-        return self.expect(rawpat,timeout,True,False)
-    
+        
     def wait(self,seconds=None):
         async def _wait(seconds):
             await self.waitio(seconds)
         return loop.run_until_complete(_wait(seconds))                
 
     def __enter__(self):
-        return self
+        return WithChannelWrapper(self)
     
     def __exit__(self,*args):
         self.wait(1)
