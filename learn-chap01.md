@@ -302,3 +302,5 @@ netstat -antu
 last -30
 '''
 ```
+
+[Learning SSHScript Chapter 2](https://iapyeh.github.io/sshscript/learn-chap02)
