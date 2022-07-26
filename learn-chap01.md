@@ -1,12 +1,9 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
-
 # Learning SSHScript Chapter 1
 
 The SSHScript is in pure Python. Its capability is based on the [Paramiko](https://www.paramiko.org/) and subprocess. The SSHScript provides easy syntax for you. With the SSHScript you can embed shell commands in Python codes. It looks like writing a shell script in Python.
 
 ## Installation
-
-Installation for your account only:
 
 ```
 $pip install sshscript
@@ -14,33 +11,21 @@ or
 $python3 -m pip install sshscript
 ```
 
-Installation for all accounts on the same host:
-
-```
-$sudo pip install sshscript
-or
-$sudo python3 -m pip install sshscript
-```
-
 ## Upgrading
-
-Append  --upgrade at the end, eg.
 
 ```
 $pip install sshscript --upgrade
 ```
 
-Because the SSHScript is under development, you might need to upgrade sometimes.
-
 ## Check Installation
 
-The lesson needs “sshscript” executable, let us check if it works before moving on. To check it, please type “sshcript [ENTER]” on your console.
+This course needs the “sshscript” executable, let us check if it works before moving on. To check it, please type “sshscript [ENTER]” on your console.
 
 ```
 $ sshscript
 ```
 
-If your screen is something like below, you have done. (version number does not matter)
+If your screen shows something like below, it works. (version number does not matter)
 
 ```
 SSHScript Version:1.102
@@ -60,8 +45,8 @@ optional arguments:
 
 ## Usage Scenario
 
-1. Edit a file in python script (with suffix .spy) which contains statements in SSHScript syntax. Then execute the sshscript to run your .spy script.
-2. Import sshscript module in a regular .py file, then call the sshscript.runFile() or sshscript.runScript() to run scripts which contain SSHScript syntax.
+1. Edit a file of python script which contains codes in the syntax of SSHScript. Maybe you can name it with the suffix “.spy” to distinguish it from regular python script. Then let the sshscript executable to run your .spy script.
+2. Import “sshscript module” in a regular .py file, then call function sshscript.runFile() or sshscript.runScript() to run scripts which contain codes in the syntax of SSHScript.
 
 This lesson introduces Scenario 1. When you are familiar with Scenario 1, you are able to use the SSHScript in Scenario 2.
 
@@ -109,7 +94,7 @@ Please be noted that only one line in the script:
 $echo hello world
 ```
 
-The SSHScript runs it and puts its stdout into the $.stdout. You can take the $.stdout as a regular variable. Just likes as the second line:
+The SSHScript runs it and puts its stdout into the $.stdout. You can take the $.stdout as a regular variable. Just likes what the second line did:
 
 ```
 print($.stdout) 
@@ -121,14 +106,14 @@ It’s a regular Python script but prints a SSHScript-specific variable $.stdout
 
 Please be noted that there is a dot (.) behind the $.
 
-$.stdout is a str variable. Its content is the output of stdout of the least shell command. eg.
+$.stdout is a str variable. Its content is the output of stdout of the least execution of shell command. eg.
 
 ```
 $echo hello world
 assert $.stdout.strip() == 'hello world'
 ```
 
-Since the “echo” outputs ”hello word” to stdout. The content of $.stdout is “hello world\n”（with newline）. Because it is a str，appending .strip() or other string functions are fine. eg.
+Since the “echo” outputs ”hello word” to  the stdout. The content of $.stdout is “hello world\n”（with newline）. Because it is a str，appended by .strip() or other string functions are fine. eg.
 
 ```
 $ls -l 
@@ -141,7 +126,7 @@ for line in $.stdout.split('\n'):
 
 Please be noted that there is a dot (.) behind the $.
 
-$.stdout is paired with $.stderr。The $.stdout is a str variable. Its content is the output of stderr of the least shell command.  eg.
+The $.stdout is paired with the $.stderr。The $.stderr is a str variable. Its content is the output of stderr of the least execution of shell command.  eg.
 
 ```
 # Content of stderr-testing.spy file
@@ -150,7 +135,7 @@ print('Error:' + $.stderr)
 ```
 
 ```
-# In console
+# On console
 $ sshscript stderr-testing.spy
 
 #Output：
@@ -161,7 +146,7 @@ Generally speaking, $.stderr is an empty string if the least shell command execu
 
 ## Hello World @Host
 
-All the example codes on the above sections are run on [localhost](http://localhost) by subprocess package. What if you want to execute them on a remote host?
+All the example codes on the above sections are run on localhost by subprocess module. What if you want to execute them on a remote host?
 
 All you have to do is connecting the remote host by adding one line:
 
@@ -171,18 +156,18 @@ $ echo hello world
 print($.stdout)
 ```
 
-When you have two hosts, you can do it by:
+When you have two hosts, you can do it one by one:
 
 ```
-# ssh to host-a
+# ssh from localhost ➜ host-a
 $.connect('yourname@host-a',password='password-a')
-$ echo hello world @host-a
+$ echo hello world on host-a
 print($.stdout)
 $.close() # disconnect from host-a
 
-# ssh to host-b
+# ssh from localhost ➜ host-b
 $.connect('yourname@host-b',password='password-b')
-$ echo hello world @host-b
+$ echo hello world on host-b
 print($.stdout)
 $.close() # disconnect from host-b. this line is optional
 ```
@@ -190,15 +175,16 @@ $.close() # disconnect from host-b. this line is optional
 In case that the host-b is behind the host-a. You have to take the host-a as a bridge to the host-b. It’s easy, just keep the connection to the host-a, don’t close it, then connect to host-b. Here you are:
 
 ```
+# localhost ➜ host-a ➜ host-b
 $.connect('yourname@host-a',password='password-a')
 $.connect('yourname@host-b',password='password-b')
 $ echo hello world
 print($.stdout)
 ```
 
-Usually, it is called “nested ssh”. With the SSHScript, you have done it with only 2 lines.
+Usually, it is called “nested ssh”. With the SSHScript, you make a nested ssh with only 2 lines. No surprise, you can make a nested-nested ssh with 3 lines.
 
-Of course, you can execute any commands.
+Of course, you can execute any commands on the connected host, not just saying hello.
 
 ```
 $.connect('yourname@host-a',password='password-a')
@@ -220,7 +206,7 @@ $ last -30
 print($.stdout)
 ```
 
-Or do some complex parsing on command’s output with Python
+You can also do complex parsing on command’s output with Python
 
 ```
 $.connect('yourname@host-a',password='password-a')
@@ -240,7 +226,7 @@ for line in $.stdout.split('\n'):
               sendsms(f'Warning:{cols[0]} has capacity over 80')
 ```
 
-Actually, a .spy is a .py. You are full-powered by Python in a .spy too.
+A .spy file is eventually a .py script file. In a .spy file, you are full-powered by Python.
 
 The $.connect() supports “with” syntax. You can utilize this feature to make codes more readable. eg.
 
@@ -251,20 +237,35 @@ with $.connect('yourname@host-a',password='password-a') as _:
         print($.stdout)
 ```
 
-## ssh with key
+You don’t need to call $.close() in context of “with”.  The above example can be written like this:
 
-If you do ssh with key, you can make connection without password by:
+```
+# ssh from localhost ➜ host-a
+with $.connect('yourname@host-a',password='password-a') as _:
+    $ echo hello world on host-a
+    print($.stdout)
+
+# ssh from localhost ➜ host-b
+with $.connect('yourname@host-b',password='password-b') as _:
+    $ echo hello world on host-b
+    print($.stdout)
+```
+
+## ssh connection with key
+
+If you do ssh connection with key, you do not need to provide  password. Just like this:
 
 ```
 $.connect('yourname@host-a')
 ```
 
-It is because the Paramiko would load the key from a regular path. At least it works on my Macbook Pro. If It was not working for you, you can explicitly assign the key, eg.
+It is because the Paramiko would load the key from the default path. At least it works on my Macbook Pro. If It was not working for you, you can explicitly assign the key by giving its path, eg.
 
 ```
 keypath = os.path.expanduser('~/.ssh/id_rsa')
 # $.pkey() loads ssh key from file
-$.connect('yourname@host-a',pkey=$.pkey(keypath))
+pkey = $.pkey(keypath)
+$.connect('yourname@host-a',pkey=pkey)
 ```
 
 When jumping to a nested host by ssh with key, the pkey parameter is required.
@@ -272,14 +273,14 @@ When jumping to a nested host by ssh with key, the pkey parameter is required.
 ```
 $.connect('yourname@host-a')
 
-# Please be noted that the keypath is on the host-a, not on the localhost.
+# Please be noted that the given keypath is on the host-a, not the localhost.
 keypath = '/home/yourname/.ssh/id_rsa'
 pkey = $.pkey(keypath)
 
 $.connect('yourname@host-b',pkey=pkey)
 ```
 
-If you have already moved the key file from the host-a to the localhost. You should load the key file before connecting to the host-a. eg.
+If you have already moved the key file from the host-a to the localhost. You should load the key before making connection to remote host.
 
 ```
 keyA = $.pkey('keys/host-a/id_rsa')
@@ -288,9 +289,9 @@ $.connect('yourname@host-a',pkey=keyA)
 $.connect('yourname@host-b',pkey=keyB)
 ```
 
-The reason is that the $.pkey() loads the file depending on its context. Under the context of existing ssh connection, it looks for content on the connecting host instead of the local host.
+The reason is that the $.pkey() loads key depending on its context. Under the context of having ssh connection, it looks for content on the connecting host.
 
-## Many commands to run
+## Multiple commands in triple quotes
 
 If you have many commands to run, you can write them into a triple quotes string. eg.
 
@@ -301,5 +302,3 @@ netstat -antu
 last -30
 '''
 ```
-
-Each line would be executed one by one, not in parallel. Their output would be collected together in $.stdout and $.stderr. As the given example code above, there are three instances of subprocess.Popen() being created for the three lines of command. The next chapter would introduce another syntax which runs the 3 commands in a single subprocess.
