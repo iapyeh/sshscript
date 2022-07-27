@@ -1,5 +1,5 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
- 
+
 # Syntax, Variables and Functions
 
 # Syntax
@@ -251,16 +251,11 @@ If you know what you are doing, you can get the instance of paramiko.sftp_client
 
 ## os.environ
 
-### os.environ[’VERBOSE] = “1”
+### os.environ[’CMD_INTERVAL’]
 
-```jsx
-if sys.stdout.isatty():
-    os.environ['VERBOSE'] = "1"
-```
+Default is 0.5 (seconds).
 
-### os.environ[’CMD_INTERVAL’] = “0.5”
-
-The interval between two commands. Default is 0.5 seconds. Interval is counted from the latest time when having data received from stdout or stderr.  This value can be changed by os.environ[’CMD_INTERVAL’]. For example:
+The interval between two commands. Interval is counted from the latest time when having data received from stdout or stderr.  This value can be changed by os.environ[’CMD_INTERVAL’]. For example:
 
 ```jsx
 os.environ[’CMD_INTERVAL’] = "2"
@@ -280,9 +275,40 @@ You can reset this value by
 del os.environ[’CMD_INTERVAL’]
 ```
 
-### os.environ[’CMD_TIMEOUT’] = “60”
+### os.environ[’CMD_TIMEOUT’]
 
-The max time spent for executing a command in seconds. Default is 60 seconds.
+The max time spent for executing a command in seconds.
+
+Default is 60 seconds.
+
+### os.environ[’SHELL’]
+
+This is used when the subprocess is invoking shell. Usually it is set by your shell. You don’t need to bother it. If it is not set, shutil.which('bash') is called to find the shell to invoke.
+
+### os.environ[’VERBOSE]
+
+Default is “” (empty string)
+
+The verbose mode is enabled by setting this value to non-empty string. When the verbose mode is enabled, every message received from stdout and stderr of the executing command would be shown on console.
+
+You can enable it like this example:
+
+```jsx
+if sys.stdout.isatty():
+    os.environ['VERBOSE'] = "1"
+```
+
+### os.environ[’VERBOSE_STDOUT_PREFIX’]
+
+Default is ▏
+
+In verbose mode, This string is prefixed to every line when showing a messages of stdout on console.
+
+### os.environ[’VERBOSE_STDERR_PREFIX’]
+
+ Default is 🐞.
+
+In verbose mode, This string is prefixed to every line when showing a messages of stderr on console.
 
 # Functions
 
@@ -290,7 +316,7 @@ The max time spent for executing a command in seconds. Default is 60 seconds.
 
 To close the current ssh connection. This is the counterpart of $.connect(). Please see examples in the $.connect() section. Actually, you don’t need to call this in the context of “with $.connect()”. But you do need this in some context.
 
-## $.connect(host,username=,password=,port=,policy=,**kw)
+## $.connect(host, username, password, port, policy,**kw)
 
 This function open a ssh connection to remote host.
 
