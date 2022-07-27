@@ -327,7 +327,7 @@ logger.addHandler(handler)
 
 ### \_\_main\_\_.unknown_args
 
-The sshscript use argparse to parsing command-line arguments. It puts those unknown argements in \__main\__.unknown_args. You can use “argparse” in .spy file by parsing this variable. For example:
+The sshscript use argparse to parsing command-line arguments. It puts those unknown argements in \_\_main\_\_.unknown_args. You can use “argparse” in .spy file by parsing this variable. For example:
 
 ```
 # file content of test.spy
