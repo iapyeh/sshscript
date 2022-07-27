@@ -1,5 +1,4 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
-
 # sshscript CLI
 
 If you install the sshscript package by “pip install”. A CLI “sshcript” is also installed by the setuptools. To check it, please open a terminal then type “sshscript[ENTER]”.
@@ -104,27 +103,13 @@ With this argument, the sshscript would  dump stdout and stderr to console.
 $sshscript hello.spy --verbose
 ```
 
-## sshscript **╌silent**
-
-with --silent, you can suppress dumping stdout and stderr to console
-
-```python
-# suppress dumping of stdout and stderr
-$sshscript hello.spy --silent
-```
-
-“Dumping stdout and stderr to console” is automatically turned-on when sys.stdout.isatty() is True. In python script, you can set os.environ[’VERBOSE’]=”1” to enable it, or set os.environ[’VERBOSE’]=””  to empty string to disable it.
-
-<aside>
-💡 You can set the prefix of dumping lines for stdout or stderr:
+You can set the prefix of dumping lines for stdout or stderr:
 For stdout, it is os.environ[’VERBOSE_STDOUT_PREFIX’] , default is ▏.
 For stderr, it is os.environ[’VERBOSE_STDERR_PREFIX’] , default is 🐞.
 
-</aside>
-
 ## sshscript  **╌**debug
 
-With this argument, the sshscript would dump the executing script where there is exception raise during execution. Also the level of logger would be set to “DEBUG”. This argument would suppress “--silent”.
+With this argument, the sshscript would dump the executing script where there is exception raise during execution. Also the level of logger would be set to “DEBUG”. 
 
 ```python
 $sshscript hello.spy --debug
