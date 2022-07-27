@@ -907,13 +907,9 @@ def main():
                         default=False,
                         help='show the converted python script only, no execution.')
     
-    parser.add_argument('--silent', dest='silent', action='store_true',
-                        default=False,
-                        help='when executing on tty, do not dump to console.')
-
     parser.add_argument('--verbose', dest='verbose', action='store_true',
                         default=False,
-                        help='dump stdout,stderr to console. "debug" implies "verbose". "silent" implies not "verbose".')   
+                        help='dump stdout,stderr to console. "debug" implies "verbose".')   
 
     parser.add_argument('--ext', dest='sshscriptExt', action='store',
                         default='.spy',
@@ -935,13 +931,7 @@ def main():
         if args.debug:
             os.environ['DEBUG'] = '1'
             os.environ['VERBOSE'] = '1'
-        # debug suppress silent
-        elif args.silent:
-            os.environ['SILENT'] = '1'
-        # silent suppress verbose
         elif args.verbose:
-            os.environ['VERBOSE'] = '1'
-        elif sys.stdout.isatty():
             os.environ['VERBOSE'] = '1'
 
         setupLogger()
