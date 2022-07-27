@@ -1,5 +1,4 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
-
 # Syntax, Variables and Functions
 
 # Syntax
@@ -310,6 +309,51 @@ In verbose mode, This string is prefixed to every line when showing a messages o
 
 In verbose mode, This string is prefixed to every line when showing a messages of stderr on console.
 
+## __main__
+
+### __main__.SSHScript.logger
+
+You can assess the logger of the SSHScript by this variable. Below is an example of setting log files in a .spy file.
+
+```
+import __main__
+logger = __main__.SSHScript.logger
+
+logfile = 'unittest.log'
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(logfile, 'w', 'utf-8')
+logger.addHandler(handler)
+```
+
+### __main__.unknown_args
+
+The sshscript use argparse to parsing command-line arguments. It puts those unknown argements in __main__.unknown_args. You can use “argparse” in .spy file by parsing this variable. For example:
+
+```
+# file content of test.spy
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--account', dest='account', action='store',default='')
+args, unknown = parser.parse_known_args(__main__.unknown_args)
+
+# in some circumstance, next line also works
+#args, unknown = parser.parse_known_args()
+
+if not args.account:
+    parser.print_help()
+    $.exit()
+$.connect(args.account)
+$netstat -antu
+print($.stdout)
+```
+
+Then run it by 
+
+```
+$sshscript test.spy --account=username@host
+```
+
 # Functions
 
 ## $.close()
@@ -608,5 +652,3 @@ $upload('/home/user/mysql.cnf','/etc/mysql/master/backup/',makedirs=1)
 💡 If you are not satisfied by the $.upload , you can use the $.sftp for better control.
 
 </aside>
-
-##
