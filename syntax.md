@@ -309,9 +309,9 @@ In verbose mode, This string is prefixed to every line when showing a messages o
 
 In verbose mode, This string is prefixed to every line when showing a messages of stderr on console.
 
-## __main__
+## \_\_main\_\_
 
-### __main__.SSHScript.logger
+### \_\_main\_\_.SSHScript.logger
 
 You can assess the logger of the SSHScript by this variable. Below is an example of setting log files in a .spy file.
 
@@ -325,9 +325,9 @@ handler = logging.FileHandler(logfile, 'w', 'utf-8')
 logger.addHandler(handler)
 ```
 
-### __main__.unknown_args
+### \_\_main\_\_.unknown_args
 
-The sshscript use argparse to parsing command-line arguments. It puts those unknown argements in __main__.unknown_args. You can use “argparse” in .spy file by parsing this variable. For example:
+The sshscript use argparse to parsing command-line arguments. It puts those unknown argements in \__main\__.unknown_args. You can use “argparse” in .spy file by parsing this variable. For example:
 
 ```
 # file content of test.spy
