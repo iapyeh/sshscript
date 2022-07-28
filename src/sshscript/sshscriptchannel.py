@@ -63,8 +63,9 @@ class GenericChannel(object):
         self.stderrDumpBuf = []
         if os.environ.get('VERBOSE'):
             self.dump2sys = True
-            self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','▏').encode('utf8')
-            self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🐞').encode('utf8')
+            #🔵🔴🟠🟡🟢🟣🟤⭕⬜⬛🔲🟦🟥🟧🟨🟩🟪🟫🛑🔶🔷🔸🔹🔺🔻 
+            self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','🟩').encode('utf8')
+            self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🟨').encode('utf8')
         else:
             self.dump2sys = False
     @property
