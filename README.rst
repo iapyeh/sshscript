@@ -20,10 +20,10 @@ Something likes to embed shell commands in a python script. For example:
         if line.startswith('d'): continue
         print(line)
 
-More on github_
+Documents_
 
 
 
 .. _paramiko : https://www.paramiko.org/
 
-.. _github: https://github.com/iapyeh/sshscript
+.. _Documents: https://iapyeh.github.io/sshscript/index
