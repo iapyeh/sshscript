@@ -299,13 +299,13 @@ if sys.stdout.isatty():
 
 ### os.environ[’VERBOSE_STDOUT_PREFIX’]
 
-Default is ▏
+Default is 🟩
 
 In verbose mode, This string is prefixed to every line when showing a messages of stdout on console.
 
 ### os.environ[’VERBOSE_STDERR_PREFIX’]
 
- Default is 🐞.
+ Default is 🟨.
 
 In verbose mode, This string is prefixed to every line when showing a messages of stderr on console.
 
