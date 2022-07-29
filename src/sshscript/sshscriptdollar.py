@@ -248,7 +248,7 @@ class SSHScriptDollar(object):
         else:
             self.channel = ParamikoChannel(self,None, timeout)
             for command in cmds:
-                logger.debug(f'ssh executing {command}')
+                logger.debug(f'execute: {command}')
                 # The paramiko documentation says:
                 # "using exec_command or invoke_shell without a pty will ever have data on the stderr stream."
                 # So, we always need not a pty.

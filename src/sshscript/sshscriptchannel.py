@@ -83,9 +83,6 @@ class GenericChannel(object):
         self.lock.acquire()
         del self.stdoutBuf[:]
         del self.stderrBuf[:]
-        del self.stdoutDumpBuf[:]
-        del self.stderrDumpBuf[:]
-        self.lock.release()    
 
         if self.dump2sys:
             if len(self.stdoutDumpBuf):
@@ -94,6 +91,10 @@ class GenericChannel(object):
             if len(self.stderrDumpBuf):
                 sys.stderr.buffer.write(self.stderrPrefix + b''.join(self.stderrDumpBuf) + b'\n')
                 sys.stderr.buffer.flush()
+
+        del self.stdoutDumpBuf[:]
+        del self.stderrDumpBuf[:]
+        self.lock.release()    
 
         if self._stderr and self.owner.sshscript._paranoid:
             self.close()
@@ -177,25 +178,27 @@ class GenericChannel(object):
         return n
 
     def addStdoutData(self,x):  
-        self._lastIOTime = time.time()
-        if not x: return
         # 不要讓self.lock.acquire()影響self._lastIOTime
+        self._lastIOTime = time.time()
+        if not x:return
         self.lock.acquire()
         self.stdoutBuf.append(x)
         self.allStdoutBuf.append(x)
-        self.lock.release()
+        lines = None
         if self.dump2sys:
             if b'\n' in x:
                 lines = ((b''.join(self.stdoutDumpBuf))+x).split(b'\n')
-                for line in lines[:-1]:
-                    sys.stdout.buffer.write(self.stdoutPrefix + line + b'\n')
-                self.stdoutDumpBuf = [lines[-1]]
-                sys.stdout.buffer.flush()
+                lastItem = lines.pop()
+                del self.stdoutDumpBuf[:]
+                if lastItem:
+                    self.stdoutDumpBuf.append(lastItem)
             else:
-                #print('add',[x])
                 self.stdoutDumpBuf.append(x)
-
-        self._lastIOTime = time.time()
+        self.lock.release()
+        if lines:
+            for line in lines:
+                sys.stdout.buffer.write(self.stdoutPrefix + line + b'\n')
+            sys.stdout.buffer.flush()
     
     def addStderrData(self,x):
         # 不要讓self.lock.acquire()影響self._lastIOTime
@@ -204,17 +207,21 @@ class GenericChannel(object):
         self.lock.acquire()
         self.stderrBuf.append(x)
         self.allStderrBuf.append(x)
-        self.lock.release()
+        lines = None
         if self.dump2sys:
             if b'\n' in x:
                 lines = ((b''.join(self.stderrDumpBuf))+x).split(b'\n')
-                for line in lines[:-1]:
-                    sys.stderr.buffer.write(self.stderrPrefix + line + b'\n')
-                self.stderrDumpBuf = [lines[-1]]
-                sys.stderr.buffer.flush()
+                lastItem = lines.pop()
+                del self.stderrDumpBuf[:]
+                if lastItem:
+                    self.stderrDumpBuf.append(lastItem)
             else:
                 self.stderrDumpBuf.append(x)
-        self._lastIOTime = time.time()
+        self.lock.release()
+        if lines:
+            for line in lines:
+                sys.stderr.buffer.write(self.stderrPrefix + line + b'\n')
+            sys.stderr.buffer.flush()
 
 class POpenPipeChannel(GenericChannel):
     def __init__(self,owner,cp,timeout):
