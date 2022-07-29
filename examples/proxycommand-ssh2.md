@@ -22,5 +22,5 @@ with $ssh user@host-b as console:
 ```
 $sshscript test.spy
 $sshscript test.spy --verbose
-$sshscript test.spy --verbose --debug
+$sshscript test.spy --debug
 ```
