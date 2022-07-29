@@ -6,6 +6,7 @@
 $.connect('user@host',proxyCommand='openssl s_client -connect proxy:port')
 $hostname
 
+# connect to another host with password
 password = 'secret'
 $.connect('user@host2',password=password)
 with $sudo -S su as console:
