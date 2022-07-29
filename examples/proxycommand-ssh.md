@@ -1,3 +1,4 @@
+```
 # use case
 $.connect('user@host',proxyCommand='openssl s_client -connect proxy:port')
 $hostname
@@ -9,3 +10,4 @@ with $ssh -t user@host as console:
     console.expect('#',timeout=3)
     console.sendline('crontab -l')
     console.sendline('exit')
+```
