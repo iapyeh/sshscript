@@ -7,7 +7,7 @@ $.connect('user@host-a',proxyCommand='openssl s_client -connect proxy:port')
 $hostname
 
 # connect to another host-b with key
-pkey = $.pkey('/home/user/.ssh/id_rsa')
+pkey = $.pkey('/home/user/.ssh/id_rsa') # path on host-a, not on localhost
 password = 'secret'
 $.connect('user@host-b',pkey=pkey)
 with $sudo -S su as console:
