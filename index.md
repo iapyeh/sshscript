@@ -108,6 +108,9 @@ The SSHScript is based on subprocess and [Paramiko](https://www.paramiko.org/). 
 ```python
 pip install sshscript
 ```
+## Examples
+
+- [Examples](https://iapyeh.github.io/sshscript/examples) 
 
 ## Disclaimer
 
