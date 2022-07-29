@@ -1,8 +1,10 @@
 ```
-# use case
+# connect ssh with proxyCommand
 $.connect('user@host',proxyCommand='openssl s_client -connect proxy:port')
 $hostname
-with $ssh -t user@host as console:
+
+# ssh to another host and sudo to root
+with $ssh user@host2 as console:
     console.expect('Last login')
     console.sendline('sudo su')
     console.expect('password')
