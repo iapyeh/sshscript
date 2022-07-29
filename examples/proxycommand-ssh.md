@@ -7,7 +7,7 @@ $.connect('user@host',proxyCommand='openssl s_client -connect proxy:port')
 $hostname
 
 password = 'secret'
-$.connect('timwang@rmswks',password=password)
+$.connect('user@host2',password=password)
 with $sudo -S su as console:
     console.expect('password')
     console.sendline(password)
