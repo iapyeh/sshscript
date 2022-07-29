@@ -1,3 +1,5 @@
+<div style="text-align:right"><a href="./index">Examples</a></div>
+
 ```
 # connect ssh with proxyCommand
 $.connect('user@host',proxyCommand='openssl s_client -connect proxy:port')
