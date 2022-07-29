@@ -17,7 +17,9 @@ with $sudo -S su as console:
     console.sendline('exit')
 ```
 
-#### execution
+#### execution examples
 ```
 $sshscript test.spy
+$sshscript test.spy --verbose
+$sshscript test.spy --debug
 ```
