@@ -269,7 +269,7 @@ class SSHScript(object):
             if 'proxyCommand' in kw:
                 raise NotImplementedError('proxyCommand not support in nested session')
             else:
-                sshscriptLogger.debug(f'{self.id} nested openning {self.username}@{self.host}:{self.port}')
+                sshscriptLogger.debug(f'nested connecting {self.username}@{self.host}:{self.port}')
                 # REF: https://stackoverflow.com/questions/35304525/nested-ssh-using-python-paramiko
                 vmtransport = self.parentSession._client.get_transport()
                 dest_addr = (host,port)
@@ -278,12 +278,12 @@ class SSHScript(object):
                 self._client = SSHScript.connectClient(host,username,password,port,policy,sock=self._sock,**kw)
         else:
             if 'proxyCommand' in kw:
-                sshscriptLogger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port} by {kw["proxyCommand"]}')
+                sshscriptLogger.debug(f'connecting {self.username}@{self.host}:{self.port} by {kw["proxyCommand"]}')
                 self._sock = self.getSocketWithProxyCommand(kw['proxyCommand'])
                 del kw['proxyCommand']
                 self._client = SSHScript.connectClient(host,username,password,port,policy,sock=self._sock,**kw)
             else:
-                sshscriptLogger.debug(f'{self.id} openning {self.username}@{self.host}:{self.port}')
+                sshscriptLogger.debug(f'connecting {self.username}@{self.host}:{self.port}')
                 self._client = SSHScript.connectClient(host,username,password,port,policy,**kw)
 
         self._previousSshscriptInContext = SSHScript.inContext
@@ -724,7 +724,6 @@ class SSHScript(object):
         def dumpScriptItem(scriptChunk):
             for idx, line in enumerate(scriptChunk.split('\n')):
                 print(f'{str(idx+1).zfill(3)}:{line}')
-            #traceback.print_exc()
 
         for scriptChunk in self.blocksOfScript:
             if isinstance(scriptChunk, str):
@@ -741,19 +740,19 @@ class SSHScript(object):
                 try:
                     exec(scriptChunk,_globals,_locals)
                 except SyntaxError as e:
-                    if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
+                    #if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
                 except SystemExit as e:
                     if e.code:
                         traceback.print_exc()
                     raise
                 except SSHScriptError:
-                    if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
+                    #if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
                 except SSHScriptExit:
                     raise
                 except:
-                    if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
+                    #if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
             elif isinstance(scriptChunk, self.__class__):
                 scriptChunk.run(None,_locals,_globals,showScript=showScript)
@@ -825,8 +824,9 @@ def runFile(givenPaths,
         sshscriptLogger.debug(f'run {file}')
 
         absfile = os.path.abspath(file)
-        with open(absfile) as fd:
-            script = fd.read()
+        # 有點怪，但比較能windows時也適用
+        with open(absfile,'rb') as fd:
+            script = fd.read().decode('utf-8')
 
         # add folder to sys.path,so "import <module in the same folder of __file__>" works
         scriptFolder = os.path.dirname(abspath)

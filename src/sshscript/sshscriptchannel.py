@@ -222,7 +222,7 @@ class GenericChannel(object):
             for line in lines:
                 sys.stderr.buffer.write(self.stderrPrefix + line + b'\n')
             sys.stderr.buffer.flush()
-
+'''
 class POpenPipeChannel(GenericChannel):
     def __init__(self,owner,cp,timeout):
         super().__init__()
@@ -297,11 +297,12 @@ class POpenPipeChannel(GenericChannel):
     
         self.owner.stderr = (b''.join(self.allStderrBuf)).decode('utf8')
         self.owner.stdout = (b''.join(self.allStdoutBuf)).decode('utf8')    
-
+'''
 class POpenChannel(GenericChannel):
     def __init__(self,owner,cp,timeout,masterFd=None,slaveFd=None):
         super().__init__()
         self.owner = owner
+        self.closed = False
         self.cp = cp
         if cp is None:
             # dummy instance for "with $<command> as ..."
@@ -328,7 +329,7 @@ class POpenChannel(GenericChannel):
             self.masterFd[0]: self.addStdoutData, #stdout
             self.masterFd[1]: self.addStderrData  #stderr
         }
-        while buffer:
+        while (not self.closed) and buffer:
             try:
                 for fd in select(buffer, [], [],1)[0]:
                     try:
@@ -358,6 +359,7 @@ class POpenChannel(GenericChannel):
                     raise
 
     def close(self):
+        self.closed = True
         self.wait(1) # at least 1 seconds has no io
         if self.cp: # not dummy instance
             os.close(self.masterFd[0])
