@@ -20,10 +20,10 @@ import __main__
 import shutil, asyncio
 try:
     from sshscripterror import SSHScriptError
-    from sshscriptchannel import POpenChannel, ParamikoChannel,POpenPipeChannel
+    from sshscriptchannel import POpenChannel, ParamikoChannel#,POpenPipeChannel
 except ImportError:
     from .sshscripterror import SSHScriptError
-    from .sshscriptchannel import POpenChannel, ParamikoChannel,POpenPipeChannel
+    from .sshscriptchannel import POpenChannel, ParamikoChannel#,POpenPipeChannel
 try:
     import pty
 except ImportError:
@@ -172,12 +172,15 @@ class SSHScriptDollar(object):
 
         else:
             
+            '''
             # not invoke shell
             if self.usePty:
                 self.channel = POpenChannel(self,None,timeout)
             else:
                 self.channel = POpenPipeChannel(self,None,timeout)
-            
+            '''
+            self.channel = POpenChannel(self,None,timeout)
+
             for command in cmds:
                 # it is recommended to pass args as a sequence.... If shell is True, 
                 # it is recommended to pass args as a string rather than as a sequence.
