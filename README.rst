@@ -13,8 +13,18 @@ Something likes to embed shell commands in a python script. For example:
         if line.startswith('d'): continue
         print(line)
     
-    # execute a command on remote host and parse the output with python
-    $.open('user@host')
+    # by adding one line to make connection.
+    # you can do the same thing on remote host-a
+    $.connect('user@host-a',password='19890604')
+    $ls -l
+    for line in $.stdout.split('\n'):
+        if line.startswith('d'): continue
+        print(line)
+
+    # by adding two lines to make connections.
+    # you can do the same thing on remote host-b which is behind host-a
+    $.connect('user@host-a',password='19890604')
+    $.connect('user@host-b',password='19890604')
     $ls -l
     for line in $.stdout.split('\n'):
         if line.startswith('d'): continue
