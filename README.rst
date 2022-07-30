@@ -7,12 +7,14 @@ Something likes to embed shell commands in a python script. For example:
 
 .. code:: 
 
+    # file: demo.spy
     # execute a command on localhost and parse the output with python
     $netstat -ant
     for line in $.stdout.split('\n'):
         if not line.endswith('LISTEN'): continue
         print(line)
-    
+
+    # file: demo.spy
     # by adding one line to make connection.
     # you can do the same thing on remote host-a
     $.connect('user@host-a',password='19890604')
@@ -21,6 +23,7 @@ Something likes to embed shell commands in a python script. For example:
         if not line.endswith('LISTEN'): continue
         print(line)
 
+    # file: demo.spy
     # by adding two lines to make connections.
     # you can do the same thing on remote host-b which is behind host-a
     $.connect('user@host-a',password='19890604')
@@ -30,10 +33,26 @@ Something likes to embed shell commands in a python script. For example:
         if not line.endswith('LISTEN'): continue
         print(line)
 
-More in Documents_
+Execution
+
+.. code::
+
+    $ sshscript demo.spy
+
+Installation
+============
+
+.. code:: 
+
+    $ pip install sshscript
+
+Documents
+=========
+
+Here is documents_
 
 
 
 .. _paramiko : https://www.paramiko.org/
 
-.. _Documents: https://iapyeh.github.io/sshscript/index
+.. _documents: https://iapyeh.github.io/sshscript/index
