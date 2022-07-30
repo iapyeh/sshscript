@@ -8,26 +8,26 @@ Something likes to embed shell commands in a python script. For example:
 .. code:: 
 
     # execute a command on localhost and parse the output with python
-    $ls -l
+    $netstat -ant
     for line in $.stdout.split('\n'):
-        if line.startswith('d'): continue
+        if not line.endswith('LISTEN'): continue
         print(line)
     
     # by adding one line to make connection.
     # you can do the same thing on remote host-a
     $.connect('user@host-a',password='19890604')
-    $ls -l
+    $netstat -ant
     for line in $.stdout.split('\n'):
-        if line.startswith('d'): continue
+        if not line.endswith('LISTEN'): continue
         print(line)
 
     # by adding two lines to make connections.
     # you can do the same thing on remote host-b which is behind host-a
     $.connect('user@host-a',password='19890604')
     $.connect('user@host-b',password='19890604')
-    $ls -l
+    $netstat -ant
     for line in $.stdout.split('\n'):
-        if line.startswith('d'): continue
+        if not line.endswith('LISTEN'): continue
         print(line)
 
 Having more, please see the Documents_
