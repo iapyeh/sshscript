@@ -17,19 +17,18 @@ $.connect(f'{user}@{host}',password=pwd)
 with $sudo -S su as console:
     console.expect('password')
     console.sendline(pwd)
-    console.sendline(f'ls -l {file}')
-    console.sendline(f'chmod a+r {file}')
+    # copy as a temporary file
+    console.sendline(f'cp {file} /tmp/file.tgz')
+    # set owner of the temporary file to "user"
+    console.sendline(f'chown {user} /tmp/file.tgz')
 
-# download the file with "user"
-src,dst = $.download(file)
+# download the temporary file with "user"
+src,dst = $.download('/tmp/file.tgz')
 print('downloaded as ',dst)
 
-# sudo as root to restore file's mode
-with $sudo -S su as console:
-    console.expect('password')
-    console.sendline(pwd)
-    console.sendline(f'chmod a-r {file}')
-    console.sendline(f'ls -l {file}')
+# remove the temporary file
+$rm /tmp/file.tgz
+# close the connnection
 $.close()
 
 # ls folder on localhost
