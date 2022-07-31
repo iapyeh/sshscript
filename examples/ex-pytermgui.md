@@ -41,6 +41,6 @@ $sshscript demopytermgui.spy --verbose
 $sshscript demopytermgui.spy --debug
 ```
 
-####Screenshot of execution:
+#### Screenshot of execution:
 ![image](https://user-images.githubusercontent.com/4695577/182014011-2006db55-8ba1-4a49-9de9-a52a7901de6c.png)
 
