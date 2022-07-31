@@ -8,6 +8,7 @@ How to ssh to a remote host, su as root and download root's files
 #### file: example.spy
 ```
 file = '/root/file.tgz'
+tmpfile = '/tmp/file.tgz'
 pwd = 'secret'
 user = 'user'
 host = 'host'
@@ -18,16 +19,17 @@ with $sudo -S su as console:
     console.expect('password')
     console.sendline(pwd)
     # copy as a temporary file
-    console.sendline(f'cp {file} /tmp/file.tgz')
+    console.sendline(f'cp {file} {tmpfile}')
     # set owner of the temporary file to "user"
-    console.sendline(f'chown {user} /tmp/file.tgz')
+    console.sendline(f'chown {user} {tmpfile}')
 
 # download the temporary file with "user"
-src,dst = $.download('/tmp/file.tgz')
-print('downloaded as ',dst)
+src, dst = $.download(tmpfile)
+print('downloaded as ', dst)
 
 # remove the temporary file
-$rm /tmp/file.tgz
+$rm @{tmpfile}
+
 # close the connnection
 $.close()
 
