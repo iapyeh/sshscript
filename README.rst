@@ -60,6 +60,6 @@ Here are documents_
 
 .. _paramiko : https://www.paramiko.org/
 
-.. examples_ :  https://iapyeh.github.io/sshscript/examples/index
+.. _examples :  https://iapyeh.github.io/sshscript/examples/index
 
 .. _documents : https://iapyeh.github.io/sshscript/index
