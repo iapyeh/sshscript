@@ -46,13 +46,20 @@ Installation
 
     $ pip install sshscript
 
+Examples
+========
+
+Here are examples_
+
 Documents
 =========
 
-Here is documents_
+Here are documents_
 
 
 
 .. _paramiko : https://www.paramiko.org/
 
-.. _documents: https://iapyeh.github.io/sshscript/index
+.. examples_ :  https://iapyeh.github.io/sshscript/examples/index
+
+.. _documents : https://iapyeh.github.io/sshscript/index
