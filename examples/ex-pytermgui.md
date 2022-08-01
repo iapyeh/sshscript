@@ -1,10 +1,11 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
-## SSHScript and "pytermgui"
+## SSHScript and Pytermgui
 
-"pytermgui" is an excellent Python TUI framework. This example shows that it can get data from the remote console easily by sshscript.
+<a target="_blank" href="https://github.com/bczsalba/pytermgui">Pytermgui</a> is an excellent Python TUI framework. This example shows that it can get data from the remote console easily by sshscript. And the difference is only one line (connecting or not) between getting data from localhost or remote host.
 
-pytermgui: https://github.com/bczsalba/pytermgui
+![image](https://user-images.githubusercontent.com/4695577/182080610-880bd0b0-0e2b-4db8-9944-67c2ab7b7218.png)
+
 
 #### file: demopytermgui.spy
 ```
