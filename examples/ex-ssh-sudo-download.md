@@ -4,10 +4,9 @@
 
 Ssh to a remote host, su as root and download root's files
 
-![image](https://user-images.githubusercontent.com/4695577/182082615-558d146c-de5f-4efb-b732-c1279262ffb6.png)
-
-
 ## Solution:
+
+![image](https://user-images.githubusercontent.com/4695577/182082615-558d146c-de5f-4efb-b732-c1279262ffb6.png)
 
 #### file: example.spy
 ```
