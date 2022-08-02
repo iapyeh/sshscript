@@ -1,20 +1,20 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
 ## Scenario:
-Generate a list of crackers' ip address by "lastb". This list could be used for generating configuation file for "iptable-restore" to block those ip addresses.
+Generate a list of crackers' ip address by "lastb" command. This list could be used for generating configuation file for "iptable-restore" command to block those ip addresses.
 
 ## Answer:
 
 #### file: blackip.spy
 ```
 # generate black list of cracker's ip from "lastb"
-
 """
 output sample of "lastb"
 blogdosa ssh:notty    178.128.125.70   Tue Aug  2 09:09 - 09:09  (00:00)
 """
+
 def handleLastbData(stdout):
-    # dealing with the output
+    # dealing with the output of "lastb"
     cracker = {}
     for line in stdout.split('\n'):
         if not line: continue
@@ -41,7 +41,7 @@ def handleLastbData(stdout):
     print(tabulate.tabulate(rows,headers=('IP','#count')))
 
     # you can then generate lines like "-A INPUT -s 208.78.41.201/32 -j DROP" 
-    # for "iptables-restore" by the resulting data.
+    # for "iptables-restore" command by the resulting data.
 #
 # there are 3 methods to run on  localhost
 #
@@ -49,10 +49,12 @@ if 1:
     # this script is run by root
     $lastb -10000
     handleLastbData($.stdout)
+    
 elif 0:
     # this script is run by regular user, use sudo to run
     $$echo 123456 | sudo -S lastb -10000
     handleLastbData($.stdout)
+    
 elif 0:
     # this script is run by regular user, su as root to run
     with $sudo -S su as console:
@@ -60,6 +62,7 @@ elif 0:
         console.sendline('123456')
         console.sendline('lastb -10000')
         handleLastbData(console.stdout)
+        
 #
 # there are also 3 methods to run on remote host
 #
