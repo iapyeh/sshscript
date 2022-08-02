@@ -42,14 +42,27 @@ def handleLastbData(stdout):
 
     # you can then generate lines like "-A INPUT -s 208.78.41.201/32 -j DROP" 
     # for "iptables-restore" by the resulting data.
-
-# this is on localhost
-$lastb -10000
-handleLastbData($.stdout)
-
-
-# there are 3 methods to run on remote host
-
+#
+# there are 3 methods to run on  localhost
+#
+if 1:
+    # this script is run by root
+    $lastb -10000
+    handleLastbData($.stdout)
+elif 0:
+    # this script is run by regular user, use sudo to run
+    $$echo 123456 | sudo -S lastb -10000
+    handleLastbData($.stdout)
+elif 0:
+    # this script is run by regular user, su as root to run
+    with $sudo -S su as console:
+        console.expect('password')
+        console.sendline('123456')
+        console.sendline('lastb -10000')
+        handleLastbData(console.stdout)
+#
+# there are also 3 methods to run on remote host
+#
 if 1:
     # login as root
     $.connect('root@host',password='123456')
@@ -75,9 +88,13 @@ elif 0:
     $.close()
 ```
 
-#### execute the example.spy on Host-c
+#### Examples of execution command
 ```
 $sshscript blackip.spy
+$sshscript blackip.spy --verbose
+$sudo sshscript blackip.spy
+$sudo sshscript blackip.spy --verbose
+
 ```
 ![image](https://user-images.githubusercontent.com/4695577/182344161-e8753829-9be5-4176-8ba4-e660d732c9be.png)
 
