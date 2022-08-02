@@ -95,5 +95,7 @@ $sshscript check.disk.space.spy
 # remote host
 $sshscript check.disk.space.spy -t 65 -a user@host
 ```
-![image](https://user-images.githubusercontent.com/4695577/182323999-078dc955-086a-46cc-9557-fcf29a6eeccc.png)
+
+![image](https://user-images.githubusercontent.com/4695577/182324261-f6e0579c-df39-4e76-bbfe-00722200450c.png)
+
 
