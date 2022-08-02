@@ -3,10 +3,10 @@
 
 # Examples
 - [ssh to a host, su as root, then download root's file](https://iapyeh.github.io/sshscript/examples/ex-ssh-sudo-download) 
-- [works with pytermgui by providing output data of remote executions](https://iapyeh.github.io/sshscript/examples/ex-pytermgui) 
-- [file exchanging between hosts](https://iapyeh.github.io/sshscript/examples/ex-filetransfer) 
+- [work with pytermgui by providing output data of remote executions](https://iapyeh.github.io/sshscript/examples/ex-pytermgui) 
+- [exchange file between hosts](https://iapyeh.github.io/sshscript/examples/ex-filetransfer) 
 - [check disk space utilization](https://iapyeh.github.io/sshscript/examples/ex-disk.space.checking) 
 - [generate list of ip addresses for blocking](https://iapyeh.github.io/sshscript/examples/ex-blackip) 
-- [proxyCommand, nested ssh with password and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh) 
-- [proxyCommand, nested ssh with ssh key and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh3) 
-- [proxyCommand, nested ssh with interactive ssh and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh2) 
+- [ssh via proxyCommand, nested ssh with password and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh) 
+- [ssh via proxyCommand, nested ssh with ssh key and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh3) 
+- [ssh via proxyCommand, nested ssh with interactive ssh and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh2) 
