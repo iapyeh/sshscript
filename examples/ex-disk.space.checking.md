@@ -15,11 +15,11 @@ import __main__
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('-t','--warning-percent',dest='threshold', action='store',type=int,default=70,
-                    help='issue warning if utilization rate over this percent(inclusive)')
+parser.add_argument('-t','--threshold',dest='threshold', action='store',type=int,default=70,
+                    help='percent of warning')
 
 parser.add_argument('-a','--account',dest='account', action='store',default='',
-                    help='ssh account (username@host) to make connection')
+                    help='ssh account (username@host)')
 
 args, unknown = parser.parse_known_args()
 
