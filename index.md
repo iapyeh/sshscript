@@ -114,6 +114,5 @@ pip install sshscript
 
 ## Disclaimer
 
-- Developing and testing on MacOS, Linux only.
-- This project is still in the beta phase. I’d like to keep its interface stable, but subject to change without notice.
+- Developing and testing on MacOS, Linux, Freebsd only. For Windows users, suggestion is to use the SSHScript in the "bash of Powershell" or the WSL.
 - Please use it at your own risk.
