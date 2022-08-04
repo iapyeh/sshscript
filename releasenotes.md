@@ -4,7 +4,7 @@
 
 Date: 2022/8/4
 
-- add support for threading. "$.thread()" is the new command to get thread. please see example:<a href="https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading">py_cui and threading</a>. This feature is at experimental state.
+- adding support for threading. "$.thread()" is a new $.command to create threads. please see example:<a href="https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading">py_cui and threading</a>. This feature is at experimental state.
 
 ## 1.1.7
 Date: 2022/7/29
