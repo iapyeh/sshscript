@@ -1,10 +1,8 @@
 
-.. _h60505595954b5b1b3159693b175140:
-
 SSHScript
 #########
 
-The sshscript is an integration of subprocess and \ |LINK1|\ . It provides an unique interface to invoke commands locally and remotely. Something likes to embed shell commands in a python script. For example:
+The sshscript is an integration of subprocess and _paramiko . It provides an unique interface to invoke commands locally and remotely. Something likes to embed shell commands in a python script. For example:
 
 
 .. code:: 
@@ -41,8 +39,6 @@ Execution
 
     $ sshscript demo.spy
 
-.. _h7c2856e31346c6c7732740396a6867:
-
 Installation
 ============
 
@@ -51,7 +47,6 @@ Installation
 
     pip install sshscript
 
-.. _h6f164770434487734563451612a1218:
 
 Why
 ===
@@ -62,27 +57,24 @@ Why
 
 * Handling execution output or exceptions with Python is easier than shell script. Tons of Python packages are handy for you.
 
-.. _h2d26691e27521b3852031565351c67:
 
 More
 ====
 
-* \ |LINK2|\ 
+* docs_
 
-* \ |LINK3|\ 
+* Examples_
+
+* Release Notes_
 
 .. bottom of content
 
+.. _paramiko : https://www.paramiko.org/
 
-.. |LINK1| raw:: html
+.. _docs : https://iapyeh.github.io/sshscript/index
 
-    <a href="https://www.paramiko.org/" target="_blank">paramiko</a>
+.. _Examples : https://iapyeh.github.io/sshscript/examples/index
 
-.. |LINK2| raw:: html
 
-    <a href="https://iapyeh.github.io/sshscript/index" target="_blank">Documents</a>
-
-.. |LINK3| raw:: html
-
-    <a href="https://iapyeh.github.io/sshscript/examples/index" target="_blank">Examples</a>
+.. _Notes : https://iapyeh.github.io/sshscript/releasenotes
 
