@@ -10,29 +10,28 @@ This example shows that SSHScript can works with threading.
 import py_cui
 import os, logging
 import time,random
-import threading
 import math
 global PyCUI,Runner
 PyCUI = py_cui.PyCUI
 class Runner(object):
-    def __init__(self,account,textbox):
-        global threading
+    def __init__(self,name,account,textbox):
         self.account = account
         self.textbox = textbox
+        self.textbox.set_title(name)
         self.stop = False
-        t = threading.Thread(target=self.run)
+        t = $.thread(target=self.run)
         t.start()
     
     def run(self):
         try:
             $.connect(self.account)
             $hostname
-            self.textbox.set_title('@'+$.stdout.strip())
+            hostname = $.stdout.strip()
             while not self.stop:
                 $date
-                n = $.stdout.strip()
-                self.textbox.set_text(n)
-                time.sleep(random.randint(0,3))    
+                line = f'{hostname}:{$.stdout.strip()}'
+                self.textbox.set_text(line)
+                time.sleep(2)
             $.close()
         except Exception as e:
             self.textbox.set_title(self.account)
@@ -48,20 +47,20 @@ class Sample:
             row = math.floor(i / colcount)
             col = i % colcount
             textbox = self.master.add_text_box('',row,col,initial_text=f'')
-            self.runners.append(Runner(account,textbox))
+            self.runners.append(Runner(f'host#{i+1}',account,textbox))
     def stop(self):
         for r in self.runners:
             r.stop = True
 
-# you have to modify hosts, accounts and passwords for your context.
+# You have to modify the following 2 lines 
 hosts = ('host1','host2','host3','host4','host5')
+username = 'username'
+
 accounts = []
 for host in hosts:
-    accounts.append('username@' + host, password="123456")
+    accounts.append(username + '@' + host)
 
-# number of columns
 colcount = 2
-
 rowcount = math.ceil(len(hosts)/float(colcount))
 root = py_cui.PyCUI(rowcount,colcount)
 root.set_title('Date on Hosts')
