@@ -21,6 +21,11 @@ class Runner(object):
         self.textbox = textbox
         self.textbox.set_title(name)
         self.stop = False
+        #
+        # Instead of calling threading.Thread(), please call $.thread().
+        # $.thread() is a wrapper of the threading.Thread().
+        # It accepts exactly the same arguments as the threading.Thread().
+        #
         t = $.thread(target=self.run)
         t.start()
     
