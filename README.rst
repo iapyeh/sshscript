@@ -71,6 +71,8 @@ More
 
 * \ |LINK3|\ 
 
+* \ |LINK4|\ 
+
 .. bottom of content
 
 
@@ -85,4 +87,8 @@ More
 .. |LINK3| raw:: html
 
     <a href="https://iapyeh.github.io/sshscript/examples/index" target="_blank">Examples</a>
+
+.. |LINK4| raw:: html
+
+    <a href="https://iapyeh.github.io/sshscript/releasenotes" target="_blank">Release Notes</a>
 
