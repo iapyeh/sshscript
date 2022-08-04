@@ -65,13 +65,12 @@ More
 
 * Examples_
 
-<<<<<<< HEAD
-* Release Notes_
-=======
-* \ |LINK4|\ 
+
+* `Release Notes`_
+
 
 .. bottom of content
->>>>>>> affb2040abd6207330cdd0eb5e45f790a7c50f5d
+
 
 .. bottom of content
 
@@ -82,9 +81,5 @@ More
 .. _Examples : https://iapyeh.github.io/sshscript/examples/index
 
 
-.. _Notes : https://iapyeh.github.io/sshscript/releasenotes
-
-.. |LINK4| raw:: html
-
-    <a href="https://iapyeh.github.io/sshscript/releasenotes" target="_blank">Release Notes</a>
+.. _`Release Notes` : https://iapyeh.github.io/sshscript/releasenotes
 
