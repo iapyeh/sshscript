@@ -1,7 +1,5 @@
 # SSHScript Documents
 
-[![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
-
 ## en
 
 - [Tutorial](https://iapyeh.github.io/sshscript/tutorial) 
@@ -118,3 +116,5 @@ pip install sshscript
 
 - Developing and testing on MacOS, Linux, Freebsd only. For Windows users, suggestion is to use the SSHScript in the "bash of Powershell" or the WSL.
 - Please use it at your own risk.
+
+[![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
