@@ -1,5 +1,7 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
+This example requires SSHScript v1.1.9 or above to work. You can upgrade the SSHScript by "pip install sshscript --upgrade".
+
 ## py_cui and threading
 
 <a target="_blank" href="https://github.com/jwlodek/py_cui">py_cui</a> is an excellent Python TUI framework.
