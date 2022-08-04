@@ -1,5 +1,7 @@
 # SSHScript Documents
 
+[![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
+
 ## en
 
 - [Tutorial](https://iapyeh.github.io/sshscript/tutorial) 
