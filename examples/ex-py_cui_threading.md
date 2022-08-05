@@ -1,6 +1,8 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
-This example requires SSHScript v1.1.9 or above to work. You can upgrade the SSHScript by "pip install sshscript --upgrade".
+## Note
+
+This example requires SSHScript v1.1.9 or above to work. You can upgrade the SSHScript by "pip install sshscript \-\-upgrade".
 
 ## py_cui and threading
 
