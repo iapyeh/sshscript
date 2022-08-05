@@ -11,3 +11,6 @@
 - [ssh via proxyCommand, nested ssh with password and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh) 
 - [ssh via proxyCommand, nested ssh with ssh key and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh3) 
 - [ssh via proxyCommand, nested ssh with interactive ssh and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh2) 
+
+## Hi
+If you need an example or you'd like to share your examples. You are welcome to <a target="_blank" href="https://github.com/iapyeh/sshscript/issues">create an issue</a> for it.
