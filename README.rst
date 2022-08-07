@@ -2,7 +2,7 @@
 SSHScript
 #########
 
-The sshscript is an integration of subprocess and _paramiko . It provides an unique interface to invoke commands locally and remotely. Something likes to embed shell commands in a python script. For example:
+You can take the SSHScript as an automation tool in Python. Functionally, the SSHScript is something like the Ansible. Instead of writing descriptive YML files, just write Python scripts with the simplicity of Python and the power of all Python packages. Technically, the sshscript is an integration of subprocess and Paramiko_ . It provides an unique interface to invoke commands locally and remotely. Something like embedding shell commands in a python script. For example:
 
 
 .. code:: 
@@ -74,7 +74,7 @@ More
 
 .. bottom of content
 
-.. _paramiko : https://www.paramiko.org/
+.. _Paramiko : https://www.paramiko.org/
 
 .. _docs : https://iapyeh.github.io/sshscript/index
 
