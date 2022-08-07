@@ -2,7 +2,13 @@
 SSHScript
 #########
 
-You can take the SSHScript as an automation tool in Python. Functionally, the SSHScript is something like the Ansible. Instead of writing descriptive YML files, just write Python scripts with the simplicity of Python and the power of all Python packages. Technically, the sshscript is an integration of subprocess and Paramiko_ . It provides an unique interface to invoke commands locally and remotely. Something like embedding shell commands in a python script. For example:
+You can take the SSHScript as an automation tool in Python. Functionally, the SSHScript is something like the Ansible. Instead of writing descriptive YML files, just write Python scripts with the simplicity of Python and the power of all Python packages. 
+
+Technically, the SSHScript is an integration of subprocess and Paramiko_ . It provides an unique interface to invoke commands locally and remotely. Something like embedding shell commands in a python script. 
+
+The idea is that many automation tasks are running commands and dealing with outputs on localhost and remote hosts. Between these scripts, there are many common routines. Eg. making ssh connections, execution and collecting data. That's where the SSHScript comes into play. The most charming part is that you could directly process the resulting data in Python. It then enables you to efficiently build complex data structure and working flow with object-oriented approach.
+
+For example:
 
 
 .. code:: 
@@ -38,6 +44,7 @@ Execution
 .. code:: 
 
     $ sshscript demo.spy
+
 
 Installation
 ============
