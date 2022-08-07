@@ -621,6 +621,10 @@ with open('user@host',pkey=pkey) as _:
         $.download(f'/var/log/nginx/log-{today.strftime("%m-%d")}')
 ```
 
+## $.thread()
+
+This is a wrapper function of threading.Thread(). Please use it to get an instance of Thread in stead of calling threading.Thread().  [Here is an usage example.](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading)
+
 ## $.upload(src, dst, makedirs=0, overwrite=1)
 
 - src(str): the file path in the localhost to upload.
