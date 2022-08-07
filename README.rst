@@ -6,19 +6,18 @@ SSHScript makes Python become a scripting tool for system automation. Functional
 
 Technically, the SSHScript is an integration of subprocess and Paramiko_ . It provides an unique interface to invoke commands locally and remotely. Something like embedding shell commands in a python script. 
 
-For example:
-
+Below are three examples:
 
 .. code:: 
 
-    # file: demo.spy
+    # example 1: demo.spy
     # execute a command on localhost and parse the output with python
     $netstat -ant
     for line in $.stdout.split('\n'):
         if not line.endswith('LISTEN'): continue
         print(line)
     
-    # file: demo.spy
+    # example 2: demo.spy
     # by adding one line to make connection.
     # you can do the same thing on remote host-a
     $.connect('user@host-a',password='19890604')
@@ -27,7 +26,7 @@ For example:
         if not line.endswith('LISTEN'): continue
         print(line)
     
-    # file: demo.spy
+    # example 3: demo.spy
     # by adding two lines to make connections.
     # you can do the same thing on remote host-b which is behind host-a
     $.connect('user@host-a',password='19890604')
