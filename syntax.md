@@ -623,7 +623,7 @@ with open('user@host',pkey=pkey) as _:
 
 ## $.thread()
 
-This is a wrapper function of threading.Thread(). Please use it to get an instance of Thread in stead of calling threading.Thread().  [Here is an usage example.](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading)
+This is a wrapper function of threading.Thread(). Please use it to get an instance of Thread instead of calling threading.Thread().  [Here is an usage example.](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading)
 
 ## $.upload(src, dst, makedirs=0, overwrite=1)
 
