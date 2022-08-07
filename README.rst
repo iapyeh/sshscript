@@ -55,7 +55,7 @@ Installation
 Why and Features
 ================
 
-The idea is that many automation tasks are running commands and dealing with outputs on localhost and remote hosts. Between these scripts, there are many common routines. Eg. making ssh connections, execution and collecting data. That's where the SSHScript comes into play. The most charming part is that you could directly process the resulting data in Python. It then enables you to efficiently build complex data structure and working flow with object-oriented approach.
+The idea is that many automation tasks are running commands and dealing with outputs on localhost and remote hosts. Among these scripts, there are many common routines. Eg. making ssh connections, execution and collecting data. That's where the SSHScript comes into play. The most charming part is that you could directly process the resulting data in Python. It then enables you to efficiently build complex data structures and processing flow with object-oriented approaches.
 
 
 * Easy to script. If you know what commands to run and which host to ssh, then you can write your script. No extra stuff to learn. 
