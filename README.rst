@@ -58,11 +58,13 @@ Why and Features
 The idea is that many automation tasks are running commands and dealing with outputs on localhost and remote hosts. Between these scripts, there are many common routines. Eg. making ssh connections, execution and collecting data. That's where the SSHScript comes into play. The most charming part is that you could directly process the resulting data in Python. It then enables you to efficiently build complex data structure and working flow with object-oriented approach.
 
 
-* Easy to use, quick to learn. you can utilize the power of subprocess and Paramiko to execute commands and make ssh connections even having no idea of both.
+* Easy to script. If you know what commands to run and which host to ssh, then you can write your script. No extra stuff to learn. 
 
 * Embedding shell commands in Python scripts are intuitive and self-explaining. It is good for teamwork and maintenance.
 
-* Handling execution output or exceptions with Python is easier than shell script. Tons of Python packages are handy for you.
+* Handling execution output or exceptions with Python is easier than shell script. 
+
+* Your scripts are powered by tons of Python packages.
 
 * With thread support.
 
