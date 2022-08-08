@@ -2,7 +2,7 @@
 import setuptools
 
 # Reads the content of your README.md into a variable to be used in the setup below
-with open("README-pipy.rst", "r", encoding="utf-8") as fh:
+with open("README.rst", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
