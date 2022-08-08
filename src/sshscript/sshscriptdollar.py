@@ -16,14 +16,20 @@
 from glob import glob
 import os, re
 import subprocess, shlex
+import paramiko
+from paramiko.common import (
+    DEBUG,
+    ERROR,
+)
+#import threading
 import __main__
-import shutil, asyncio
+import shutil
 try:
     from sshscripterror import SSHScriptError
-    from sshscriptchannel import POpenChannel, ParamikoChannel#,POpenPipeChannel
+    from sshscriptchannel import POpenChannel, ParamikoChannel
 except ImportError:
-    from .sshscripterror import SSHScriptError
-    from .sshscriptchannel import POpenChannel, ParamikoChannel#,POpenPipeChannel
+    from .sshscripterror import SSHScriptErro
+    from .sshscriptchannel import POpenChannel, ParamikoChannel
 try:
     import pty
 except ImportError:
@@ -32,17 +38,19 @@ except ImportError:
 
 pvarS = re.compile('(\b?)\@\{(.+?)\}',re.S)
 
-global logger, loop
-logger = None
-loop = asyncio.get_event_loop()
+global loop
+#global logger
+#logger = SSHScriptDummyLogger
+#loop = asyncio.get_event_loop()
 
 class SSHScriptDollar(object):
     exportedProperties = set(['stdout','stderr','stdin'])
     # aka $shell-commmand , or coverted "_c"
     def __init__(self,ssId,cmd=None,globals=None,locals=None,inWith=False):
-        global logger
+        #global logger
         # assign logger to sshscript's logger
-        if logger is None: logger = __main__.SSHScript.logger
+        #if logger is SSHScriptDummyLogger: logger = __main__.SSHScript.logger
+        self.logger = paramiko.util.get_logger('sshscript')
         self.args = (ssId,cmd,globals,locals)
         self.sshscript = None #執行的脈絡下的 sshscript instance
         self.inWith = inWith
@@ -53,10 +61,13 @@ class SSHScriptDollar(object):
         self.bufferedErrorData = b''
         # set os.environ['NO_PTY']='1' to disable pty
         self.usePty = pty and os.environ.get('NO_PTY','') != '1'
+
+    def _log(self, level, msg, *args):
+        self.logger.log(level, "[sshscript$]" + msg, *args)
     
     def __call__(self,invokeShell=False,deepCall=True):
         ssId = self.args[0]
-        self.sshscript = __main__.SSHScript.items[ssId] if ssId else __main__.SSHScript.inContext
+        self.sshscript = __main__.SSHScript.items[ssId] if ssId else __main__.SSHScript.getContext()
         # reset self.sshscript's stdout and stderr
         if self.sshscript.host:
             self.execBySSH(invokeShell,deepCall)
@@ -79,7 +90,7 @@ class SSHScriptDollar(object):
         (ssId,cmd,_globals,_locals) = self.args
         # eval @{py-var} in $shell-command
         def pvarRepl(m):
-            logger.debug(f'calling eval({m.group(2)}) in "${cmd}"')
+            self._log(DEBUG,f'calling eval({m.group(2)}) in "${cmd}"')
             return f'{eval(m.group(2),_globals,_locals)}'
         cmd = pvarS.sub(pvarRepl,cmd)
         # should be one-line command
@@ -88,17 +99,9 @@ class SSHScriptDollar(object):
         return cmds
 
     def execBySubprocess(self,invokeShell):
-        global loop
-        #(ssId,cmd,_globals,_locals) = self.args
         cmds = self.evalCommand()
-        # should be one-line command
-        #cmds = [x.strip() for x in cmd.split('\n')]
-        #cmds = [x for x in cmds if (x and not x.startswith('#'))]
-        #hasMultipleLines = len(cmds) > 1
-
         # 只要有with,一定是invokeShell(with ${} same as with $${})
         if self.inWith: invokeShell = True
-
         # implement stdin, and timeout (default to 60)
         timeout = float(os.environ.get('CMD_TIMEOUT',60))
         
@@ -118,7 +121,7 @@ class SSHScriptDollar(object):
 
             # prepare popen command
             args = shlex.split(shCmd)
-            logger.debug(f'subprocess.Popen {args}')
+            self._log(DEBUG,f'subprocess.Popen {args}')
             if self.usePty:
                 # ref: https://errorsfixing.com/run-interactive-bash-in-dumb-terminal-using-python-subprocess-popen-and-pty/
                 # ref: https://stackoverflow.com/questions/19880190/interactive-input-output-using-python
@@ -172,13 +175,6 @@ class SSHScriptDollar(object):
 
         else:
             
-            '''
-            # not invoke shell
-            if self.usePty:
-                self.channel = POpenChannel(self,None,timeout)
-            else:
-                self.channel = POpenPipeChannel(self,None,timeout)
-            '''
             self.channel = POpenChannel(self,None,timeout)
 
             for command in cmds:
@@ -186,8 +182,9 @@ class SSHScriptDollar(object):
                 # it is recommended to pass args as a string rather than as a sequence.
                 args = shlex.split(command)
                 if  ('|' in args) : raise SSHScriptError('| works only in shell mode, consider to run with $$',501)
-                if  ('>' in args) : raise SSHScriptError('> not works in $',502)
-                logger.debug(f'subprocess.Popen {args}')
+                elif  ('>' in args) : raise SSHScriptError('> not works in $',502)
+                elif  ('&' in args) : raise SSHScriptError('& not works in $',503)
+                self._log(DEBUG,f'subprocess execute: {args}')
                 cp = subprocess.Popen(args,
                     # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
                     #bufsize=1,
@@ -214,11 +211,8 @@ class SSHScriptDollar(object):
                 raise SSHScriptError(self.channel.stderr)
     
     def execBySSH(self,invokeShell,deepCall):
-        global loop
 
         cmds = self.evalCommand()
-        #cmds = [x.strip() for x in cmd.split('\n')]
-        #cmds = [x for x in cmds if (x and not x.startswith('#'))]
 
         # provide value of $.username, $.port, $.host
         self.host = self.sshscript.host;
@@ -251,7 +245,7 @@ class SSHScriptDollar(object):
         else:
             self.channel = ParamikoChannel(self,None, timeout)
             for command in cmds:
-                logger.debug(f'execute: {command}')
+                self._log(DEBUG,f'ssh execute: {command}')
                 # The paramiko documentation says:
                 # "using exec_command or invoke_shell without a pty will ever have data on the stderr stream."
                 # So, we always need not a pty.
