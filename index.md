@@ -17,7 +17,11 @@
 
 ## Introduction
 
-The sshscript let you embed shell commands in python script. It is like writing shell-script in python. Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
+SSHScript makes Python become a scripting tool for system automation. Functionally, the SSHScript is something like the Ansible. Instead of writing descriptive YML files, just write Python scripts with the simplicity of Python and the power of all Python packages.
+
+The sshscript let you embed shell commands in python script. It is like writing shell-script in python. 
+
+Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
 
 ```python
 $.connect('username1@host1')
@@ -101,7 +105,10 @@ for line in content.split('\n'):
 print(myIp)
 ```
 
-The SSHScript is based on subprocess and [Paramiko](https://www.paramiko.org/). You can embed commands to run and get its output on localhost. As well as, you can embed commands to run and get its output on a remote host.
+
+## Releases
+
+The last version is 1.1.12 on 2022/8/8. [Release Notes](https://iapyeh.github.io/sshscript/releasenotes)
 
 ## Installation
 
