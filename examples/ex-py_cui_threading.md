@@ -1,13 +1,11 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
-## Note
-
-This example requires SSHScript v1.1.9 or above to work. You can upgrade the SSHScript by "pip install sshscript \-\-upgrade".
-
-## py_cui and threading
+## Scenario
 
 <a target="_blank" href="https://github.com/jwlodek/py_cui">py_cui</a> is an excellent Python TUI framework.
 This example shows that SSHScript can works with threading. 
+
+Note: this example requires sshscript version >= 1.1.12
 
 #### file: demopy_cui_threaing.spy
 ```
