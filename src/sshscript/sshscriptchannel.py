@@ -13,8 +13,14 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 import __main__
-import time,subprocess
 import threading, os, sys, re
+import paramiko
+from paramiko.common import (
+    DEBUG,
+    ERROR,
+)
+import time
+import subprocess
 from select import select
 import errno
 import asyncio
@@ -22,7 +28,9 @@ try:
     from sshscripterror import SSHScriptError
 except ImportError:
     from .sshscripterror import SSHScriptError
-loop = asyncio.get_event_loop()
+
+#global logger
+#logger = SSHScriptDummyLogger
 
 class WithChannelWrapper(object):
     def __init__(self,channel):
@@ -48,6 +56,10 @@ class WithChannelWrapper(object):
 
 class GenericChannel(object):
     def __init__(self):
+        #global logger
+        #if logger is SSHScriptDummyLogger:
+        #    logger = __main__.SSHScript.logger
+        self.logger = paramiko.util.get_logger('sshscript')
         self.allStdoutBuf = []
         self.allStderrBuf = [] 
         self._stdout = ''
@@ -58,9 +70,15 @@ class GenericChannel(object):
         # 不要0，這樣可以讓一開始就先等一等
         self._lastIOTime = time.time()
 
-        # dump-related
+        # verbose-related
         self.stdoutDumpBuf = []
         self.stderrDumpBuf = []
+        try:
+            self.loop = asyncio.get_event_loop()
+        except RuntimeError:
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+        
         if os.environ.get('VERBOSE'):
             self.dump2sys = True
             #🔵🔴🟠🟡🟢🟣🟤⭕⬜⬛🔲🟦🟥🟧🟨🟩🟪🟫🛑🔶🔷🔸🔹🔺🔻 
@@ -68,18 +86,23 @@ class GenericChannel(object):
             self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🟨').encode('utf8')
         else:
             self.dump2sys = False
+
     @property
     def stdout(self):
         return self._stdout
+
     @property
     def stderr(self):
         return self._stderr
-    
+
+    def _log(self, level, msg, *args):
+        self.logger.log(level, "[sshscriptC]" + msg, *args)
+
     def recv(self,secondsToWaitIOStop=1):
         # 每次執行一行命令就更新一次stdout, stderr的內容        
         self.wait(secondsToWaitIOStop) # 確保不要在還在接收資料時做結算
-        self._stdout = (b''.join(self.stdoutBuf)).decode('utf8')
-        self._stderr = (b''.join(self.stderrBuf)).decode('utf8')
+        self._stdout = (b''.join(self.stdoutBuf)).decode('utf8',errors='ignore')
+        self._stderr = (b''.join(self.stderrBuf)).decode('utf8',errors='ignore')
         self.lock.acquire()
         del self.stdoutBuf[:]
         del self.stderrBuf[:]
@@ -107,7 +130,7 @@ class GenericChannel(object):
         while remain > 0:
             await asyncio.sleep(remain)    
             remain = waitingInterval - (time.time() - self._lastIOTime)
-        #如果有螢幕輸出的化，幫助它順序維持正確的順序
+        #如果有螢幕輸出的話，幫助它順序維持正確的順序
         sys.stdout.flush()
         sys.stderr.flush()
 
@@ -153,12 +176,17 @@ class GenericChannel(object):
                             await self.waitio(1)
                             return
                 await asyncio.sleep(0.1)
-        return loop.run_until_complete(_wait())    
+        return self.loop.run_until_complete(_wait())    
         
     def wait(self,seconds=None):
         async def _wait(seconds):
             await self.waitio(seconds)
-        return loop.run_until_complete(_wait(seconds))                
+        return self.loop.run_until_complete(_wait(seconds))    
+        
+    def wait(self,seconds=None):
+        async def _wait(seconds):
+            await self.waitio(seconds)
+        return self.loop.run_until_complete(_wait(seconds))                
 
     def __enter__(self):
         return WithChannelWrapper(self)
@@ -168,7 +196,8 @@ class GenericChannel(object):
         self.close()
     
     def sendline(self,s='\n',secondsToWaitResponse=1):
-        __main__.SSHScript.logger.debug(f'sendline: {s}')
+        #global logger
+        self._log(DEBUG,f'sendline: {s}')
         if not s[-1] == '\n': s += '\n'
         # 確保跟前面的一個指令有點「距離」，不要在還在接收資料時送出下一個指令
         self.wait()
@@ -374,8 +403,8 @@ class POpenChannel(GenericChannel):
                     self.cp.kill()
                     break
     
-        self.owner.stderr = (b''.join(self.allStderrBuf)).decode('utf8')
-        self.owner.stdout = (b''.join(self.allStdoutBuf)).decode('utf8')    
+        self.owner.stderr = (b''.join(self.allStderrBuf)).decode('utf8',errors='ignore')
+        self.owner.stdout = (b''.join(self.allStdoutBuf)).decode('utf8',errors='ignore')    
 
 
 class ParamikoChannel(GenericChannel):
@@ -417,5 +446,5 @@ class ParamikoChannel(GenericChannel):
             self.channel.close()
         # 此時呼叫self.recv()沒有意義，只要呼叫wait()就好
         self.wait(1)
-        self.owner.stderr = (b''.join(self.allStderrBuf)).decode('utf8')
-        self.owner.stdout = (b''.join(self.allStdoutBuf)).decode('utf8')    
+        self.owner.stderr = (b''.join(self.allStderrBuf)).decode('utf8',errors='ignore')
+        self.owner.stdout = (b''.join(self.allStdoutBuf)).decode('utf8',errors='ignore')    

@@ -15,9 +15,14 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 from io import StringIO
 import paramiko
+from paramiko.common import (
+    DEBUG,
+    ERROR,
+)
 import os, sys, traceback, time, re, random, glob
 import logging, stat
 import hashlib
+import threading
 import __main__
 try:
     from sshscriptdollar import SSHScriptDollar
@@ -58,10 +63,6 @@ pCurlyBrackets = re.compile('^[ \t]*?\}')
 pqoute1 =re.compile('("{3})(.+?)"{3}',re.S)
 pqoute2 =re.compile("('{3})(.+?)'{3}",re.S)
 
-
-global sshscriptLogger
-sshscriptLogger = None
-
 class LineGenerator:
     def __init__(self,lines):
         self.lines = lines
@@ -91,14 +92,14 @@ SSHScriptExportedNames = set(['sftp','client']) #
 def pstdSub(m):
     pre,post = m.groups()
     if post in SSHScriptExportedNames:
-        return f'{pre}SSHScript.inContext.{post}'
+        return f'{pre}SSHScript.getContext(1).{post}'
     elif post in SSHScriptDollar.exportedProperties:
         return f'{pre}_c.{post}'
     #elif post in SSHScriptClsExportedFuncs:
     #    return f'{pre}SSHScript.{post}'
     else:
         # SSHScript.inContext's property
-        return f'{pre}SSHScript.inContext.{post}'
+        return f'{pre}SSHScript.getContext(1).{post}'
 
 def export2Dollar(func):
     try:
@@ -111,11 +112,33 @@ def export2Dollar(func):
     return func
 
 class SSHScript(object):
-    logger = sshscriptLogger
-    # this SSHScript() which in context of @method in py
-    inContext = None
+    # SSHScript is the subject of $.method in py
+    context = {}
+    contextLocker = threading.Lock()
     # a lookup table of instances of SSHScript by id
     items = {}
+
+    @classmethod
+    def getContext(cls,forceOne=False):
+        t = threading.current_thread()
+        try:
+            return cls.context[t]
+        except KeyError:
+            if forceOne:
+                pt = t.parent
+                pobj = cls.context.get(pt)
+                obj = SSHScript(pobj)
+                cls.setContext(obj)
+                return obj
+            else: return None
+
+    @classmethod
+    def setContext(cls,obj):
+        assert isinstance(obj,SSHScript)
+        t = threading.current_thread()
+        cls.contextLocker.acquire()
+        cls.context[t] = obj
+        cls.contextLocker.release()
 
     @classmethod
     def connectClient(cls,host,username,password,port,policy,**kw):
@@ -125,7 +148,6 @@ class SSHScript(object):
         if policy:
             client.set_missing_host_key_policy(policy)
 
-        # 3.連線伺服器
         client.connect(host,username=username,password=password,port=port,**kw)
         return client
     
@@ -146,16 +168,16 @@ class SSHScript(object):
         except KeyError:
             alreadyIncluded[abspath] = 1
         
+        with open(abspath,'rb') as fd:
+            content = fd.read().decode('utf8')
 
-
-        with open(abspath) as fd:
-            content = fd.read()
         #find prefix
         prefixLen = 0
         for c in content:
             if c == ' ': prefixLen += 1
             elif c == '\t': prefixLen += 1
             else: break
+        
         # omit leading prefix
         rows = []
         for line in content.split('\n'):
@@ -179,7 +201,9 @@ class SSHScript(object):
 
     def __init__(self,parent=None):
 
-        if parent is not None: assert isinstance(parent,SSHScript)
+        # parent is an SSHScript() in the same-thread or  parent-thread
+        if parent is not None:
+            assert isinstance(parent,SSHScript)
 
         # initial properties
         self.host = None
@@ -189,15 +213,17 @@ class SSHScript(object):
         self._previousSshscriptInContext = None
         # SSHScript.inContext 一開始是第一個創建的SSHScript instance，
         # 其次的SSHScript instance，只有在open之後才會成為SSHScript.inContext
-        if SSHScript.inContext is None:
-            SSHScript.inContext = self
+        if SSHScript.getContext() is None:
+            SSHScript.setContext(self)
             self._previousSshscriptInContext = self       
         
-        self.id = f'{time.time()}{int(1000*random.random())}'
+        # 1659910734.660772  = 2200/8/8 06:10
+        self.id = f'{int(time.time()) - 1659910734}{int(1000*random.random())}'
         SSHScript.items[self.id] = self
         self._client = None
         self._shell = None
         self._sftp = None
+        self.logger = paramiko.util.get_logger('sshscript')
 
         self.blocksOfScript = None
 
@@ -209,31 +235,32 @@ class SSHScript(object):
 
         # settings when exec command (see client.exec_command)
         self._paranoid = parent._paranoid if parent else False
-        #self._pty = parent._pty if parent else False
+
         self._timeout = parent._timeout if parent else None #blocking
         
-        # current dir
-        #self.pwd = '.'
         # 累積的行號(多檔案showScript時使用)
         self.lineNumberCount = 0
-
-        # value of self.cachedStdin
-        #self.__stdinForNextExecution = None
     
     @property
     def client(self):
         return self.subSession.client if self.subSession else self._client
 
-    #@property
-    #def deepPwd(self):
-    #    return self.subSession.deepPwd if self.subSession else self.pwd
-
     def __repr__(self):
         return f'(SSHScript:{id(self)}@{self.host})'
 
+    def _log(self, level, msg, *args):
+        self.logger.log(level, "[sshscript]" + msg, *args)
+
     def getSocketWithProxyCommand(self,argsOfProxyCommand):
         return paramiko.ProxyCommand(argsOfProxyCommand)        
-    
+
+    @export2Dollar
+    def thread(self,*args,**kw):
+        c = threading.current_thread()
+        t = threading.Thread(*args,**kw)
+        setattr(t,'parent',c)
+        return t
+
     @export2Dollar
     def exit(self,code=0):
         raise SSHScriptExit(code)
@@ -248,7 +275,7 @@ class SSHScript(object):
         if self._client is not None:
             # 但不能是自己連接自己
             if host == self.host:
-                raise SSHScriptError(f'Self connection from {host} to {host} is not allowed',502)
+                raise SSHScriptError(f'Self connection from {host} to {host} make no sense',502)
             else:
                 return self.subconnect(host,username,password,port,**kw)
         
@@ -269,7 +296,7 @@ class SSHScript(object):
             if 'proxyCommand' in kw:
                 raise NotImplementedError('proxyCommand not support in nested session')
             else:
-                sshscriptLogger.debug(f'nested connecting {self.username}@{self.host}:{self.port}')
+                self._log(DEBUG,f'nested connecting {self.username}@{self.host}:{self.port}')
                 # REF: https://stackoverflow.com/questions/35304525/nested-ssh-using-python-paramiko
                 vmtransport = self.parentSession._client.get_transport()
                 dest_addr = (host,port)
@@ -278,16 +305,16 @@ class SSHScript(object):
                 self._client = SSHScript.connectClient(host,username,password,port,policy,sock=self._sock,**kw)
         else:
             if 'proxyCommand' in kw:
-                sshscriptLogger.debug(f'connecting {self.username}@{self.host}:{self.port} by {kw["proxyCommand"]}')
+                self._log(DEBUG,f'connecting {self.username}@{self.host}:{self.port} by {kw["proxyCommand"]}')
                 self._sock = self.getSocketWithProxyCommand(kw['proxyCommand'])
                 del kw['proxyCommand']
                 self._client = SSHScript.connectClient(host,username,password,port,policy,sock=self._sock,**kw)
             else:
-                sshscriptLogger.debug(f'connecting {self.username}@{self.host}:{self.port}')
+                self._log(DEBUG,f'connecting {self.username}@{self.host}:{self.port}')
                 self._client = SSHScript.connectClient(host,username,password,port,policy,**kw)
 
-        self._previousSshscriptInContext = SSHScript.inContext
-        SSHScript.inContext = self
+        self._previousSshscriptInContext = SSHScript.getContext()
+        SSHScript.setContext(self)
     
         return self
     
@@ -327,7 +354,7 @@ class SSHScript(object):
             self._sock = None
         
         if self._client:
-            #sshscriptLogger.debug(f'{self.id} closing {self.username}@{self.host}:{self.port}')
+            self._log(DEBUG,f'{self.id} closing {self.username}@{self.host}:{self.port}')
             self._client.close()
             self._client = None
         
@@ -347,7 +374,7 @@ class SSHScript(object):
         self.port = None
         self.username = None
 
-        SSHScript.inContext = self._previousSshscriptInContext
+        SSHScript.setContext(self._previousSshscriptInContext)
 
     def __del__(self):
         self.close(True)
@@ -362,6 +389,10 @@ class SSHScript(object):
     def pkey(self,pathOfRsaPrivate):
         if self.host:
             _,stdout,_ = self._client.exec_command(f'cat "{pathOfRsaPrivate}"')
+            keyfile = StringIO(stdout.read().decode('utf8'))
+            return paramiko.RSAKey.from_private_key(keyfile)
+        elif self.parentSession and self.parentSession._client:
+            _,stdout,_ = self.parentSession._client.exec_command(f'cat "{pathOfRsaPrivate}"')
             keyfile = StringIO(stdout.read().decode('utf8'))
             return paramiko.RSAKey.from_private_key(keyfile)
         else:
@@ -391,7 +422,7 @@ class SSHScript(object):
         if not dst.startswith('/'):
             raise SSHScriptError(f'uploading dst "{dst}" must be absolute path',504)
         
-        sshscriptLogger.debug(f'upload {src} to {dst}')
+        self._log(DEBUG,f'upload {src} to {dst}')
 
         # check exists of dst folders
         srcbasename = os.path.basename(src)
@@ -416,7 +447,7 @@ class SSHScript(object):
                 foldersToMake.reverse()
                 for folder in foldersToMake:
                     self.sftp.mkdir(folder)
-                    sshscriptLogger.debug(f'mkdir {folder}')
+                    self._log(DEBUG,f'mkdir {folder}')
         else:
             # 1. basename 一樣：
             # 2. basename 不一樣：
@@ -470,7 +501,7 @@ class SSHScript(object):
         if os.path.isdir(dst):
             dst = os.path.join(dst,os.path.basename(src))
 
-        sshscriptLogger.debug(f'downaload from {src} to {dst}')            
+        self._log(DEBUG,f'downaload from {src} to {dst}')            
         
         self.sftp.get(src,dst)
         
@@ -499,7 +530,7 @@ class SSHScript(object):
         script = pqoute1.sub(pqouteSub,script)
         script = pqoute2.sub(pqouteSub,script)
         # replace with @open( to "with open("
-        script = pAtFuncSWith.sub('\\1with SSHScript.inContext.\\3',script)
+        script = pAtFuncSWith.sub('\\1with SSHScript.getContext(1).\\3',script)
         listOfLines = script.split('\n')
         # listOfLines: [string]
         lines = LineGenerator(listOfLines)
@@ -509,7 +540,6 @@ class SSHScript(object):
         # leadingIndent is the smallest leadingIndent of given script
         leadingIndent = -1
         rows = []
-        #codeStarted = False
 
         def getShellCommandsInMultipleLines(lines):
             # multiple lines ${
@@ -572,7 +602,6 @@ class SSHScript(object):
 
                 # 檢查是否是 with 開頭的 block "with $shell-command"
                 # 不包括其他的，例如 "with @open(" 取代之後的 "with SSHScript.inContext ..."
-                #prefixedByWith = False
                 asPartOfWith = False
                 
                 #
@@ -720,10 +749,10 @@ class SSHScript(object):
         
         assert  self.blocksOfScript is not None
         
-        assert _locals.get('self')
-        def dumpScriptItem(scriptChunk):
-            for idx, line in enumerate(scriptChunk.split('\n')):
-                print(f'{str(idx+1).zfill(3)}:{line}')
+        #assert _locals.get('self')
+        #def dumpScriptItem(scriptChunk):
+        #    for idx, line in enumerate(scriptChunk.split('\n')):
+        #        print(f'{str(idx+1).zfill(3)}:{line}')
 
         for scriptChunk in self.blocksOfScript:
             if isinstance(scriptChunk, str):
@@ -740,19 +769,16 @@ class SSHScript(object):
                 try:
                     exec(scriptChunk,_globals,_locals)
                 except SyntaxError as e:
-                    #if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
                 except SystemExit as e:
                     if e.code:
                         traceback.print_exc()
                     raise
                 except SSHScriptError:
-                    #if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
                 except SSHScriptExit:
                     raise
                 except:
-                    #if os.environ.get('DEBUG'):  dumpScriptItem(scriptChunk)
                     raise
             elif isinstance(scriptChunk, self.__class__):
                 scriptChunk.run(None,_locals,_globals,showScript=showScript)
@@ -799,7 +825,7 @@ def runFile(givenPaths,
         unsortedFilesInPath.sort()
         for p in unsortedFilesInPath:
             if p in paths:
-                sshscriptLogger.debug('ignore duplicate path: %s' % p)
+                print('ignoring duplicate path: %s' % p)
                 continue
             paths.append(p)
 
@@ -821,7 +847,7 @@ def runFile(givenPaths,
         if not unisession:
             session = SSHScript()
 
-        sshscriptLogger.debug(f'run {file}')
+        session._log(DEBUG,f'run {file}')
 
         absfile = os.path.abspath(file)
         # 有點怪，但比較能windows時也適用
@@ -839,7 +865,7 @@ def runFile(givenPaths,
             _locals['__file__'] = absfile
             newglobals = session.run(script,_locals.copy(),_globals.copy(),showScript=showScript)
         except SSHScriptExit:
-            sshscriptLogger.debug('exit by receiving SSHScriptExit')
+            session._log(DEBUG,'exiting by receiving SSHScriptExit')
             break
         
         # restore sys.path
@@ -856,7 +882,7 @@ def runFile(givenPaths,
             else:
                 basename = os.path.basename(file)
                 for key in exported:
-                    sshscriptLogger.debug(f'{basename} export {key}')
+                    session._log(DEBUG,f'{basename} export {key}')
                     #_locals[key] = newlocals[key]
                     _globals[key] = newglobals[key]
         
@@ -873,24 +899,18 @@ def runScript(script,varGlobals=None,varLocals=None):
     session.run(script,varGlobals,varLocals,showScript=False)
 
 def setupLogger():
-    global sshscriptLogger
-
-    # silent paramiko
-    #logging.getLogger("paramiko").setLevel(logging.WARNING)
-
-    sshscriptLogger = logging.getLogger('sshscript')
-    SSHScript.logger = sshscriptLogger    
-
+    logger = paramiko.util.get_logger('sshscript')
     if os.environ.get('DEBUG'):
-        sshscriptLogger.setLevel(logging.DEBUG) 
+        logger.setLevel(DEBUG) 
+        if sys.stdout.isatty():
+            handler = logging.StreamHandler(sys.stdout)
+            handler.setFormatter(logging.Formatter('%(asctime)s:%(message)s',"%Y-%m-%d %H:%M:%S")) 
+            logger.addHandler(handler)
     else:
-        sshscriptLogger.setLevel(logging.INFO) 
-    
-    if os.environ.get('VERBOSE'):
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(logging.Formatter('%(asctime)s:: %(message)s',"%m-%d %H:%M:%S")) # or whatever
-        sshscriptLogger.addHandler(handler)
+        # supress debug dumpings
+        logger.setLevel(logging.INFO) 
 
+    return logger
    
 
 def main():
@@ -928,10 +948,11 @@ def main():
     os.environ['SSHSCRIPT_EXT'] = args.sshscriptExt
 
     if len(args.paths):
+        
         if args.debug:
             os.environ['DEBUG'] = '1'
-            os.environ['VERBOSE'] = '1'
-        elif args.verbose:
+        
+        if args.verbose:
             os.environ['VERBOSE'] = '1'
 
         setupLogger()
