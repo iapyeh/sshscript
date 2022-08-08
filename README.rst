@@ -70,6 +70,11 @@ The idea is that many automation tasks are running commands and dealing with out
 
 * With thread support.
 
+Releases
+========
+
+Relase Notes_
+
 More
 ====
 
