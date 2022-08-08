@@ -3,7 +3,9 @@
 ## 1.1.12
 Date: 2022/8/8
 
-- refine thread support. "$.thread()" is a new $.command to create threads. please see example:<a href="https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading">py_cui and threading</a>. This feature is at experimental state.
+- refine thread support. "$.thread()" is a new $.command to create threads. This feature is at experimental state.
+  - example: <a href="https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading">py_cui and threading</a>. 
+  - example: <a href="https://iapyeh.github.io/sshscript/examples/ex-threads-2">ssh to remote hosts and executing commands in parallel</a>.  
 - bugfix: $.pkey() failed in some context of nested ssh
 - improve logger by using paramiko's logger
 
