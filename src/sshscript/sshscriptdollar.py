@@ -28,7 +28,7 @@ try:
     from sshscripterror import SSHScriptError
     from sshscriptchannel import POpenChannel, ParamikoChannel
 except ImportError:
-    from .sshscripterror import SSHScriptErro
+    from .sshscripterror import SSHScriptError
     from .sshscriptchannel import POpenChannel, ParamikoChannel
 try:
     import pty
