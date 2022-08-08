@@ -1,8 +1,9 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
 ## Scenario:
-ssh to many hosts to run commands by threads.
+ssh to remote hosts and run commands in parallel by threads.
 
+![image](https://user-images.githubusercontent.com/4695577/183364361-3244b778-4aaa-458e-aed5-d08b2227d49d.png)
 
 Note: this example require sshscript version >= 1.1.12
 
