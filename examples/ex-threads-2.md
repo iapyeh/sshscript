@@ -18,9 +18,8 @@ print('connected to',$.stdout)
 # if you are interested of its outupt
 # os.environ['VERBOSE'] = '1'
 
-def job(account,ret):
+def job(account,pkey,ret):
     # this example shows how to load private key for authentication
-    pkey = $.pkey('/home/user/.ssh/id_rsa')
     $.connect(account,pkey=pkey)
 
     # executing command
@@ -33,13 +32,15 @@ def job(account,ret):
     
     $.close()
 
+pkey = $.pkey('/home/user/.ssh/id_rsa')
+
 # invoking thread-1
 ret1 = {}
-t1 = $.thread(target=job,args=('user@host-b',ret1))
+t1 = $.thread(target=job,args=('user@host-b', pkey, ret1))
 
 # invoking thread-2
 ret2 = {}
-t2 = $.thread(target=job,args=('user@host-c',ret2))
+t2 = $.thread(target=job,args=('user@host-c',pkey, ret2))
 
 t1.start()
 t2.start()
