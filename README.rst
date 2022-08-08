@@ -73,7 +73,7 @@ The idea is that many automation tasks are running commands and dealing with out
 Releases
 ========
 
-Relase Notes_
+The last version is 1.1.12. (2022/8/8). Relase Notes_
 
 More
 ====
@@ -82,7 +82,6 @@ More
 
 * Examples_
 
-* Release Notes_
 
 .. bottom of content
 
