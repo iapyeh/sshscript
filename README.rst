@@ -2,22 +2,19 @@
 SSHScript
 #########
 
-SSHScript makes Python become a scripting tool for system automation. Functionally, the SSHScript is something like the Ansible. Instead of writing descriptive YML files, just write Python scripts with the simplicity of Python and the power of all Python packages. 
+The sshscript is an integration of subprocess and _paramiko . It provides an unique interface to invoke commands locally and remotely. Something likes to embed shell commands in a python script. For example:
 
-Technically, the SSHScript is an integration of subprocess and Paramiko_ . It provides an unique interface to invoke commands locally and remotely. Something like embedding shell commands in a python script. 
-
-Below are three examples:
 
 .. code:: 
 
-    # example 1: demo.spy
+    # file: demo.spy
     # execute a command on localhost and parse the output with python
     $netstat -ant
     for line in $.stdout.split('\n'):
         if not line.endswith('LISTEN'): continue
         print(line)
     
-    # example 2: demo.spy
+    # file: demo.spy
     # by adding one line to make connection.
     # you can do the same thing on remote host-a
     $.connect('user@host-a',password='19890604')
@@ -26,7 +23,7 @@ Below are three examples:
         if not line.endswith('LISTEN'): continue
         print(line)
     
-    # example 3: demo.spy
+    # file: demo.spy
     # by adding two lines to make connections.
     # you can do the same thing on remote host-b which is behind host-a
     $.connect('user@host-a',password='19890604')
@@ -41,7 +38,6 @@ Execution
 .. code:: 
 
     $ sshscript demo.spy
-
 
 Installation
 ============
@@ -68,7 +64,6 @@ The idea is that many automation tasks are running commands and dealing with out
 
 * With thread support.
 
-
 More
 ====
 
@@ -76,21 +71,16 @@ More
 
 * Examples_
 
-
-* `Release Notes`_
-
+* Release Notes_
 
 .. bottom of content
 
-
-.. bottom of content
-
-.. _Paramiko : https://www.paramiko.org/
+.. _paramiko : https://www.paramiko.org/
 
 .. _docs : https://iapyeh.github.io/sshscript/index
 
 .. _Examples : https://iapyeh.github.io/sshscript/examples/index
 
 
-.. _`Release Notes` : https://iapyeh.github.io/sshscript/releasenotes
+.. _Notes : https://iapyeh.github.io/sshscript/releasenotes
 
