@@ -9,6 +9,7 @@
 - [generate list of ip addresses for blocking](https://iapyeh.github.io/sshscript/examples/ex-blackip) 
 - [py_cui and threads](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading) 
 - [connecting to hosts in threads](https://iapyeh.github.io/sshscript/examples/ex-threads-2) 
+- [connecting to hosts in threads more complex example](https://iapyeh.github.io/sshscript/examples/ex-threads-3) 
 - [ssh via proxyCommand, nested ssh with password and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh) 
 - [ssh via proxyCommand, nested ssh with ssh key and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh3) 
 - [ssh via proxyCommand, nested ssh with interactive ssh and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh2) 
