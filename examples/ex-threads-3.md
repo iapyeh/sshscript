@@ -3,8 +3,7 @@
 ## Scenario:
 ssh to remote hosts and run commands in parallel by threads more complex example.
 
-![image](https://user-images.githubusercontent.com/4695577/183380051-617bef46-c141-48a5-bd9d-b9d3ed33b525.png)
-
+![image](https://user-images.githubusercontent.com/4695577/183380792-86ceae61-3b8e-422f-bb76-834ea55cc893.png)
 
 Note: this example require sshscript version >= 1.1.12
 
