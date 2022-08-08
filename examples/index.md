@@ -14,9 +14,9 @@
 - [ssh via proxyCommand, nested ssh with interactive ssh and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh2) 
 
 ## Using Thread
-- [py_cui and threads](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading) 
+- [py_cui with threads](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading) 
 - [connecting to hosts in threads](https://iapyeh.github.io/sshscript/examples/ex-threads-2) 
-- [connecting to hosts in threads more complex example](https://iapyeh.github.io/sshscript/examples/ex-threads-3) 
+- [complex example of connecting to hosts in threads ](https://iapyeh.github.io/sshscript/examples/ex-threads-3) 
 
 
 ## Need an Example?
