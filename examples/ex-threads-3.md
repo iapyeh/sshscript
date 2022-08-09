@@ -6,7 +6,7 @@ ssh to remote hosts and run commands in parallel by threads more complex example
 ![image](https://user-images.githubusercontent.com/4695577/183549013-587a75f4-2e36-4147-a2f3-7b5102f04b69.png)
 
 
-Note: this example require sshscript version >= 1.1.12
+Note: this example requires sshscript version >= 1.1.12
 
 #### file: example.spy 
 ```
