@@ -68,7 +68,7 @@ The idea is that many automation tasks are running commands and dealing with out
 
 * Your scripts are powered by tons of Python packages.
 
-* With thread support.
+* SSHScript supports thread, aka jobs in parallel.
 
 Releases
 ========
