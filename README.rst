@@ -1,4 +1,20 @@
 
+
+Announcement
+############
++-------------------------------------------------------------------------------------------+
+|For installer of version 1.101, 1.102, 1.103.                                              |
+|                                                                                           |
+|Due to miss versioning, this way does not work:"python3 -m pip install sshscript --upgrade"|
+|                                                                                           |
+|Please upgrade SSHScript by this way:                                                      |
++-------------------------------------------------------------------------------------------+
+
+
+.. code:: 
+
+    python3 -m pip install sshscript==1.1.12
+    
 SSHScript
 #########
 
