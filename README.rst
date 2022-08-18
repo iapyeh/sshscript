@@ -4,12 +4,7 @@ Announcement
 ############
 +-------------------------------------------------------------------------------------------+
 |For installers of version v1.101, v1.102 and v1.103.                                       |
-|                                                                                           |
-|Due to miss versioning, this way does not work:"python3 -m pip install sshscript --upgrade"|
-|                                                                                           |
-|Please upgrade SSHScript by this way:                                                      |
 +-------------------------------------------------------------------------------------------+
-
 
 .. code:: 
 
