@@ -32,6 +32,16 @@ with $sudo -S /bin/sh as shell:
         echo shell is $0
     ''')
 
+# method 4, if you don't care what shell to use
+with $ as shell:
+    shell.sendline('sudo -S su')
+    shell.expect('password')
+    shell.sendline(f'''{password}
+    whoami
+    echo shell is $0
+    ''')
+print('*' * 20)
+
 ```
 
 ## Ways to get a root's console on remote host (ssh-Paramiko)
@@ -65,7 +75,17 @@ with $sudo /bin/sh as shell:
         whoami
         echo shell is $0
     ''')
- ```
+
+# method 4, if you don't care what shell to use
+with $ as shell:
+    shell.sendline('sudo su')
+    shell.expect('password')
+    shell.sendline(f'''{password}
+    whoami
+    echo shell is $0
+    ''')
+print('*' * 20)
+```
  
 ## Note
  
