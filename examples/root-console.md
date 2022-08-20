@@ -10,8 +10,8 @@ with $ as shell:
     shell.sendline('sudo -S /bin/bash')
     shell.expect('password')
     shell.sendline(f'''{password}
-    whoami
-    echo shell is $0
+        whoami
+        echo shell is $0
     ''')
 
 # method 2
@@ -19,8 +19,8 @@ with $#!/bin/bash as shell:
     shell.sendline('sudo -S su')
     shell.expect('password')
     shell.sendline(f'''{password}
-    whoami
-    echo shell is $0
+        whoami
+        echo shell is $0
     ''')
 
 
@@ -28,8 +28,8 @@ with $#!/bin/bash as shell:
 with $sudo -S /bin/sh as shell:
     shell.expect('password')
     shell.sendline(f'''{password}
-    whoami
-    echo shell is $0
+        whoami
+        echo shell is $0
     ''')
 
 ```
@@ -45,8 +45,8 @@ with $ as shell:
     shell.sendline('sudo /bin/bash')
     shell.expect('password')
     shell.sendline(f'''{password}
-    whoami
-    echo shell is $0
+        whoami
+        echo shell is $0
     ''')
 
 # method 2
@@ -54,16 +54,16 @@ with $#!/bin/bash as shell:
     shell.sendline('sudo -S su')
     shell.expect('password')
     shell.sendline(f'''{password}
-    whoami
-    echo shell is $0
+        whoami
+        echo shell is $0
     ''')
 
 # method 3
 with $sudo /bin/sh as shell:
     shell.expect('password')
     shell.sendline(f'''{password}
-    whoami
-    echo shell is $0
+        whoami
+        echo shell is $0
     ''')
  ```
  
@@ -76,7 +76,7 @@ with $#!/bin/bash as shell:
     shell.sendline('sudo -S su')
     shell.expect('password')
     shell.sendline(f'''{password}
-    whoami
-    echo shell is $0
+        whoami
+        echo shell is $0
     ''')
 ```
