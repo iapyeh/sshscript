@@ -94,9 +94,9 @@ elif 0:
 #### Examples of execution command
 ```
 $sshscript blackip.spy
-$sshscript blackip.spy --verbose
+$sshscript blackip.spy --verbose --debug
 $sudo sshscript blackip.spy
-$sudo sshscript blackip.spy --verbose
+$sudo sshscript blackip.spy --verbose --debug
 
 ```
 ![image](https://user-images.githubusercontent.com/4695577/182344161-e8753829-9be5-4176-8ba4-e660d732c9be.png)
