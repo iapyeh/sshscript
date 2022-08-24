@@ -119,7 +119,7 @@ Summary
     
     You can use $.log() to do logging and customize the logger with $.logger
     
-    Please see [examples](https://iapyeh.github.io/sshscript/examples/) for detail.
+    Please see [examples](https://iapyeh.github.io/sshscript/examples/logger) for detail.
     
 - Refine: more sophisticated Scenarios of thread support
     - [Example 1](https://iapyeh.github.io/sshscript/examples/ex-threads-userlist)
@@ -202,6 +202,6 @@ a = f'''
     '''
 ```
 
-![image](https://user-images.githubusercontent.com/4695577/186346811-f44a3059-952b-4db1-8954-25e5fb3a6215.png)
-
 - bug-fixing: command interval control. This is an internal bug which was something like without throttle between commands. It leads to making the setting of os.environ[’CMD_INTERVAL’] in vain.
+
+![image](https://user-images.githubusercontent.com/4695577/186346811-f44a3059-952b-4db1-8954-25e5fb3a6215.png)
