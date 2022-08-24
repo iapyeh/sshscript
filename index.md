@@ -12,6 +12,7 @@
 - [Syntax, Variables and Functions](https://iapyeh.github.io/sshscript/syntax)
 - [sshscript CLI](https://iapyeh.github.io/sshscript/cli)
 - [sshscript Module](https://iapyeh.github.io/sshscript/module) 
+- [Ways to get a root’s console](https://iapyeh.github.io/sshscript/examples/root-console)
 
 ## zh-TW
 
