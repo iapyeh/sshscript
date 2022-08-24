@@ -8,7 +8,7 @@ Announcement
 
 .. code:: 
 
-    python3 -m pip install sshscript==1.1.12
+    python3 -m pip install sshscript==1.1.14
     
 SSHScript
 #########
