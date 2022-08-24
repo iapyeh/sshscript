@@ -13,6 +13,7 @@
 - [sshscript CLI](https://iapyeh.github.io/sshscript/cli)
 - [sshscript Module](https://iapyeh.github.io/sshscript/module) 
 - [Ways to get a root’s console](https://iapyeh.github.io/sshscript/examples/root-console)
+- [Do logging](https://iapyeh.github.io/sshscript/examples/logger)
 
 ## zh-TW
 
