@@ -1,4 +1,15 @@
 
+
+Announcement
+############
++-------------------------------------------------------------------------------------------+
+|For installers of version v1.101, v1.102 and v1.103.                                       |
++-------------------------------------------------------------------------------------------+
+
+.. code:: 
+
+    python3 -m pip install sshscript==1.1.12
+    
 SSHScript
 #########
 
@@ -68,7 +79,12 @@ The idea is that many automation tasks are running commands and dealing with out
 
 * Your scripts are powered by tons of Python packages.
 
-* With thread support.
+* SSHScript supports thread, aka jobs in parallel.
+
+Releases
+========
+
+The last version is 1.1.12. (2022/8/8). Relase Notes_
 
 More
 ====
@@ -77,7 +93,6 @@ More
 
 * Examples_
 
-* Release Notes_
 
 .. bottom of content
 
