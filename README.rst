@@ -2,13 +2,22 @@
 
 Announcement
 ############
-+-------------------------------------------------------------------------------------------+
-|For installers of version v1.101, v1.102 and v1.103.                                       |
-+-------------------------------------------------------------------------------------------+
 
+v1.1.14 has released on 2022/8/24. Users are recommanded to upgrade by 
+
+.. code::
+
+    pip3 install --upgrade sshscript
+
+
++---------------------------------------------------------------------------------------------------+
+|For installers of version v1.101, v1.102 and v1.103.  Please do upgrade by                         |
++---------------------------------------------------------------------------------------------------+
 .. code:: 
 
     python3 -m pip install sshscript==1.1.14
+    
+Please see v1.1.14 Relaese Notes_ for details.
     
 SSHScript
 #########
