@@ -1,8 +1,10 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
 
-# sshscript related problems
+# Troubleshooting of installation
 
-## Check the installation of sshscript (CLI)
+## sshscript CLI related
+
+### Check the installation of sshscript CLI
 
 SSHScript package has a CLI "sshscript". To check if it is successfully installed. You can open a console and type:
 
@@ -54,7 +56,7 @@ the executable "sshscript" CLI might be
 ```
 Then, `/home/john/.local/bin` is the path which has to be added into the $PATH.
 
-### Case II：Bad Interpreter
+## Case II：Bad Interpreter
 
 When you run `sshscript` and have result like this:
 ```
@@ -90,6 +92,6 @@ then, you can change the first line of "sshcript" to be
 ```
 
 
-### Non of above cases:
+# Non of above cases:
 
 You are welcome to issue a ticket on [the Github's issue system](https://github.com/iapyeh/sshscript/issues)
