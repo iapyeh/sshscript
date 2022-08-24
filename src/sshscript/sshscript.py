@@ -239,32 +239,37 @@ def main():
             except ImportError:
                 __version__ = 'unknown'
 
-        try:
-            import urllib.request
-            import json
-            info = json.loads(urllib.request.urlopen("https://iapyeh.github.io/sshscript/info.json").read())
-            mime = [x for x in __version__.split('.')]
-            current = [x for x in info['version'].split('.')]
-            if __version__ == info['version']:
-                print(f'Installed SSHScript version "{__version__}" is the most updated version.')
-            else:
-                canupgrade = False
-                for m,c in zip(mime,current):
-                    if int(m) < int(c):
-                        canupgrade = True
-                        break
-                if canupgrade:
-                    print(f"Installed SSHScript Version is \"{__version__}\", SSHScript has new version \"{info['version']}\".")
-                    print("  You can upgrade it by: (choose one)")
-                    print(f"  1.  pip install sshscript --upgrade")
-                    print(f"  2.  pip install sshscript=={info['version']} --upgrade")
-                    print(f"  3.  {sys.executable} -m pip install sshscript --upgrade")
-                    print(f"  4.  {sys.executable} -m pip install sshscript=={info['version']} --upgrade")
+        def checkversion():
+            try:
+                import urllib.request
+                import json
+                info = json.loads(urllib.request.urlopen("https://iapyeh.github.io/sshscript/info.json",timeout=3).read())
+                mime = [x for x in __version__.split('.')]
+                current = [x for x in info['version'].split('.')]
+                if __version__ == info['version']:
+                    print(f'Installed SSHScript version "{__version__}" is the most updated version.')
                 else:
-                    print(f"Installed SSHScript Version is \"{__version__}\"(official release is \"{info['version']}\").")
+                    canupgrade = False
+                    for m,c in zip(mime,current):
+                        if int(m) < int(c):
+                            canupgrade = True
+                            break
+                    if canupgrade:
+                        print(f"Installed SSHScript Version is \"{__version__}\", SSHScript has new version \"{info['version']}\".")
+                        print("  You can upgrade it by: (choose one)")
+                        print(f"  1.  pip install sshscript --upgrade")
+                        print(f"  2.  pip install sshscript=={info['version']} --upgrade")
+                        print(f"  3.  {sys.executable} -m pip install sshscript --upgrade")
+                        print(f"  4.  {sys.executable} -m pip install sshscript=={info['version']} --upgrade")
+                    else:
+                        print(f"Installed SSHScript Version is \"{__version__}\"(official release is \"{info['version']}\").")
 
-        except:
-            print(f'SSHScript Version:{__version__}')
+            except:
+                print(f'SSHScript Version:{__version__}')
+        
+        import threading
+        threading.Thread(target=checkversion).start()
+        
         print()
         parser.print_help()
     
