@@ -1,5 +1,9 @@
 # SSHScript Documents
 
+
+
+#### v1.1.14 Released on 2022/8/24 [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.14)
+
 ## en
 
 - [Tutorial](https://iapyeh.github.io/sshscript/tutorial) 
@@ -108,7 +112,7 @@ print(myIp)
 
 ## Releases
 
-The last version is 1.1.12 on 2022/8/8. [Release Notes](https://iapyeh.github.io/sshscript/releasenotes)
+The last version is 1.1.14 on 2022/8/24. [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.14)
 
 ## Installation
 
