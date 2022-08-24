@@ -84,7 +84,7 @@ The idea is that many automation tasks are running commands and dealing with out
 Releases
 ========
 
-The last version is 1.1.12. (2022/8/8). Relase Notes_
+The last version is 1.1.14. (2022/8/24). Relase Notes_
 
 More
 ====
@@ -103,4 +103,4 @@ More
 .. _Examples : https://iapyeh.github.io/sshscript/examples/index
 
 
-.. _Notes : https://iapyeh.github.io/sshscript/releasenotes
+.. _Notes : https://iapyeh.github.io/sshscript/release-v1.1.14
