@@ -54,37 +54,3 @@ script= '''
    '''
 sshscript.runScript(script,globals(),locals())
 ```
-
-## Logger
-
-You can get the logger of sshscript by 
-
-```python
-import logging
-logger=logging.getLogger('sshscript')
-```
-
-or 
-
-```python
-import __main__
-logger = __main__.logger
-```
-
-If you need to know the details about what the sshscript is working, please set the logging to debug level.
-
-```python
-import logging
-logger.setLevel(logging.DEBUG)
-```
-
-If you want to log to file, below is an example:
-
-```python
-import __main__
-logger = __main__.logger
-logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler('unittest.log', 'w', 'utf-8')
-handler.setFormatter(logging.Formatter('%(asctime)s: %(message)s',"%Y-%m-%d %H:%M:%S")) 
-logger.addHandler(handler)
-```
