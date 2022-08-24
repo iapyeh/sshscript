@@ -1,5 +1,8 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
+
 # Syntax, Variables and Functions
+
+#### Please be noted: This article is obsoleted, new version for v1.1.14 is coming soon. (2022/8/24)
 
 # Syntax
 
