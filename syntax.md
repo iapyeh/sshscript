@@ -2,7 +2,7 @@
 
 # Syntax, Variables and Functions
 
-#### Please be noted: This article is obsoleted, new version for v1.1.14 is coming soon. (2022/8/24)
+#### Please be noted: This article is for v1.1.12. A new version for v1.1.14 is coming soon. (2022/8/24)
 
 # Syntax
 
