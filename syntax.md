@@ -235,7 +235,7 @@ The “console” object has the following methods to use:
         - seconds to wait after submitting the input string.
     
     ```python
-    with $PS1=;export PS1 as console:
+    with $ as console:
         # at least wait 2 seconds before inputing password
         console.sendline('sudo -S lastb -F -10',2) 
         console.sendline('1234')
