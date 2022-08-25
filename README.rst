@@ -11,7 +11,7 @@ v1.1.14 has released on 2022/8/24. Users are recommanded to upgrade by
 
 
 +---------------------------------------------------------------------------------------------------+
-|For installers of version v1.101, v1.102 and v1.103.  Please do upgrade by                         |
+|For installers of version v1.101, v1.102 and v1.103.  Please do upgrade with                       |
 +---------------------------------------------------------------------------------------------------+
 .. code:: 
 
