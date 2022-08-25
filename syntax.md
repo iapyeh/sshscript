@@ -4,7 +4,8 @@
 
 **for version 1.1.14**
 
-![image](https://user-images.githubusercontent.com/4695577/186639584-f70662d6-c41f-46af-a5d8-0fa872376862.png)
+![image](https://user-images.githubusercontent.com/4695577/186641506-3a7c0086-ba35-4b5c-9aa7-9ab1fd0f86ee.png)
+
 
 # Syntax
 
