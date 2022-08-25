@@ -1,4 +1,5 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
+
 # Syntax, Variables and Functions
 
 **for version 1.1.14**
@@ -10,7 +11,7 @@
 This defines a one-dollar command, it runs a single-line command.
 
 - When not connecting to a remote host, run the command on [localhost](http://localhost) by subprocess.
-- When has connected to a remote host, run the command on the remote host by Paramiko’s API.
+- When connected to a remote host, run the command on the remote host by Paramiko’s API.
 
 ```
 # example 1, run "ls -l" on localhost
@@ -45,7 +46,7 @@ $@{cmd} -l f'{path}'
 
 You can get the command’s exit code by $.exitcode.
 
-You can also get the command output by $.stdout and $.stderr.
+You can also get the command output by \$.stdout and $.stderr.
 
 ```
 $[ -e /non-existing-file ]
@@ -57,7 +58,7 @@ lines = $.stdout.splitlines()
 
 ## $”””
 
-This defines a multiple lines one-dollar command. Single quote or double quote does not matter. For example:
+This defines a multiple line one-dollar command. Single quote or double quote does not matter. For example:
 
 ```jsx
 
@@ -79,11 +80,11 @@ $"""
 
 ```
 
-Every single line is executed individually. Their output of stdout or stderr are concated together. Command is executed one after one. The value of $.exitcode is the exit code of the last command.
+Every single line is executed individually. Their output of stdout or stderr are concatenated together. Command is executed one after one. The value of $.exitcode is the exit code of the last command.
 
 ## $$
 
-This defines a two-dollars command. Two-dollars commands will be executed in a shell. If your commands requires to run by a shell, you should use two-dollars command. For example:
+This defines a two-dollars command. Two-dollars commands will be executed in a shell. If your commands require it to run by a shell, you should use the two-dollars command. For example:
 
 ```jsx
 $$ echo “1234” | sudo -S rm -rf /goodbye-root
@@ -95,14 +96,14 @@ Because the “sudo” requires a “pty” to work. The other usage scenario is
 # You will get the value of $SHELL. 
 $$ echo $SHELL
 
-# The above command does not work by a one-dollar command,
+# The above command does not work if it is in a one-dollar command,
 $echo $PATH
 assert $.stdout.strip() == $SHELL
 # the output is "$PATH", not the value of $SHELL
 
 ```
 
-Inline commands also requires a shell to work.
+Inline commands also require a shell to work.
 
 ```jsx
 # `pwd` works only in $$ not in $.
@@ -111,7 +112,7 @@ $$ echo `pwd`
 
 ## $$”””
 
-This defines a multiple lines two-dollars command. Many commands can be put together, for example:
+This defines a multiple line two-dollars command. Many commands can be put together, for example:
 
 ```jsx
 $$"""
@@ -121,7 +122,7 @@ $$"""
 # the output is file list of /tmp
 ```
 
-These commands are executed in a single session of shell. Their output of stdout or stderr are cancatenated in $.stdout and $.stderr respectively. The example code below shows the difference between one-dollar and two-dollars commands.
+These commands are executed in a single session of the shell. Their output of stdout or stderr are concatenated in $.stdout and $.stderr respectively. The example code below shows the difference between one-dollar and two-dollars commands.
 
 ```
 # this is a one-dollar command
@@ -142,7 +143,7 @@ $$"""
     cd /var/log
     ls message
 """
-# Notes: leading empty line and heading-spaces are ignored for readibility,
+# Notes: leading empty line and heading-spaces are ignored for readability,
 # so #!/bin/sh is actually at the first line.
 ```
 
@@ -166,7 +167,7 @@ with $$ as console:
 
 ### Alias styles:
 
-Initially, the with-command is simply prefix a “with” to a two-dollars command. Which means to open an interactive shell. Since the “with” is a strong hint, it does not matter how many dollars is following it. So, you can also prefix a “with” to a one-dollar command to define a with-command. The result is that any of the following styles defines a with-command:
+Initially, the with-command is simply prefixing a “with” to a two-dollars command. Which means to open an interactive shell. Since the “with” is a strong hint, it does not matter how many dollars is following it. So, you can also prefix a “with” to a one-dollar command to define a with-command. The result is that any of the following styles defines a with-command:
 
 - with $
 - with $$
@@ -174,10 +175,11 @@ Initially, the with-command is simply prefix a “with” to a two-dollars comma
 - with $$ single line command
 - with $f”single line f-strting command”
 - with $$f”single line f-strting command”
-- with $’’’ multiple lines command ‘’’
-- with $$’’’ multiple lines command ‘’’
-- with $f’’’ multiple lines f-string command ‘’’
-- with $$f’’’ multiple lines f-string command ‘’’
+- with $’’’ multiple line command ‘’’
+- with $$’’’ multiple line command ‘’’
+- with $f’’’ multiple line f-string command ‘’’
+
+- with $$f’’’ multiple line f-string command ‘’’
 
 ```
 # a example of "with $"
@@ -196,7 +198,7 @@ with $#!/bin/tcsh as console:
           whoami
     ''')
 
-# a example of "with $$-multiple-lines", force to use /bin/bash
+# a example of "with $$-multiple-line", force to use /bin/bash
 cmd = 'sudo -S su'
 with $$'''
   $!/bin/bash
@@ -208,7 +210,7 @@ with $$'''
           whoami
     ''')
 
-# a example of "with $$-multiple-lines f-string"
+# a example of "with $$-multiple-line f-string"
 cmd = 'sudo -S su'
 with $$f'''
   PATH = /var/log:$PATH
@@ -239,14 +241,14 @@ The “console” object has the following methods to use:
     ```
     
 - stdout
-    - you can get the stdout output of last executed command from this property.
+    - you can get the stdout output of the last executed command from this property.
 - stderr
     
-    you can get the stderr output of last executed command from this property.
+    you can get the stderr output of the last executed command from this property.
     
 - expect(keyword, timeout=60)
     
-    blocks the execution until the given keyword appears in stdout or stderr.
+    This function blocks the execution until the given keyword appears in stdout or stderr.
     
     - keyword: str, re.Pattern or list of both.
         - for example `console.expect([re.compile('pasword',re.I), 'SORRY'])`
@@ -379,13 +381,13 @@ There is a special note for $.stderr. Please consider three scenarios below:
 - B: $$cat /non-existed-file
 - C: with $$cat /non-existed-file
 
-On localhost (subprocess), $.stderr would have value “No such file or directory” in A, B and C. But it is not the same when on a remote server. 
+On localhost (subprocess), $.stderr would have value “No such file or directory” in A, B and C. But it is not the same when on a remote server.
 
-On a remote server, scenairo B and C does not dump to stderr. Instead, they dump to stdout. This is a limitation. Please see the table at the bottom for complete list for these limitations.
+On a remote server, scenario B and C do not dump to stderr. Instead, they dump it to stdout. This is a limitation. Please see the table at the bottom for a complete list of these limitations.
 
 ## $.client
 
-The instance of paramiko.client.SSHClient of current ssh session. If you know what you are doing, you can get the instance of paramiko.client.SSHClient for your own purpose. Before accessing this value, “$.connect()” should be called to open a ssh session.
+The instance of paramiko.client.SSHClient of the current ssh session. If you know what you are doing, you can get the instance of paramiko.client.SSHClient for your own purpose. Before accessing this value, “$.connect()” should be called to open a ssh session.
 
 ## $.logger
 
@@ -438,7 +440,7 @@ Default is 60 seconds.
 
 ### os.environ[’MUTE_WARNING’]
 
-This is used to subpress warnings when shell-specific chareacters (>&|;`) was found in a one-dollar command.  To enable it, please set its value to “1”.
+This is used to suppress warnings when shell-specific characters (>&|;`) was found in a one-dollar command.  To enable it, please set its value to “1”.
 
 Default is None. (False)
 
@@ -452,7 +454,7 @@ Note: starting from v1.1.14. you can force to use preferred shell and arguments 
 
 ### os.environ[’SHELL_ARGUMENTS’]
 
-This works with os.environ[’SHELL’]. When the sshscript getting shell value from os.environ[’SHELL’], it also gets arguments from os.environ[’SHELL_ARGUMENTS’].
+This works with os.environ[’SHELL’]. When the sshscript gets shell value from os.environ[’SHELL’], it also gets arguments from os.environ[’SHELL_ARGUMENTS’].
 
 No default value.
 
@@ -522,7 +524,7 @@ $sshscript test.spy --account=username@host
 
 ## $.break(code=0)
 
-This function breaks the execution of current executing script chunk. When you have many .spy files to run, the next file would start to executing.
+This function breaks the execution of the current executing script chunk. When you have many .spy files to run, the next file would start executing.
 
 ```python
 $uname -a
@@ -716,7 +718,7 @@ assert os.path.exists(os.path.join(myfolder,'message'))
 
 ## $.exit(code=0)
 
-Starts from v1.1.14, $.exit() would end the main process of sshscript. The given code is the exit code. You can call $.exit(1) to indicate an error state of exiting.
+Starting from v1.1.14, $.exit() would end the main process of sshscript. The given code is the exit code. You can call $.exit(1) to indicate an error state of exiting.
 
 ## $.include(filepath)
 
@@ -766,7 +768,7 @@ os.environ['MAX_INCLUDE'] = 999
 
 ## $.log(level, message)
 
-This function write log for you. For example
+This function writes logs for you. For example
 
 ```
 from logging import WARNING
@@ -809,11 +811,11 @@ This is a wrapper function of threading.Thread(). Please use it to get an instan
 ## $.upload(src, dst, makedirs=0, overwrite=1)
 
 - src(str): the file path in the localhost to upload.
-    - if the value is a relative path, os.path.abspath() is applied.
+    - If the value is a relative path, os.path.abspath() is applied.
 - dst(str): the file path in remote host to save the uploaded file, must be a absolute path
 - makedirs(boolean): optional, default is False.
-    - if True, intermediate folders of the dst path would be created if necessary.
-    - when makedirs=1 is enabled, if the last component of the uploading destination has the same extension of the source file, the last component is taken as a file.
+    - If True, intermediate folders of the dst path would be created if necessary.
+    - When makedirs=1 is enabled, if the last component of the uploading destination has the same extension of the source file, the last component is taken as a file.
     
     ```
       # suppose "test.txt" is the file to upload
@@ -838,7 +840,7 @@ This is a wrapper function of threading.Thread(). Please use it to get an instan
     ```
     
 - overwrite(boolean): optional, default is True.
-    - if True, the destination file would be overridden if it is already existed, otherwise raises a FileExistsError.
+    - If True, the destination file would be overridden if it is already existed, otherwise raises a FileExistsError.
 - Returns: tuple (src, dst)
 
 ```python
