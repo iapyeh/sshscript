@@ -71,7 +71,7 @@ $hostname
 
 ```
 
-You can define them as follows: 
+You can define a multiple line one-dollar command to put them together as follows: 
 
 ```jsx
 $"""
@@ -82,7 +82,7 @@ $"""
 
 ```
 
-Every single line is executed individually. Their output of stdout or stderr are concatenated together. Command is executed one after one. The value of $.exitcode is the exit code of the last command.
+Every single line is executed individually. Their output of stdout or stderr are concatenated together. Commands are executed one by one. The value of $.exitcode is the exit code of the last command.
 
 ## $$
 
