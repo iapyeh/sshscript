@@ -1,37 +1,74 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
-
 # Syntax, Variables and Functions
 
-#### Please be noted: This article is for v1.1.12. A new version for v1.1.14 is coming soon. (2022/8/24)
+**for version 1.1.14**
 
 # Syntax
 
 ## $
 
-run a single-line command
+This defines a one-dollar command, it runs a single-line command.
 
-- by subprocess.popen
-- by client.exec_command
+- When not connecting to a remote host, run the command on [localhost](http://localhost) by subprocess.
+- When has connected to a remote host, run the command on the remote host by Paramiko’s API.
 
-<aside>
-💡 “|” does not work in subprocess, but work in ssh, eg.
-$ls -l | wc -l
+```
+# example 1, run "ls -l" on localhost
+$ls -l
 
-</aside>
+# example 2, run "ls -l" on a remote host
+$.connect('user@remote')
+$ls -l
+```
+
+You can put python statements inside @{} or use f-string to define a command.
+
+```
+
+cmd = 'ls'
+path = '/root'
+
+$@{cmd} -l @{path}
+
+# the above is evaluated to 
+$ls -l /root
+
+# you can also use f-string to assign the command
+$f'{cmd} -l {path}
+
+# when using f-string, use it to define the command at all.
+# don't mix them like below: 
+$ls -l f'{path}'
+$@{cmd} -l f'{path}'
+# Both yield unpredictable results.
+```
+
+You can get the command’s exit code by $.exitcode.
+
+You can also get the command output by $.stdout and $.stderr.
+
+```
+$[ -e /non-existing-file ]
+assert $.exitcode == 1
+
+$ls -l /tmp
+lines = $.stdout.splitlines()
+```
 
 ## $”””
 
-Many lines of “$” put together, for example:
+This defines a multiple lines one-dollar command. Single quote or double quote does not matter. For example:
 
 ```jsx
 
+# suppose that you have three commands to run.
 $ls -l /tmp
 $whoami
 $hostname
 
 ```
 
-They can be put together by 
+You can define them as follows: 
 
 ```jsx
 $"""
@@ -39,136 +76,217 @@ $"""
     whoami
     hostname
 """
+
 ```
 
-Every single line is executed individually. The output of stdout or stderr are put together.
-
-Every command is executed one by one.
+Every single line is executed individually. Their output of stdout or stderr are concated together. Command is executed one after one. The value of $.exitcode is the exit code of the last command.
 
 ## $$
 
-Sometimes, we need a shell to work, for example:
+This defines a two-dollars command. Two-dollars commands will be executed in a shell. If your commands requires to run by a shell, you should use two-dollars command. For example:
 
 ```jsx
 $$ echo “1234” | sudo -S rm -rf /goodbye-root
 ```
 
-Because the “sudo” requires a “pty” to work. The other reason is that the environment works only in shell mode. For example:
+Because the “sudo” requires a “pty” to work. The other usage scenario is that the environment works only in shell mode. For example:
 
 ```jsx
-# You will get the value of $PATH. 
-$$ echo $PATH
+# You will get the value of $SHELL. 
+$$ echo $SHELL
 
-# But in a non-shell command,
-# the output is $PATH, not the value of $PATH
+# The above command does not work by a one-dollar command,
 $echo $PATH
+assert $.stdout.strip() == $SHELL
+# the output is "$PATH", not the value of $SHELL
 
 ```
 
-The inline command also requires a shell to work.
+Inline commands also requires a shell to work.
 
 ```jsx
 # `pwd` works only in $$ not in $.
 $$ echo `pwd` 
 ```
 
-$$-commands will be executed in a shell. For the subprocess, it is implemented by popen(shell=True). For the Paramiko, it is implemented by client.invoke_shell()
-
 ## $$”””
 
-Many commands can be put together, for example:
+This defines a multiple lines two-dollars command. Many commands can be put together, for example:
 
 ```jsx
 $$"""
     cd /tmp
     ls -l
 """
+# the output is file list of /tmp
 ```
 
-They are executed in a single session of shell. 
+These commands are executed in a single session of shell. Their output of stdout or stderr are cancatenated in $.stdout and $.stderr respectively. The example code below shows the difference between one-dollar and two-dollars commands.
 
-- For the subprocess, it means popen(”bash”), and commands are written to its stdin one by one.
-- For the Paramiko, it means client.invoke_shell(), and commands are written to its stdin one by one.
+```
+# this is a one-dollar command
+$'''
+    cd /tmp
+    ls -l
+'''
+# its output is not file list of /tmp, 
+# because "cd /tmp" and "ls -l" are executed seperately.
+```
 
-For multiple commands, their output of stdout or stderr are put together in $.stdout and $.stderr respectively.
+You can assign  the shell which runs the two-dollar command by prefixing #! to its first line. For example:
 
-## with $
+```
+$$"""
+    #!/bin/sh -exu
+    echo the shell is $0
+    cd /var/log
+    ls message
+"""
+# Notes: leading empty line and heading-spaces are ignored for readibility,
+# so #!/bin/sh is actually at the first line.
+```
 
-This syntax would invoke an interactive shell. Commands are executed in a shell and you can interact with it.
+## with $$
 
-```jsx
-# Example of subprocess:
-os.environ[’CMD_INTERVAL’] = "1" # 1 second between every line
-os.environ['SHELL'] = '/bin/tcsh' # if you want something diffrent 
+This defines a with-command. By with-command, you can invoke an interactive console. 
+
+```
+with $$ as console:
+    console.send('sudo -S su')
+    console.expect('password') # case-insensitive 
+    console.sendline('''root-password
+          whoami
+          cd /root
+          tar -zcf root.backup.tgz ./
+    ''')
+    print(console.stdout)
+    print(console.stderr)
+
+```
+
+### Alias styles:
+
+Initially, the with-command is simply prefix a “with” to a two-dollars command. Which means to open an interactive shell. Since the “with” is a strong hint, it does not matter how many dollars is following it. So, you can also prefix a “with” to a one-dollar command to define a with-command. The result is that any of the following styles defines a with-command:
+
+- with $
+- with $$
+- with $ single line command
+- with $$ single line command
+- with $f”single line f-strting command”
+- with $$f”single line f-strting command”
+- with $’’’ multiple lines command ‘’’
+- with $$’’’ multiple lines command ‘’’
+- with $f’’’ multiple lines f-string command ‘’’
+- with $$f’’’ multiple lines f-string command ‘’’
+
+```
+# a example of "with $"
 with $sudo -S su as console:
-    console.send('root-password-is-123456')
-    console.send('cd /tmp')
-    console.send('pwd')
-    print(console.stdout) # /tmp
-    console.send('cd /root')
-    console.send('pwd')
-    print(console.stdout) # /root
-    console.send('ls -l')
-print($.stdout) # the outputs of all lines of execution.
+    console.expect('password')
+    console.sendline('''root-password
+          whoami
+    ''')
+
+# a example of "with $$"
+cmd = 'sudo -S su'
+with $#!/bin/tcsh as console:
+    console.sendline(cmd)
+    console.expect('password')
+    console.sendline('''root-password
+          whoami
+    ''')
+
+# a example of "with $$-multiple-lines", force to use /bin/bash
+cmd = 'sudo -S su'
+with $$'''
+  $!/bin/bash
+  PATH = /var/log:$PATH
+  export PATH
+	@{cmd}
+''' as console:
+    console.sendline('''root-password
+          whoami
+    ''')
+
+# a example of "with $$-multiple-lines f-string"
+cmd = 'sudo -S su'
+with $$f'''
+  PATH = /var/log:$PATH
+  export PATH
+	{cmd}
+''' as console:
+    console.sendline('''root-password
+          whoami
+    ''')
 ```
 
-About the “console” in the above example. It is an instance of POpenChannel,POpenPipeChannel or ParamikoChannel. Which one does not matter, the following methods and properties are available for your interaction:
+### About the “console”
+
+The “console” object has the following methods to use:
 
 - sendline(command, waitingSeconds=1)
     - command: str
-        - command to input to the console (no tailing newline required)
+        - a string for inputing (ending newline is not necessary)
     - waitingSeconds: int, default is 1
-        - seconds to wait for data after submitting the seconds.
+        - seconds to wait after submitting the input string.
+    
+    ```python
+    with $PS1=;export PS1 as console:
+        # at least wait 2 seconds before inputing password
+        console.sendline('sudo -S lastb -F -10',2) 
+        console.sendline('1234')
+    print($.stdout)
+    ```
+    
 - stdout
     - you can get the stdout output of last executed command from this property.
 - stderr
-    - you can get the stderr output of last executed command from this property.
+    
+    you can get the stderr output of last executed command from this property.
+    
 - expect(keyword, timeout=60)
-    - keyword: str, case insensitive.
-        - blocks the execution until the given keyword appears in stdout or stderr.
-        - keyword can also be a string re.Pattern.
+    
+    blocks the execution until the given keyword appears in stdout or stderr.
+    
+    - keyword: str, re.Pattern or list of both.
+        - for example `console.expect([re.compile('pasword',re.I), 'SORRY'])`
+        - for string, the matching is case insensitive
     - timeout: seconds to wait. If time is over, raises a TimeoutError.
+    
+    ```
+    import re
+    with $ as console:
+        console.sendline('sudo -S lastb -F -10',2) 
+    
+        # wait for "password" to appear before inputing password
+        console.expect('password')
+        # another way is to set a string re.Pattern for expect()
+        #console.expect(re.compile('PASSWORD',re.I))
+    
+        console.sendline('your-password')
+    print($.stdout)
+    ```
+    
 - expectStderr(keyword, timeout=60)
-    - blocks the execution until the given keyword appears in stderr.
-    - timeout: seconds to wait. If time is over, raises a TimeoutError.
+    
+    same as expect() but only searching for stderr.
+    
 - expectStdout(keyword, timeout=60)
-    - blocks the execution until the given keyword appears in stdout.
-    - timeout: seconds to wait. If time is over, raises a TimeoutError.
+    
+    same as expect() but only searching for stdout.
+    
 
-Example of using the “waitingSeconds” parameter:
+The with-command would be converted to a regular python “with .. as …” syntax. Of course, you don’t need to name it “console”.  Any name is fine. For example:
 
-```python
-with $PS1=;export PS1 as console:
-    # at least wait 2 seconds before inputing password
-    console.sendline('sudo -S lastb -F -10',2) 
-    console.sendline('1234')
-print($.stdout)
 ```
-
-Another implementation style with “expect”.
-
-```python
-import re
-with $PS1=;export PS1 as console:
-    console.sendline('sudo -S lastb -F -10',2) 
-
-    # wait for "password" to appear before inputing password
-    console.expect('password')
-    # another way is to set a string re.Pattern for expect()
-    #console.expect(re.compile('PASSWORD',re.I))
-
-    console.sendline('your-password')
-print($.stdout)
+with $$ as slave:
+   slave.sendline('whoami')
+   slave.expect(['food','water','macpro'])
 ```
-
-<aside>
-💡 with $”””, with $$ or with $$””” are all the same as with $
-
-</aside>
 
 ## @{python-code}  in command
 
-You can embed python variables in $-command. It would be evaluated before executing the command. For example:
+You can embed python variables in one-dollar commands, two-dollars commands and with-commands. It would be evaluated before executing the command. For example:
 
 ```python
 import datetime
@@ -179,7 +297,7 @@ $tar -zcvf @{now.strftime("%m%d")}.tgz /var/log/system.@{now.strftime("%Y-%m-%d"
 $tar -zcvf 64.tgz /var/log/system.1989-06-04
 ```
 
-It also works in commands of multiple lines:
+It also works in multiple lines commands:
 
 ```python
 # last folder name is "c<space>d"
@@ -201,18 +319,23 @@ $"""
 
 ## $.stdout
 
-You can get the output of a command from $.stdout. If many commands are executed, the $.stdout would have all of them. For example:
+You can get the output of dollar-commands (one-dollar or two-dollars commands) and with-command from $.stdout. If many commands are executed, the value of $.stdout would have all of them. For example:
 
 ```python
 $"""
    echo "this is a book"
    echo "that is a pen"
 """
-assert $.stdout.find('this is a book') >= 0
-assert $.stdout.find('that is a pen') >= 0
+assert 'this is a book' in $.stdout
+assert 'that is a pen'  in $.stdout
+result = {
+   'stdout': $.stdout,
+   'stderr': $.stderr,
+   'stdout+stderr': f'{$.stdout + $.stderr}'
+}
 ```
 
-Please be noted, when shell is invoked, terminal control characters might be mixed in the content of stdout and stderr.
+Please be noted, when a shell is invoked, terminal control characters might be mixed in the value of $.stdout and $.stderr.
 
 ```python
 $$"""
@@ -222,30 +345,60 @@ $$"""
 # the $.stdout would have many control characters.
 ```
 
+For with-command, $.stdout is accessible when exiting the with block.
+
+```
+with $ as console:
+    console.sendline('echo hello')
+    # $.stdout has no value of "ls -l"
+    # its value is in console.stdout
+    assert 'hello' in console.stdout
+    console.sendline('echo world')
+# $.stdout contains stdout of all executions inside the with block.
+assert 'hello' in $.stdout
+assert 'world' in $.stdout
+
+```
+
+This is also valid for $.stderr.
+
 ## $.stderr
 
-If your command execution dumps something in stderr, you can get them by $.stderr.
+If  executions of dollars-commands  dump to stderr, you can get their content by $.stderr.
 
 ```python
 $"""
 cat /non-existing-file
 """
-assert $.stderr.find("No such file or directory") > 0
+assert "No such file or directory" in $.stderr
 ```
 
-There is a special note for $.stderr. Please consider the three examples below:
+There is a special note for $.stderr. Please consider three scenarios below:
 
 - A: $cat /non-existed-file
 - B: $$cat /non-existed-file
 - C: with $$cat /non-existed-file
 
-On the localhost (subprocess), $.stderr would have value “No such file or directory” in A, B and C.
+On localhost (subprocess), $.stderr would have value “No such file or directory” in A, B and C. But it is not the same when on a remote server. 
 
-On a remote server (ssh connection), $.stderr would have value “No such file or directory” for A only. Since for remote ssh sessions, case B and C, It would be $.stdout that has the error message “No such file or directory”, not the $.stderr. This is the behavior of the Paramiko invoke_shell() which implicitly sets get_pty=True.
+On a remote server, scenairo B and C does not dump to stderr. Instead, they dump to stdout. This is a limitation. Please see the table at the bottom for complete list for these limitations.
 
 ## $.client
 
 The instance of paramiko.client.SSHClient of current ssh session. If you know what you are doing, you can get the instance of paramiko.client.SSHClient for your own purpose. Before accessing this value, “$.connect()” should be called to open a ssh session.
+
+## $.logger
+
+For customizing the logger, previously, you have to get the logger from \_\_**main**\_\_.SSHScript.logger. For simplicity, you can now get the logger by $.logger.
+
+```
+import logging
+handler = logging.FileHandler('unittest.log', 'w', 'utf-8')
+$.logger.setLevel(logging.DEBUG)
+$.logger.addHandler(handler)
+```
+
+Please see [this article for details](https://iapyeh.github.io/sshscript/examples/logger) about using the logger.
 
 ## $.sftp
 
@@ -254,8 +407,6 @@ If you know what you are doing, you can get the instance of paramiko.sftp_client
 ## os.environ
 
 ### os.environ[’CMD_INTERVAL’]
-
-Default is 0.5 (seconds).
 
 The interval between two commands. Interval is counted from the latest time when having data received from stdout or stderr.  This value can be changed by os.environ[’CMD_INTERVAL’]. For example:
 
@@ -277,19 +428,37 @@ You can reset this value by
 del os.environ[’CMD_INTERVAL’]
 ```
 
+Default is 0.5 (seconds).
+
 ### os.environ[’CMD_TIMEOUT’]
 
 The max time spent for executing a command in seconds.
 
 Default is 60 seconds.
 
+### os.environ[’MUTE_WARNING’]
+
+This is used to subpress warnings when shell-specific chareacters (>&|;`) was found in a one-dollar command.  To enable it, please set its value to “1”.
+
+Default is None. (False)
+
 ### os.environ[’SHELL’]
 
 This is used when the subprocess is invoking shell. Usually it is set by your shell. You don’t need to bother it. If it is not set, shutil.which('bash') is called to find the shell to invoke.
 
-### os.environ[’VERBOSE]
+No default value.
 
-Default is “” (empty string)
+Note: starting from v1.1.14. you can force to use preferred shell and arguments by “#!” at the first line of a two-dollar command.
+
+### os.environ[’SHELL_ARGUMENTS’]
+
+This works with os.environ[’SHELL’]. When the sshscript getting shell value from os.environ[’SHELL’], it also gets arguments from os.environ[’SHELL_ARGUMENTS’].
+
+No default value.
+
+Note: starting from v1.1.14. you can force to use preferred shell and arguments by “#!” at the first line of a two-dollar command.
+
+### os.environ[’VERBOSE]
 
 The verbose mode is enabled by setting this value to non-empty string. When the verbose mode is enabled, every message received from stdout and stderr of the executing command would be shown on console.
 
@@ -300,37 +469,29 @@ if sys.stdout.isatty():
     os.environ['VERBOSE'] = "1"
 ```
 
-### os.environ[’VERBOSE_STDOUT_PREFIX’]
+Default is “” (empty string), aka False
 
-Default is 🟩
+### os.environ[’VERBOSE_STDOUT_PREFIX’]
 
 In verbose mode, This string is prefixed to every line when showing a messages of stdout on console.
 
-### os.environ[’VERBOSE_STDERR_PREFIX’]
+Default is 🟩
 
- Default is 🟨.
+### os.environ[’VERBOSE_STDERR_PREFIX’]
 
 In verbose mode, This string is prefixed to every line when showing a messages of stderr on console.
 
-## \_\_main\_\_
+ Default is 🟨.
 
-### \_\_main\_\_.SSHScript.logger
+## __main__
 
-You can assess the logger of the SSHScript by this variable. Below is an example of setting log files in a .spy file.
+### __main__.SSHScript.logger
 
-```
-import __main__
-logger = __main__.SSHScript.logger
+Sorry, this is no logger available in v1.1.14. Please get the logger by $.logger.
 
-logfile = 'unittest.log'
-logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler(logfile, 'w', 'utf-8')
-logger.addHandler(handler)
-```
+### __main__.unknown_args
 
-### \_\_main\_\_.unknown_args
-
-The sshscript use argparse to parsing command-line arguments. It puts those unknown argements in \_\_main\_\_.unknown_args. You can use “argparse” in .spy file by parsing this variable. For example:
+The sshscript use argparse to parsing command-line arguments. It puts those unknown argements in __main__.unknown_args. You can use “argparse” in .spy file by parsing this variable. For example:
 
 ```
 # file content of test.spy
@@ -359,13 +520,44 @@ $sshscript test.spy --account=username@host
 
 # Functions
 
+## $.break(code=0)
+
+This function breaks the execution of current executing script chunk. When you have many .spy files to run, the next file would start to executing.
+
+```python
+$uname -a
+
+# MacOS has "Darwin" in the output of "uname"
+# Let's stop the execution for all others.
+if $.stdout.find('Darwin') == -1:
+    $.break()
+
+# this command is only executing on MacOS
+$rm -rf /Users/jobs
+```
+
+For example:
+
+```python
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('-p','--password', dest='password', default='',
+                    help='root password to login to care database')
+args, unknown = parser.parse_known_args(__main__.parameters)
+if not args.password :
+    parser.print_help()
+    $.break()
+
+$mysqladmin -uroot -p "@{args.password}" create girlfriends
+```
+
 ## $.close()
 
-To close the current ssh connection. This is the counterpart of $.connect(). Please see examples in the $.connect() section. Actually, you don’t need to call this in the context of “with $.connect()”. But you do need this in some context.
+This  function closes the current ssh connection. This is the counterpart of $.connect(). Please see examples in the $.connect() section. Actually, you don’t need to call this in the context of “with $.connect()”. But you do need this in some context.
 
 ## $.connect(host, username, password, port, policy,**kw)
 
-This function open a ssh connection to remote host.
+This function opens a ssh connection to remote host.
 
 - host(str): the host name to connect. It also accepts  “username@host” format.  eg. ‘tim@140.119.20.90’
 - username(str): optional, the username to login ssh server. If this is not given in the “host” parameter.
@@ -522,36 +714,9 @@ assert os.path.exists(os.path.join(myfolder,'message'))
 
 </aside>
 
-## $.exit()
+## $.exit(code=0)
 
-This function breaks the execution of SSHScript script.
-
-```python
-$uname -a
-
-# MacOS has "Darwin" in the output of "uname"
-# Let's stop the execution for all others.
-if $.stdout.find('Darwin') == -1:
-    $.exit()
-
-# this command is only executing on MacOS
-$rm -rf /Users/jobs
-```
-
-For example:
-
-```python
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('-p','--password', dest='password', default='',
-                    help='root password to login to care database')
-args, unknown = parser.parse_known_args(__main__.parameters)
-if not args.password :
-    parser.print_help()
-    $.exit()
-
-$mysqladmin -uroot -p "@{args.password}" create girlfriends
-```
+Starts from v1.1.14, $.exit() would end the main process of sshscript. The given code is the exit code. You can call $.exit(1) to indicate an error state of exiting.
 
 ## $.include(filepath)
 
@@ -599,6 +764,19 @@ To prevent an infinite loop of cycling including. The max times of a file to be 
 os.environ['MAX_INCLUDE'] = 999
 ```
 
+## $.log(level, message)
+
+This function write log for you. For example
+
+```
+from logging import WARNING
+$[ -e /root/secret.txt ]
+if $.exitcode == 0:
+    $.log(WARNING,'too bad, root has its own secret')
+```
+
+Please see [this article for details](https://iapyeh.github.io/sshscript/examples/logger) about logging.
+
 ## $.panaroid(yes)
 
 - yes(boolean): If True, raises a SSHScriptError if there is data received from stderr. Default is false.
@@ -626,7 +804,7 @@ with open('user@host',pkey=pkey) as _:
 
 ## $.thread()
 
-This is a wrapper function of threading.Thread(). Please use it to get an instance of Thread instead of calling threading.Thread().  [Here is an usage example.](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading)
+This is a wrapper function of threading.Thread(). Please use it to get an instance of Thread in stead of calling threading.Thread().  [Here is an usage example.](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading)
 
 ## $.upload(src, dst, makedirs=0, overwrite=1)
 
@@ -635,6 +813,30 @@ This is a wrapper function of threading.Thread(). Please use it to get an instan
 - dst(str): the file path in remote host to save the uploaded file, must be a absolute path
 - makedirs(boolean): optional, default is False.
     - if True, intermediate folders of the dst path would be created if necessary.
+    - when makedirs=1 is enabled, if the last component of the uploading destination has the same extension of the source file, the last component is taken as a file.
+    
+    ```
+      # suppose "test.txt" is the file to upload
+        
+      src = 'test.txt'
+      $.upload(src,'/tmp/non-exist1/non-exist2/test2.txt',makedirs=1)
+        
+      # the uploaded is /tmp/non-exist1/non-exist2/test2.txt
+      # at version 1.1.12 and earlier, 
+      # the uploaded is /tmp/non-exist1/non-exist2/test2.txt/test.txt
+        
+      # --- the next 3 calls in v1.1.14 are the same as in v1.1.12 ---
+        
+      $.upload(src,'/tmp/non-exist1/non-exist2/test.txt',makedirs=1)
+      # uploaded is /tmp/non-exist1/non-exist2/test.txt
+        
+      $.upload(src,'/tmp/non-exist1/non-exist2',makedirs=1)
+      # uploaded is /tmp/non-exist1/non-exist2/test.txt
+        
+      $.upload(src,'/tmp/non-exist1/non-exist2/test.jpg',makedirs=1)
+      # uploaded is /tmp/non-exist1/non-exist2/test.jpg/test.txt
+    ```
+    
 - overwrite(boolean): optional, default is True.
     - if True, the destination file would be overridden if it is already existed, otherwise raises a FileExistsError.
 - Returns: tuple (src, dst)
@@ -659,3 +861,5 @@ $upload('/home/user/mysql.cnf','/etc/mysql/master/backup/',makedirs=1)
 💡 If you are not satisfied by the $.upload , you can use the $.sftp for better control.
 
 </aside>
+
+![image](https://user-images.githubusercontent.com/4695577/186576710-baf846ac-b88c-4b23-9f9e-49ea00b909f0.png)
