@@ -5,11 +5,12 @@
 
 Suppose that there is a security issue about some version of the openssl package. You have to check the version of openssl on all servers. You must ssh into servers from your maintaining host one by one, like this:
 
-```jsx
+```
 # Step 1: from the development host ssh to the production host1
 $ssh user@host1
 
-# Step 2: on the host1, execute a command to get openssl's version and collect its output
+# Step 2: on the host1, execute a command to get openssl's version 
+# and collect its output
 $openssl version
 OpenSSL 1.1.1f  31 Mar 2020
 
@@ -20,7 +21,7 @@ The SSHScript let you do the jobs in this way:
 
 Step 1: create a file named "check-openssl-version.spy" on the development host
 
-```jsx
+```
 # file: check-openssl-version.spy
 
 hosts = ['host1','host2','host3','host4','host5']
@@ -38,7 +39,7 @@ print(tabulate(opensslVersions, headers=['host','version']))
 
 Step 2: run the “check-openssl-version.spy”   on the development host
 
-```jsx
+```
 $ sshscript check-openssl-version.spy
 host     version
 -------  --------------------------------
@@ -53,7 +54,7 @@ Furthermore, you can store common settings in a separated file:
 
 Let’s create a new file named “common.spy”
 
-```jsx
+```
 #file: common.spy
 hosts = ['host1','host2','host3','host4','host5']
 user = 'your-name'
@@ -62,7 +63,7 @@ password = 'your-secret'
 
 Then, re-write the check-openssl-version.spy 
 
-```jsx
+```
 # file: check-openssl-version.spy
 
 # collect
@@ -81,7 +82,7 @@ When your password has changed, and you have about 100 pieces of scripts like th
 
 Furthermore, python code can be put into $command. Which means with little modification, check-openssl-version.spy can check versions of many others. Let’s do it like this:
 
-```python
+```
 # file: check-openssl-version.spy
 
 # collect
@@ -101,7 +102,7 @@ print(tabulate(opensslVersions, headers=['host','version']))
 
 Of course, you can run any other commands, like this:
 
-```python
+```
 # collect
 $.include('common.spy')  
 for host in hosts:
@@ -125,14 +126,14 @@ Suppose that your development host is in the cloud. Now you think that the commo
 
 Let’s create a file named “secret.spy” on the safe host, and put passwords there
 
-```jsx
+```
 #file: secret.spy on the safe host (in office)
 password = ‘your-secret’
 ```
 
 Then, modify the common.spy on the development host to be like this:
 
-```jsx
+```
 #file: common.spy on the maintaining host in cloud
 hosts = ['host1','host2','host3','host4','host5']
 user = 'your-name'
@@ -141,7 +142,7 @@ $.include('secret.spy')
 
 Let’s create a file named “run-from-trusted-host.spy” on the safe host.
 
-```jsx
+```
 # file: run-from-safe-host.spy on the safe host (in office)
 
 # ssh to the development host.
@@ -161,7 +162,7 @@ $rm /home/you/project/secret.spy
 
 Then run the run-from-safe-host.spy on the safe host.
 
-```python
+```
 $sshscript run-from-safe-host.spy
 ```
 
