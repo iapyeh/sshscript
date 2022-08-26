@@ -1,10 +1,14 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
+
 ## Scenario
+
 This example is to collect login-able accounts in 4 groups of hosts. In a host-group, hosts are collected one by one. Every host-group has multiple hosts. Host-groups are grouped into 2 top-groups.
 
 The main thread would spawn 2 threads for every top-group. Then the thread of a top-group, spawns threads for every host-groups.
 
 Every host group is run in an individual thread. One more to say is that before starting our data collection , we have to ssh to a bridge host.
+
+![image](https://user-images.githubusercontent.com/4695577/186790201-7dd88b2e-8205-4123-867a-2b799bc94b69.png)
 
 
 #### file: example.spy
