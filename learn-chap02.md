@@ -36,7 +36,7 @@ print($.stdout)
 
 The receipt is to give your commands two dollars ($$).
 
-In fact, “|” (pipe), “>” (redirect) and environment variables like $PATH are all dependent on the shell. If your commands utilize them, then just give them a shell by using two $$.
+In fact, “\|” (pipe), “\>” (redirect) and environment variables like $PATH are all dependent on the shell. If your commands utilize them, then just give them a shell by using two $$.
 
 An example is that when calling “sudo”, you need two dollars($$).
 
