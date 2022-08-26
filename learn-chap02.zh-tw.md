@@ -1,10 +1,11 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
-
-# 使用 SSHScript 第二章
+# SSHScript使用教學 第二章
 
 在第一章介紹了執行指定的語法$，及得到執行結果的 $.stdout與$.stderr。以及連線到遠端執行指令的 $.connect()。那是很典型的用法，如果還沒看過，請務必先去看完再來閱讀第二章。
 
 其實SSHScript並不複雜，第一章所介紹的已經是SSHScript 90％的核心功能。但是因為世事複雜，不得不衍生出第二章的功能。我們先看看問題在哪裡，這樣你就知道第二章存在的原因，學起來很快就懂。
+
+## Two-dollars Command
 
 把第一章的例子稍微改一下：
 
@@ -38,7 +39,7 @@ print($.stdout)
 
 很簡單，一個$不夠，那就用兩個$$。
 
-其實像是 \| (pipe), \> (redirect), \$PATH 這些都是shell提供的功能。所以，如果你執行的指令用了那些shell才有的功能時，須使用$$的語法。
+其實像是 | (pipe), > (redirect), $PATH 這些都是shell提供的功能。所以，如果你執行的指令用了那些shell才有的功能時，須使用$$的語法。
 
 我最常用到$$是在sudo的時候。例如：
 
@@ -46,9 +47,9 @@ print($.stdout)
 $$echo my-password | sudo -S ls -l /root
 ```
 
-## Many commands to run
+## 多列 Two-dollars Command
 
-跟$不一樣的地方是，$$的多行字串模式有「脈絡」的概念。簡單講，它知道自己所在的目錄。在$的多行字串模式中，如果需要提供路徑當執行參數，必須提供絕對路徑才不會有怪問題。但是在$$時，因為有shell在，使用相對路徑通常可以得到你所想要的結果。例如：
+跟\$不一樣的地方是，\$\$的多列指令模式有「脈絡」的概念。簡單講，它知道自己所在的目錄。在$的多行字串模式中，如果需要提供路徑當執行參數，必須提供絕對路徑才不會有怪問題。但是在$$時，因為有shell在，使用相對路徑通常可以得到你所想要的結果。例如：
 
 ```
 $.connect('username@host')
@@ -72,8 +73,10 @@ rm *.txt
 ```
 with $$sudo -S su as console:
     console.sendline('my-password')
-    console.sendline('whoami')
-    console.sendline('ls -l /root')
+    console.sendline('''
+         whoami
+         ls -l /root
+         ''')
 ```
 
 with … as 是典型的Python語法。當你使用with在$$前面時，可以從 as 後面得到一個console變數，利用console變數，可以跟負責執行程式的shell互動。
