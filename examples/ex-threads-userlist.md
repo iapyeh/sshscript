@@ -4,6 +4,8 @@
 
 This example is to collect login-able accounts in 3 groups of hosts. Every group has multiple hosts. In a group, hosts are collected one by one. Every group is run in an individual thread. One more to say is that before starting our data collection , we have to ssh to a bridge host.
 
+![image](https://user-images.githubusercontent.com/4695577/186790699-c7f24979-8f05-4f67-b6f1-9142ba63f3cc.png)
+
 #### file: example.spy
 
 ```
