@@ -15,8 +15,11 @@
 
 ## Using Thread
 - [py_cui with threads](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading) 
-- [connecting to hosts in threads](https://iapyeh.github.io/sshscript/examples/ex-threads-2) 
-- [complex example of connecting to hosts in threads ](https://iapyeh.github.io/sshscript/examples/ex-threads-3) 
+- [connecting to hosts in threads,usage scenario 1](https://iapyeh.github.io/sshscript/examples/ex-threads-2) 
+- [connecting to hosts in threads,usage scenario 2](https://iapyeh.github.io/sshscript/examples/ex-threads-3) 
+- [connecting to hosts in threads,usage scenario 3](https://iapyeh.github.io/sshscript/examples/ex-threads-userlist) 
+- [connecting to hosts in threads,usage scenario 4](https://iapyeh.github.io/sshscript/examples/ex-threads-userlist2) 
+- 
 
 
 ## Need an Example?
