@@ -31,7 +31,7 @@ The sshscript let you embed shell commands in python script. It is like writing 
 
 Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
 
-```python
+```
 $.connect('username1@host1')
 $.connect('username2@host2')
 $netstat -antu
@@ -39,7 +39,7 @@ $netstat -antu
 
 Or, to be explicit,
 
-```python
+```
 with $.connect('username1@host1') as _:
     with $.connect('username2@host2') as _:
         $netstat -antu
@@ -47,19 +47,19 @@ with $.connect('username1@host1') as _:
 
 Put the three lines into a file, say “hello.spy”, then execute it on your console by
 
-```bash
+```
 sshscript hello.spy
 ```
 
 If you did not “ssh-copy-id” to the host1 and host2, then just give the password like this
 
-```python
+```
 $.connect('username1@host1', password='secret')
 ```
 
 Doing nested-scp is simple too. The script below downloads the /var/log/message from the host2 and uploads config.ini on the localhost to  /tmp on the host2.
 
-```python
+```
 with $.connect('username1@host1') as _:
     with $.connect('username2@host2') as _:
         $.download('/var/log/message')
@@ -68,7 +68,7 @@ with $.connect('username1@host1') as _:
 
 Your script is full-powered by Python.
 
-```python
+```
 # This script would ssh to a remote server.
 # Then print out all its IP addresses.
 
@@ -120,7 +120,7 @@ The last version is 1.1.14 on 2022/8/24. [Release Notes](https://iapyeh.github.i
 
 ## Installation
 
-```python
+```
 pip install sshscript
 ```
 ## Examples
