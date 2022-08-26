@@ -112,7 +112,7 @@ Summary
     # before
     $sshscript unittest/0.spy unittest/1.spy unittest/2.spy  "unittest/b*.spy"
     # after
-    $sshscript --folder unittest 0.spy 1.spy 2.spy "b.spy"
+    $sshscript --folder unittest 0.spy 1.spy 2.spy "b*.spy"
     ```
     
 - New feature: $.log() and $.logger
@@ -186,13 +186,12 @@ Summary
     
     In v1.1.12, $.exit() does not end the main process and return to shell. It is just to stop the execution of the current spy file and start to execute the next spy file. For better naming of functionality, from v1.1.14, $.exit() would really return to shell and $.break() will stop the execution of the current file and move to the next file (aka previously the $.exit() in v1.1.12). You can call $.exit(1) to indicate an error state of exiting.
     
-- Refine: when the sshscript CLI is executed in a tty and there are no arguments. It will dump help and check if the installed version is the last version.
-    
 - bug-fixing: command interval control. This is an internal bug which was something like without throttle between commands. It leads to making the setting of os.environ[’CMD_INTERVAL’] in vain.
 - bug-fixing: $.stdout in f-string
     
     This bug is that $.stdout and $.stderr were not evaluated to its value. In the next example, it was not working in v1.1.12. Now it works.
     
+- Refine: when the sshscript CLI is executed in a tty and there are no arguments. It will dump help and check if the installed version is the last version.
 
 ```
 # execute a command
@@ -203,7 +202,3 @@ a = f'''
     concatenation of stderr are {$.stdout + $.stderr}
     '''
 ```
-
-- bug-fixing: command interval control. This is an internal bug which was something like without throttle between commands. It leads to making the setting of os.environ[’CMD_INTERVAL’] in vain.
-
-![image](https://user-images.githubusercontent.com/4695577/186346811-f44a3059-952b-4db1-8954-25e5fb3a6215.png)
