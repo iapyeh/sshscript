@@ -1,4 +1,5 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
+
 # sshscript CLI
 
 If you install the sshscript package by “pip install”. A CLI “sshcript” is also installed by the setuptools. To check it, please open a terminal then type “sshscript[ENTER]”.
@@ -34,18 +35,38 @@ If you have many files to run, you can put them into a folder, and run them all 
 $sshscript unittest
 ```
 
-## sshscript **╌run-order**
+## sshscript  \-\-debug
+
+```
+$sshscript hello.spy --debug
+```
+
+With this argument, the sshscript would dump the executing script where there is exception raise during execution. Also the level of logger would be set to “DEBUG”. 
+
+## sshscript \-\-folder
+
+With the argument, the sshscript will find files under the given folder.
+
+```
+# before
+$sshscript unittest/0.spy unittest/1.spy unittest/2.spy  "unittest/b*.spy"
+
+# starting from v1.1.14
+$sshscript --folder unittest 0.spy 1.spy 2.spy "b*.spy"
+```
+
+## sshscript \-\-run-order
 
 When many files are running sequentially, there execution order matters, you can check the running order by
 
-```python
+```
 $sshscript unittest --run-order
 # this option would shows the running order of files, no execution.
 ```
 
 The running order is simply a string-sorting result of filenames. If some file has to be the first file, you can specify it explicitly.
 
-```python
+```
 # Suppose that in the unittest folder,
 # There are files a0.spy, a1.spy and a2.spy.
 # Normally, they run in oder of: a0.spy, a1.spy and a2.spy
@@ -73,7 +94,7 @@ $sshscript unittest/b*
 
 A usage senario:
 
-```python
+```
 # Support in the unittest folder,
 # File 0.spy would ssh to a remote server 
 # File a0.spy, a1.spy are testing files for Feature-A
@@ -86,20 +107,28 @@ $sshscript unittest/0.spy "unittest/a*"
 $sshscript unittest/0.spy "unittest/b*"
 ```
 
-## sshscript  **╌script**
+## sshscript  \-\-**script**
 
 With this argument, the sshscript would dump the converted script. No execution. This is helpful for debugging.
 
-```python
+```
 $sshscript hello.spy --script
 # output is converted "regular python script" of hello.spy, no execution.
 ```
 
-## sshscript **╌verbose**
+When --script applies to many .spy files, the line numbers are continuously from the first file to the last one. Now if --script and --debug appear together, the line numbers are reset for every file. This would be more convenient for tracing codes according to traceback information.
+
+```
+# line numbering are different between the next 2 commends
+$ sshscript 1.spy 2.spy --script
+$ sshscript 1.spy 2.spy --script --debug
+```
+
+## sshscript \-\-**verbose**
 
 With this argument, the sshscript would  dump stdout and stderr to console. 
 
-```python
+```
 $sshscript hello.spy --verbose
 ```
 
@@ -107,19 +136,11 @@ You can set the prefix of dumping lines for stdout or stderr:
 For stdout, it is os.environ[’VERBOSE_STDOUT_PREFIX’] , default is ▏.
 For stderr, it is os.environ[’VERBOSE_STDERR_PREFIX’] , default is 🐞.
 
-## sshscript  **╌**debug
-
-With this argument, the sshscript would dump the executing script where there is exception raise during execution. Also the level of logger would be set to “DEBUG”. 
-
-```python
-$sshscript hello.spy --debug
-```
-
 ## _ _export_ _ = [str …]
 
 When you have  many *.spy files to run. You can export local variables in a file to files after it. For example:
 
-```python
+```
 #content of file: 0.spy
 import json, pickle
 
@@ -143,7 +164,7 @@ def saveToPickle(obj,filename):
 __export__ = ['savetoJson','myfolder']
 ```
 
-```python
+```
 #content of file: 1.spy
 
 # "saveToJson" is available in 1.spy because it is exported by 0.spy
@@ -156,7 +177,7 @@ except NameError:
     pass
 ```
 
-```python
+```
 # You can test above 0.spy and 1.spy by
 $sshscript 0.spy 1.spy
 ```
@@ -165,7 +186,7 @@ $sshscript 0.spy 1.spy
 
 When __export__  is ‘*’, then all locals() are exported. For example:
 
-```python
+```
 #content of file: 0.spy
 import json, pickle
 
@@ -182,7 +203,7 @@ def saveToPickle(obj,filename):
 __export__ = '*'  #⬅ look here
 ```
 
-```python
+```
 #content of file: 1.spy
 # saveToJson is available
 saveToJson({'hello':'world'})
@@ -191,7 +212,7 @@ saveToJson({'hello':'world'})
 saveToPickle({'hello':'world'})
 ```
 
-```python
+```
 # You can test above 0.spy and 1.spy by
 $sshscript 0.spy 1.spy
 ```
@@ -202,7 +223,7 @@ The __export__ can help to organize files better. You can put utilization functi
 
 If you run many files sequentially. They would run in a single ssh session. Which means that if it has ssh-connected to a remote host in 0.spy, then 1.spy would also run in the same remote host. For example:
 
-```python
+```
 #content of file: 0.spy
 $hostname
 print($.stdout) #⬅ would be the localhost
@@ -214,14 +235,14 @@ $.connect(’user@host’)
 # we do not __export__ anything at the end of 0.spy.
 ```
 
-```python
+```
 #content of file:1.spy
 $hostname
 print($.stdout) #⬅ would be the "host"
 $.close()  #⬅ would close the connetion to "user@host"
 ```
 
-```python
+```
 # You can test above 0.spy and 0.spy by
 $sshscript 0.spy 1.spy
 
