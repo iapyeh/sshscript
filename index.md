@@ -24,36 +24,37 @@
 - [安裝有問題](https://iapyeh.github.io/sshscript/sshscript-problem.zh-tw)
 
 ## Introduction
-System automation is a process of realizing management logics by repeating networking and execution. SSHScript makes Python an easy tool for creating system automation processes. With syntax sugar of SSHScript, writing python scripts to execute commands on local host or remote hosts is easy.
 
-You just need to embed commands and networking in python scripts. SSHScript would execute them and let you handle outputs all in Python. You need not know programming about the subprocess module and Paramiko(ssh).
+System automation is a process of realizing management logics by repeating networking and execution. SSHScript makes Python an easy tool for creating system automation processes. With syntax sugers of SSHScript, writing python scripts to execute commands on local host or remote hosts is easy. 
 
-Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
+You just need to embed commands and networking in python scripts. SSHScript would execute them and let you handle outputs all in Python. You need not to know programming about the subprocess module and Paramiko(ssh).
 
-```
-$.connect('username1@host1')
-$.connect('username2@host2')
-$netstat -antu
-```
-
-Or, to be explicit,
+Below is an example. It makes an ssh connection to the host1, then from the host1 makes a connection to the host2. Then It executes “netstat -antu” on the host2.
 
 ```
-with $.connect('username1@host1') as _:
-    with $.connect('username2@host2') as _:
+# file: hello.spy
+# 1. connect to host1
+with $.connect('username1@host1', password='secret') as _:
+
+    # 2. connect to nested host2
+    with $.connect('username2@host2', password='secret') as _:
+
+        # 3. execute a command
         $netstat -antu
+
+        # 4. handle outputs
+				with open('netstat.log','w') as fd:
+				    fd.write($.stdout)
 ```
 
-Put the three lines into a file, say “hello.spy”, then execute it on your console by
+If you did “ssh-copy-id” to remote hosts in advance, you don’t even need to give the password. 
 
-```
-sshscript hello.spy
-```
+```python
+# login by a ssh key
+$.connect('username1@host1')
 
-If you did not “ssh-copy-id” to the host1 and host2, then just give the password like this
-
-```
-$.connect('username1@host1', password='secret')
+# login by a ssh key in a path
+$.connect('username1@host2',pkey=$.pkey('/path/to/keyfile'))
 ```
 
 Doing nested-scp is simple too. The script below downloads the /var/log/message from the host2 and uploads config.ini on the localhost to  /tmp on the host2.
@@ -65,34 +66,26 @@ with $.connect('username1@host1') as _:
         $.upload('config.ini','/tmp')
 ```
 
-Your script is full-powered by Python.
+Below is a longer example, it makes an ssh connection to a remote host, then prints out all its IP addresses.
 
 ```
-# This script would ssh to a remote server.
-# Then print out all its IP addresses.
-
-#
-# Below is regular python script
-#
+# regular python script
 import unicodedata,re
 from getpass import getpass
 password = getpass()
 
-#
-# Below is python script with content of sshscript syntax
-#
-# First: ssh to username@host with password
-$.connect('username@host',password=password)
-# Second: execute command "ifconfig | grep inet"
-$ifconfig | grep inet
-# Third: collect the output
-conten = $.stdout
-# Close the connection, not required but my boss always hopes me to do.
-$.close()
+#### start of SSHScript's block
+# 1. ssh to the remote host
+with $.connect('username@host',password=password) as _:
+    
+    # 2. execute command 
+    $ifconfig | grep inet
+    
+    # 3. collect the output
+    content = $.stdout
+#### end of SSHScript's block
 
-#
-# Below is regular python script
-#
+# handle the outputs in regular python script
 def remove_control_characters(s):
     global unicodedata,re
     s = re.sub(r'[\x00-\x1f\x7f-\x9f]', '',s)
@@ -112,6 +105,15 @@ for line in content.split('\n'):
 print(myIp)
 ```
 
+Suppose that the file is named “hello.spy”, then execute it on console by
+
+```
+sshscript hello.spy
+```
+
+the SSHScript’s CLI “sshscript” would transfer hello.spy into a regular python script, then execute the script.  In fact, “hello.spy” can contain any python statements. 
+
+You can also use SSHScript as a regular python package by “import sshscript”. The documents page has examples for your reference.
 
 ## Releases
 
