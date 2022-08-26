@@ -173,7 +173,7 @@ Summary
     
     ```
     
-- Refine: Prohibition of putting “|” in one-dollar command is removed.
+- Refine: Prohibition of putting “\|” in one-dollar command is removed.
     
     The v1.1.12 rejects to execute if shell-specific characters such as >, |, & was found in the command. This restriction was removed. Instead, it drops warnings. If you encountered this issue and didn't like it. Please disable the warning by this way:
     
