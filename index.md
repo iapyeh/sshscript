@@ -24,10 +24,9 @@
 - [安裝有問題](https://iapyeh.github.io/sshscript/sshscript-problem.zh-tw)
 
 ## Introduction
+System automation is a process of realizing management logics by repeating networking and execution. SSHScript makes Python an easy tool for creating system automation processes. With syntax sugar of SSHScript, writing python scripts to execute commands on local host or remote hosts is easy.
 
-SSHScript makes Python become a scripting tool for system automation. Functionally, the SSHScript is something like the Ansible. Instead of writing descriptive YML files, just write Python scripts with the simplicity of Python and the power of all Python packages.
-
-The sshscript let you embed shell commands in python script. It is like writing shell-script in python. 
+You just need to embed commands and networking in python scripts. SSHScript would execute them and let you handle outputs all in Python. You need not know programming about the subprocess module and Paramiko(ssh).
 
 Below is an example. It makes ssh connection to the host1, then from the host1 makes connection to the host2. Then It executes “netstat -antu” on the host2.
 
@@ -137,7 +136,8 @@ The idea is that many automation tasks are running commands and dealing with out
 - Your scripts are powered by tons of Python packages.
 - SSHScript supports thread, aka jobs in parallel.
 
-![image](https://user-images.githubusercontent.com/4695577/186846232-c4a0809d-d085-4b3c-9694-319c21146d40.png)
+![image](https://user-images.githubusercontent.com/4695577/186998717-ef372f78-daa5-4893-b9e9-2b6b8bff6114.png)
+
 
 
 ## Disclaimer
