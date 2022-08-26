@@ -68,8 +68,10 @@ The SSHScript also supports interactive shells. The keyword is “with”. The n
 ```
 with $$sudo -S su as console:
     console.sendline('my-password')
-    console.sendline('whoami')
-    console.sendline('ls -l /root')
+    console.sendline('''
+        whoami
+        ls -l /root
+        ''')
 ```
 
 The “with … as” is regular syntax of Python. With it, you gain a variable (here is “console”) to interact with the shell. You can call sendline(), expect() with the “console”.
