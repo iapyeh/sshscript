@@ -1,11 +1,12 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
+
 # SSHScript使用教學 第二章
 
 在第一章介紹了執行指定的語法$，及得到執行結果的 $.stdout與$.stderr。以及連線到遠端執行指令的 $.connect()。那是很典型的用法，如果還沒看過，請務必先去看完再來閱讀第二章。
 
 其實SSHScript並不複雜，第一章所介紹的已經是SSHScript 90％的核心功能。但是因為世事複雜，不得不衍生出第二章的功能。我們先看看問題在哪裡，這樣你就知道第二章存在的原因，學起來很快就懂。
 
-## Two-dollars Command
+## two-dollars command ($$)
 
 把第一章的例子稍微改一下：
 
@@ -37,9 +38,9 @@ $$ echo hello `whoami`
 print($.stdout)
 ```
 
-很簡單，一個$不夠，那就用兩個$$。
+概念很簡單，一塊錢($)不夠，那就給兩塊錢($$)。
 
-其實像是 | (pipe), > (redirect), $PATH 這些都是shell提供的功能。所以，如果你執行的指令用了那些shell才有的功能時，須使用$$的語法。
+其實像是 \| (pipe), \> (redirect), $PATH 這些都是shell提供的功能。所以，如果你執行的指令用了那些shell才有的功能時，須使用$$的語法。
 
 我最常用到$$是在sudo的時候。例如：
 
@@ -47,7 +48,7 @@ print($.stdout)
 $$echo my-password | sudo -S ls -l /root
 ```
 
-## 多列 Two-dollars Command
+## 多列 two-dollars command
 
 跟\$不一樣的地方是，\$\$的多列指令模式有「脈絡」的概念。簡單講，它知道自己所在的目錄。在$的多行字串模式中，如果需要提供路徑當執行參數，必須提供絕對路徑才不會有怪問題。但是在$$時，因為有shell在，使用相對路徑通常可以得到你所想要的結果。例如：
 
@@ -66,7 +67,7 @@ rm *.txt
 
 刪錯檔案通常是一場悲劇，這裡只是為了演示$$的功能，盡量還是使用絕對目錄是比較穩當的作法。
 
-## with
+## with-command
 
 既然有shell，那麼就有interactive shell的情況。SSHScript也支援這樣的用法，例如，以下這段程式模擬執行sudo su，輸入密碼之後成為root，然後執行whoami與ls -l /root兩個指令。
 
