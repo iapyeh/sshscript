@@ -4,7 +4,7 @@
 
 Chapter 1 is essential for learning SSHScript, if you did not read it. It is highly recommended to read it before proceeding to this chapter. Frankly speaking, the core features of SSHScript have been introduced in Chapter 1, they are the $ (shell command), $.stdout, $.stderr and the $.connect().
 
-## Two dollars ($$)
+## Two-dollars command ($$)
 
 At beginning, let us see why we need the features in this chapter? Let’s modify the hello.spy in Chapter 1 by adding `whoami` after "hello".
 
@@ -36,7 +36,7 @@ print($.stdout)
 
 The receipt is to give your commands two dollars ($$).
 
-In fact, “\|” (pipe), “\>” (redirect) and environment variables like \$PATH are all dependent on the shell. If your commands utilize them, then just give them a shell by using two $$.
+In fact, “|” (pipe), “>” (redirect) and environment variables like $PATH are all dependent on the shell. If your commands utilize them, then just give them a shell by using two $$.
 
 An example is that when calling “sudo”, you need two dollars($$).
 
@@ -44,7 +44,7 @@ An example is that when calling “sudo”, you need two dollars($$).
 $$echo my-password | sudo -S ls -l /root
 ```
 
-## Multiple commands to run
+## Multi-lines two-dollars command
 
 For two dollars ($$), you can put multiple commands line by line behind it as same as one dollar ($). Their difference is that the $$ has an idea of its context because its process is a shell. Simply put, it works with a working folder. Please see this example:
 
@@ -61,7 +61,7 @@ The listed content is /tmp and the removed txt files are also in the /tmp. It is
 
 This behavior is different for the one dollar $. For one dollar $,  the 3 lines are executed separately, the second command “cd /tmp” makes no sense. The listed content and files being removed are all in your login directory (home directory).
 
-## with
+## With-command
 
 The SSHScript also supports interactive shells. The keyword is “with”. The next example demonstrates execution of “sudo su”, inputting the required password, then executing 2 commands as root.
 
@@ -69,9 +69,9 @@ The SSHScript also supports interactive shells. The keyword is “with”. The n
 with $$sudo -S su as console:
     console.sendline('my-password')
     console.sendline('''
-        whoami
-        ls -l /root
-        ''')
+             whoami
+             ls -l /root
+             ''')
 ```
 
 The “with … as” is regular syntax of Python. With it, you gain a variable (here is “console”) to interact with the shell. You can call sendline(), expect() with the “console”.
