@@ -127,6 +127,19 @@ pip install sshscript
 
 - [Examples](https://iapyeh.github.io/sshscript/examples) 
 
+## Why and Features
+
+The idea is that many automation tasks are running commands and dealing with outputs on localhost and remote hosts. Among these scripts, there are many common routines. Eg. making ssh connections, execution and collecting data. That's where the SSHScript comes into play. The most charming part is that you could directly process the resulting data in Python. It then enables you to efficiently build complex data structures and processing flow with object-oriented approaches.
+
+- Easy to script. If you know what commands to run and which host to ssh, then you can write your script. No extra stuff to learn.
+- Embedding shell commands in Python scripts are intuitive and self-explaining. It is good for teamwork and maintenance.
+- Handling execution output or exceptions with Python is easier than shell script.
+- Your scripts are powered by tons of Python packages.
+- SSHScript supports thread, aka jobs in parallel.
+
+![image](https://user-images.githubusercontent.com/4695577/186846232-c4a0809d-d085-4b3c-9694-319c21146d40.png)
+
+
 ## Disclaimer
 
 - Developing and testing on MacOS, Linux, Freebsd only. For Windows users, suggestion is to use the SSHScript in the "bash of Powershell" or the WSL.
