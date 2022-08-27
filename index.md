@@ -43,8 +43,8 @@ with $.connect('username1@host1', password='secret') as _:
         $netstat -antu
 
         # 4. handle outputs
-				with open('netstat.log','w') as fd:
-				    fd.write($.stdout)
+	with open('netstat.log','w') as fd:
+	fd.write($.stdout)
 ```
 
 If you did “ssh-copy-id” to remote hosts in advance, you don’t even need to give the password. 
