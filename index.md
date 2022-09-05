@@ -2,7 +2,7 @@
 
 
 
-#### v1.1.14 Released on 2022/8/24 [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.14)
+#### v1.1.15 works on Windows too. Released on 2022/9/5, [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.15)
 
 ## en
 
@@ -115,15 +115,22 @@ the SSHScript’s CLI “sshscript” would transfer hello.spy into a regular py
 
 You can also use SSHScript as a regular python package by “import sshscript”. The documents page has examples for your reference.
 
-## Releases
-
-The last version is 1.1.14 on 2022/8/24. [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.14)
-
-## Installation
+## Install
 
 ```
 pip install sshscript
 ```
+## Upgrade
+
+```
+pip install sshscript --upgrade
+```
+or
+```
+pip install sshscript==1.1.16
+```
+
+
 ## Examples
 
 - [Examples](https://iapyeh.github.io/sshscript/examples) 
@@ -141,10 +148,10 @@ The idea is that many automation tasks are running commands and dealing with out
 ![image](https://user-images.githubusercontent.com/4695577/186998717-ef372f78-daa5-4893-b9e9-2b6b8bff6114.png)
 
 
+## Releases
 
-## Disclaimer
+#### v1.1.16 works on Windows too. Released on 2022/9/5, [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.16)
 
-- Developing and testing on MacOS, Linux, Freebsd only. For Windows users, suggestion is to use the SSHScript in the "bash of Powershell" or the WSL.
-- Please use it at your own risk.
+#### v1.1.14 Released on 2022/8/24 [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.14)
 
 [![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
