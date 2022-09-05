@@ -3,7 +3,7 @@
 Announcement
 ############
 
-v1.1.14 has released on 2022/8/24. Users are recommanded to upgrade by 
+v1.1.16 has released on 2022/9/5. Users are recommanded to upgrade by 
 
 .. code::
 
@@ -15,9 +15,9 @@ v1.1.14 has released on 2022/8/24. Users are recommanded to upgrade by
 +---------------------------------------------------------------------------------------------------+
 .. code:: 
 
-    python3 -m pip install sshscript==1.1.14
+    python3 -m pip install sshscript==1.1.16
     
-Please see v1.1.14 Relaese Notes_ for details.
+Please see v1.1.16 Relaese Notes_ for details.
     
 SSHScript
 #########
@@ -94,7 +94,7 @@ The idea is that many automation tasks are running commands and dealing with out
 Releases
 ========
 
-The last version is 1.1.14. (2022/8/24). Relase Notes_
+The last version is 1.1.16. (2022/9/5). Relase Notes_
 
 More
 ====
@@ -113,4 +113,4 @@ More
 .. _Examples : https://iapyeh.github.io/sshscript/examples/index
 
 
-.. _Notes : https://iapyeh.github.io/sshscript/release-v1.1.14
+.. _Notes : https://iapyeh.github.io/sshscript/release-v1.1.16
