@@ -2,7 +2,7 @@
 
 
 
-#### v1.1.15 works on Windows too. Released on 2022/9/5, [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.15)
+#### v1.1.16 works on Windows too. Released on 2022/9/5, [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.15)
 
 ## en
 
