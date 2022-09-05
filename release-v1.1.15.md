@@ -5,7 +5,7 @@
 
 ## New feature: Windows Powershell Support
 
-SSHScript can now work with powershell on Windows. When sys.platform is “win32”, the default shell of two-dollars command and with-dollar command would be the powershell. The executable path is obtained by shutil.which(’pwsh’). For two-dollars command, it is 
+SSHScript can now work with powershell on Windows. When sys.platform is “win32”, the default shell of two-dollars commands and with-dollar commands would be the powershell. The executable path is obtained by shutil.which(’pwsh’). For two-dollars command, it is 
 
 ```
 shell = shutil.which('pwsh') + ' -noni -nol -ExecutionPolicy RemoteSigned'
