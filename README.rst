@@ -2,20 +2,30 @@
 
 Announcement
 ############
-+-------------------------------------------------------------------------------------------+
-|For installers of version v1.101, v1.102 and v1.103.                                       |
-+-------------------------------------------------------------------------------------------+
 
+v1.1.14 has released on 2022/8/24. Users are recommanded to upgrade by 
+
+.. code::
+
+    pip3 install --upgrade sshscript
+
+
++---------------------------------------------------------------------------------------------------+
+|For installers of version v1.101, v1.102 and v1.103.  Please do upgrade with                       |
++---------------------------------------------------------------------------------------------------+
 .. code:: 
 
-    python3 -m pip install sshscript==1.1.12
+    python3 -m pip install sshscript==1.1.14
+    
+Please see v1.1.14 Relaese Notes_ for details.
     
 SSHScript
 #########
+System automation is a process of realizing management logics by repeating networking and execution. SSHScript makes Python an easy tool for creating system automation processes. With syntax sugar of SSHScript, writing python scripts to execute commands on local host or remote hosts is easy.
 
-SSHScript makes Python become a scripting tool for system automation. Functionally, the SSHScript is something like the Ansible. Instead of writing descriptive YML files, just write Python scripts with the simplicity of Python and the power of all Python packages.
+You just need to embed commands and networking in python scripts. SSHScript would execute them and let you handle outputs all in Python. You need not know programming about the subprocess module and Paramiko(ssh).
 
-Technically, the SSHScript is an integration of subprocess and Paramiko . It provides an unique interface to invoke commands locally and remotely. Something like embedding shell commands in a python script.
+Technically, SSHScript is an integration of the subprocess and Paramiko. It provides an unique interface to invoke commands on local host and remote hosts. It could perform the same functionality as a shell script. But it is pure Python.
 
 Below are three examples:
 
@@ -84,7 +94,7 @@ The idea is that many automation tasks are running commands and dealing with out
 Releases
 ========
 
-The last version is 1.1.12. (2022/8/8). Relase Notes_
+The last version is 1.1.14. (2022/8/24). Relase Notes_
 
 More
 ====
@@ -103,4 +113,4 @@ More
 .. _Examples : https://iapyeh.github.io/sshscript/examples/index
 
 
-.. _Notes : https://iapyeh.github.io/sshscript/releasenotes
+.. _Notes : https://iapyeh.github.io/sshscript/release-v1.1.14
