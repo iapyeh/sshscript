@@ -1,6 +1,6 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
 
-# Release Notes of v1.1.15
+# Release Notes of v1.1.16
 
 
 ## New feature: Windows Powershell Support
@@ -127,8 +127,8 @@ with $ as console:
 
 ## Refine: \$\.download() and \$\.upload() behavior changed
 
-Before v1.1.15, calling \$.download(src,dst) failed when the “src” was not an absolute path. As well as calling \$.upload(src,dst) failed when the “dst” was not an absolute path. Now, they trigger warnings only. There is no exception. You can suppress warnings by setting os.environ[’MUTE_WARNING’]=’1’
+Before v1.1.16, calling \$.download(src,dst) failed when the “src” was not an absolute path. As well as calling \$.upload(src,dst) failed when the “dst” was not an absolute path. Now, they trigger warnings only. There is no exception. You can suppress warnings by setting os.environ[’MUTE_WARNING’]=’1’
 
 ## Refine: \$\.paranoid() → \$\.careful()
 
-The \$.paranoid() is renamed to \$.careful(). Due to “paranoid” might be a negative term. When $.careful(1) was called, the execution would be stopped if there is any \$.exitcode > 0. Starting from v1.1.15, the $.careful(1) is regardless of $.stderr. It is based on the value of \$.exitcode. So it works only when the \$.exitcode works.
+The \$.paranoid() is renamed to \$.careful(). Due to “paranoid” might be a negative term. When $.careful(1) was called, the execution would be stopped if there is any \$.exitcode > 0. Starting from v1.1.16, the $.careful(1) is regardless of $.stderr. It is based on the value of \$.exitcode. So it works only when the \$.exitcode works.
