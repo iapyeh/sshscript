@@ -2,29 +2,29 @@
 #
 # This file is part of Sshscript.
 #
-# Sshscript is free software; you can redistribute it and/or modify it under the
+# SSHScript is free software; you can redistribute it and/or modify it under the
 # terms of the MIT License.
 #
-# Sshscript is distributed in the hope that it will be useful, but WITHOUT ANY
+# SSHScript is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE.  See the MIT License for more details.
 #
-# You should have received a copy of the MIT License along with Sshscript;
+# You should have received a copy of the MIT License along with SSHScript;
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
+#
 
-
-import os, re
+import os, re, sys
 import subprocess, shlex
 from logging import DEBUG
 import warnings
 import __main__
 import shutil
 try:
-    from .sshscripterror import SSHScriptError,getLogger
+    from .sshscripterror import SSHScriptCareful
     from .sshscriptchannel import POpenChannel, ParamikoChannel
 except ImportError:
-    from sshscripterror import SSHScriptError,getLogger
+    from sshscripterror import SSHScriptCareful
     from sshscriptchannel import POpenChannel, ParamikoChannel
 try:
     import pty
@@ -59,33 +59,43 @@ def pstdSub(m):
 global loop
 
 class SSHScriptDollar(object):
-    # v1.1.13 add "exitcode", "returncode" and "channel"
-    exportedProperties = set(['stdout','stderr','stdin','exitcode','returncode','channel'])
+    # v1.1.14 add "exitcode", "channel"
+    exportedProperties = set(['stdout','stderr','stdin','exitcode','channel'])
     # aka $shell-commmand , or coverted "_c"
-    def __init__(self,ssId,cmd=None,globals=None,locals=None,inWith=False):
+    def __init__(self,ssId,cmd=None,globals=None,locals=None,inWith=False,fr=0):
         # got value when __call__()
         self.logger = None
 
         cmd = cmd.strip()
         
-        self.fCommand = cmd.startswith('#_____f') or cmd.startswith('f"') or cmd.startswith("f'")
-        self.rCommand = cmd.startswith('#_____r') or cmd.startswith('r"') or cmd.startswith("r'")
+        if fr == 1:
+            self.fCommand, self.rCommand = 1,0
+        elif fr == 2:
+            self.fCommand, self.rCommand = 0,1
+        elif cmd.startswith('f"') or cmd.startswith("f'"):
+            self.fCommand, self.rCommand = 1,0
+        elif cmd.startswith('r"') or cmd.startswith("r'"):
+            self.fCommand, self.rCommand = 0,1
+            cmd = cmd[2:-1]
+        else:
+            self.fCommand, self.rCommand = 0,0
 
         self.args = (ssId,cmd,globals,locals)
         self.sshscript = None #執行的脈絡下的 sshscript instance
+        self.cp = None # got value if run by subprocess and inWith
         self.stdout = ''
         self.stderr = ''
         self.stdin = None
         self.exitcode = None
         self.inWith = inWith
-        #self.hasExit = False # True if user calls exit()
-        #self.invokeShell = False
         self.wrapper = None
         self.bufferedOutputData = b''
         self.bufferedErrorData = b''
         # set os.environ['NO_PTY']='1' to disable pty
+        global pty
         self.usePty = pty and os.environ.get('NO_PTY','') == ''
         self.waitingInterval = float(os.environ.get('CMD_INTERVAL',0.5))
+        self.waitingIntervalSSH = float(os.environ.get('SSH_CMD_INTERVAL',0.5))
         # subpress warnings
         self.mute = os.environ.get('MUTE_WARNING')
 
@@ -100,13 +110,6 @@ class SSHScriptDollar(object):
         else:
             self.sshscript = __main__.SSHScript.getContext(1)
             assert self.sshscript is not None
-            '''
-            if self.sshscript is None:
-                # 這個情況發生在呼叫thread時，不是使用$.thread。
-                # 除了使用者的問題之外，也可能發生在像使用pytermgui這種場合。
-                # 例如 ex-pytermguil.spy在ubuntu執行
-                self.sshscript = __main__.SSHScript.getContextFromMainThread()
-            '''
         # assign logger
         self.logger = self.sshscript.logger
         
@@ -138,14 +141,14 @@ class SSHScriptDollar(object):
                 c = pstd.sub(pstdSub,c)
             # 有時候$@{...} eval出來的不是str
             return f'{eval(c,_globals,_locals)}'
+
         # pretty print for logging
         _cmds = ['  ' +x for x in cmd.splitlines() if x]
-        prefix = ':f' if self.fCommand else (':r' if self.rCommand else '')
         if len(_cmds) > 1:
-            self._log(DEBUG,f'eval{prefix}:')
+            self._log(DEBUG,f'eval:')
             for _cmd in _cmds:self._log(DEBUG,_cmd)
         else:
-            self._log(DEBUG,f'eval{prefix}:{cmd}')
+            self._log(DEBUG,f'eval:{cmd}')
 
         if self.fCommand:
             def pqouteRepl(m):
@@ -155,7 +158,7 @@ class SSHScriptDollar(object):
             cmd = fpqoute1.sub(pqouteRepl,cmd)
             cmd = fpqoute2.sub(pqouteRepl,cmd)
         elif self.rCommand:
-            cmd = eval(cmd)
+            pass
         else:
             # eval @{py-var} in $shell-command
             # f-string mixing r-string is not allowed
@@ -226,7 +229,10 @@ class SSHScriptDollar(object):
             if not shell:
                 shell = os.environ.get('SHELL')
                 if shell is None:
-                    shell = shutil.which('bash')
+                    if sys.platform == 'win32':
+                        shell = shutil.which('pwsh') + (' -i' if self.inWith else ' -noni') +' -nol -ExecutionPolicy RemoteSigned'
+                    else:
+                        shell = shutil.which('bash')                    
                     if shell is None:
                         raise RuntimeError('no shell command found')
             
@@ -238,18 +244,17 @@ class SSHScriptDollar(object):
                 shell += ' ' + shArgs
 
             # prepare popen command
-            args = shlex.split(shell)
+            if sys.platform == 'win32':
+                args = shell
+            else:
+                args = shlex.split(shell)
             self._log(DEBUG,f'[subprocess]Popen {args}')
             
             if self.usePty:
                 # ref: https://errorsfixing.com/run-interactive-bash-in-dumb-terminal-using-python-subprocess-popen-and-pty/
                 # ref: https://stackoverflow.com/questions/19880190/interactive-input-output-using-python
                 masterFd,slaveFd = zip(pty.openpty(),pty.openpty())                
-                #masterFd,slaveFd = zip([subprocess.PIPE,subprocess.PIPE],[subprocess.PIPE,subprocess.PIPE])       
-                #masterFd,slaveFd = zip(os.pipe(),os.pipe())
                 cp = subprocess.Popen(args,
-                    # 會導致  cannot set terminal process group (-1)
-                    #stdin=slaveFd[0],stdout=slaveFd[0],stderr=slaveFd[1],
                     stdin=subprocess.PIPE,stdout=slaveFd[0],stderr=slaveFd[1],
                     # Run in a new process group to enable bash's job control.
                     preexec_fn=os.setsid,
@@ -261,12 +266,9 @@ class SSHScriptDollar(object):
                 #windows
                 masterFd,slaveFd = zip(os.pipe(),os.pipe())
                 cp = subprocess.Popen(args,
-                    # 會引起  RuntimeWarning: line buffering (buffering=1) isn't supported in binary mode,
-                    #bufsize=1,
-                    #stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
                     stdin=subprocess.PIPE,stdout=slaveFd[0],stderr=slaveFd[1],
                     # Run in a new process group to enable bash's job control.
-                    preexec_fn=os.setsid,
+                    #preexec_fn=os.setsid, # windows沒有，不知道會怎樣
                     # Run in "dumb" terminal.
                     env=dict(os.environ, TERM='vt100'),
                     )                
@@ -279,21 +281,36 @@ class SSHScriptDollar(object):
             self.sshscript.touchIO()
 
             # wait for bash to start up
-            # 等到初始IO結束後0.5second才繼續
-            self.channel.wait(0.5)
+            # 等到初始IO結束後至少0.5second才繼續
+            self.channel.wait(max(self.waitingInterval,0.5))
             try:
-                for command in cmds:
-                    self.channel.wait(self.waitingInterval)
-                    self.channel.sendline(command)
+                #for command in cmds:
+                #    # 這裡的盲點是，不知道程式多久之後才開始回應
+                #    # sendline 會等
+                #    self.channel.sendline(command)
+                self.channel.sendline(cmds)
             except subprocess.CalledProcessError as exc:
                 self._log(DEBUG,f'[subprocess]error={exc.output}')
-            self.channel.wait(self.waitingInterval)
             
             if not self.inWith:
-                self.channel.wait(1)
+                # 要等程式確實跑完
+                try:
+                    outs, errs = cp.communicate(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    cp.kill()
+                    outs, errs = cp.communicate()     
+                finally:
+                    if outs is not None: 
+                        self._log(DEBUG,f'extra stdout {outs}')
+                        self.channel.addStdoutData(outs)
+                    if errs is not None: 
+                        self._log(DEBUG,f'extra stderr {errs}')
+                        self.channel.addStderrData(errs)
+                # 至少等1秒
+                self.channel.wait(max(1,self.waitingInterval))
+                # self.channel.close() also handles _careful-related issues
                 self.channel.close()
-                self.exitcode = cp.returncode
-        
+
         elif len(cmds):            
             self.channel = POpenChannel(self,None,timeout)
 
@@ -304,8 +321,10 @@ class SSHScriptDollar(object):
             for command in cmds:
                 # 這種指令是一個個執行的，因此不需要作什麼io管制
                 self._log(DEBUG,f'[subprocess]exec:{command}')
-                args = shlex.split(command)
-
+                if sys.platform  == 'win32':
+                    args = command
+                else:
+                    args = shlex.split(command)
                 if not self.mute:
                     for char in shellSpecialChars:
                         if char in args: 
@@ -329,7 +348,6 @@ class SSHScriptDollar(object):
                     cp.kill()
                     outs, errs = cp.communicate()
                 finally:
-                    #self.exitcode = cp.poll()
                     self.exitcode = cp.wait()
                     self._log(DEBUG,f'[subprocess]$ returncode={self.exitcode}')
                 
@@ -339,14 +357,13 @@ class SSHScriptDollar(object):
                 self.channel.addStdoutData(outs)
                 self.channel.addStderrData(errs)
 
+                if self.exitcode > 0 and self.sshscript._careful:
+                    raise SSHScriptCareful(self.exitcode,code=self.exitcode)
+
             # self.channel.close() will not call  self.channel.recv()
             # so we need to call it here
-            self.channel.recv()
+            self.channel.commitIo()
             self.channel.close()
-            #if self.channel.stderr and self.sshscript._paranoid:
-            #    raise SSHScriptError(self.channel.stderr)
-            if (self.exitcode is not None) and self.exitcode > 0 and self.sshscript._paranoid:
-                raise SSHScriptError(self.channel.stderr)
         else:
             # 如果沒有命令要執行，啥都不必作
             # ex. $, $@{}, $f''
@@ -359,27 +376,11 @@ class SSHScriptDollar(object):
 
         cmds = self.evalCommand()
 
-        # provide value of $.username, $.port, $.host
-        """
-        self.host = self.sshscript.host;
-        self.username = self.sshscript.username;
-        self.port = self.sshscript.port
-        """
         host = self.sshscript.host;
         # implement stdin, and timeout (default to 60)
         timeout = float(os.environ.get('CMD_TIMEOUT',60))             
 
         client = self.sshscript.client
-        '''
-        # 往下找最下層的client
-        if deepCall:
-            client = self.sshscript.client
-            if client is None:
-                # 這種情況是發生在新的下層threading執行時的情況
-                client = self.sshscript.connectedParent._client
-        else:
-            client = self.sshscript._client
-        '''
 
         shell = None
         if len(cmds) and cmds[0].startswith('#!'):
@@ -387,51 +388,45 @@ class SSHScriptDollar(object):
 
         if shell:
             # two dollars commands
-            channel = client.get_transport().open_session()           
+            channel = client.get_transport().open_session()   
+            # ParamikoChannel will handle _careful-related issue        
             self.channel = ParamikoChannel(self,channel, timeout)
             self._log(DEBUG,f'[{host}]user shell:{shell}')                
             self.channel.channel.exec_command(shell)
             self.sshscript.touchIO()
-                
+            self.channel.wait(max(0.5,self.waitingIntervalSSH))
             # 送# 給shell無所謂，跳過反而可能誤殺無辜
             #cmds = [x for x in cmds if (not x.startswith('#'))]
-            for command in cmds:
-                self.channel.wait(self.waitingInterval)
-                self.channel.sendline(command)# write to queue
+            #for command in cmds:
+            #    self.channel.sendline(command)
+            self.channel.sendline(cmds)
 
             if not self.inWith:
                 self.channel.close()
                 # self.channel.close() will not call self.channel.recv()
                 # so, we need to call it here
-                self.channel.recv()
+                self.channel.commitIo()
                 self.channel.close()
-
-                # ret code 一般是 -1 ,這裡的條件恐怕永不會成立
-                if self.exitcode > 0 and self.sshscript._paranoid:
-                    raise SSHScriptError(self.channel.stderr)        
 
         elif (self.inWith or isTwodollars):
             #self.invokeShell = True
             # REF: https://stackoverflow.com/questions/6203653/how-do-you-execute-multiple-commands-in-a-single-session-in-paramiko-python/6203877#6203877
             
             # client will call invoke_shell in ParamikoChannel
+            # ParamikoChannel will handle _careful-related issue
             self._log(DEBUG,f'[{host}]call paramiko invoke_shell')
             self.channel = ParamikoChannel(self,client, timeout)
             self.sshscript.touchIO()
-
-            # 送# 給shell無所謂，跳過反而可能誤殺無辜
-            #cmds = [x for x in cmds if (not x.startswith('#'))]
-            for command in cmds:
-                self.channel.wait(self.waitingInterval)
-                self.channel.sendline(command)# write to queue
-            
-            self.channel.wait(self.waitingInterval)
-            
+            self.channel.wait(max(0.5,self.waitingIntervalSSH))
+            # 送 # 給shell無所謂，跳過反而可能誤殺無辜
+            # cmds = [x for x in cmds if (not x.startswith('#'))]
+            #for command in cmds:
+            #    self.channel.sendline(command)
+            self.channel.sendline(cmds)
+                       
             if not self.inWith:
                 self.channel.close()
-                # ret code 一般是 -1 ,這裡的條件恐怕永不會成立
-                if self.exitcode > 0 and self.sshscript._paranoid:
-                    raise SSHScriptError(self.channel.stderr) 
+
         else:
             self.channel = ParamikoChannel(self,None, timeout)
             for command in cmds:
@@ -445,39 +440,12 @@ class SSHScriptDollar(object):
                 self.stdin = stdin
                 self.channel.addStdoutData(stdout.read())
                 self.channel.addStderrData(stderr.read())
+                
+                if self.exitcode > 0 and self.sshscript._careful:
+                    raise SSHScriptCareful(self.exitcode,code=self.exitcode)
 
             # self.channel.close() will not call self.channel.recv()
             # so, we need to call it here
-            self.channel.recv()
+            self.channel.commitIo()
             self.channel.close()
-
-            # when len(cmds) ==0, self.exitcode is None
-            if (self.exitcode is not None) and self.exitcode > 0 and self.sshscript._paranoid:
-                raise SSHScriptError(self.channel.stderr)
-
-        
-    # protocol of "with  as "
-    def __enter__(self):
-        return self
-    # protocol of "with  as "
-    def __exit__(self,*args):
-        if self.channel:
-            self.channel.close()
-        if self.stdin:
-            self.stdin.close()
-        
-    '''
-    Why this? and self.wait('\n')????
-    def __iter__(self):
-        """
-        Support for the iterator protocol.
-        with $ as fd: # fd is an instance of SSHScriptDollar
-            for line in fd:
-                print(line)
-        """
-        while True:
-            line = self.wait('\n')
-            if not line: break
-            yield line
-    '''
 

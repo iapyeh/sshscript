@@ -2,16 +2,17 @@
 #
 # This file is part of Sshscript.
 #
-# Sshscript is free software; you can redistribute it and/or modify it under the
+# SSHScript is free software; you can redistribute it and/or modify it under the
 # terms of the MIT License.
 #
-# Sshscript is distributed in the hope that it will be useful, but WITHOUT ANY
+# SSHScript is distributed in the hope that it will be useful, but WITHOUT ANY
 # WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 # A PARTICULAR PURPOSE.  See the MIT License for more details.
 #
-# You should have received a copy of the MIT License along with Sshscript;
+# You should have received a copy of the MIT License along with SSHScript;
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
+#
 
 class SSHScriptError(Exception):
     def __init__(self, message,code=1):
@@ -20,10 +21,11 @@ class SSHScriptError(Exception):
         self.code = code
     def __str__(self):
         return f'<{self.__class__.__name__}({self.code}){self.message}>'
-
 class SSHScriptBreak(SSHScriptError):
     pass
 class SSHScriptExit(SSHScriptError):
+    pass
+class SSHScriptCareful(SSHScriptError):
     pass
 
 import paramiko
@@ -56,9 +58,6 @@ def setupLogger(_logger=None):
             handler.setFormatter(logging.Formatter('%(asctime)s:%(message)s',"%Y-%m-%d %H:%M:%S")) 
             logger.addHandler(handler)
             logger.log(DEBUG,'sys.stdout added to logger')
-
     else:
         setLogger(_logger)
-
-
     return logger

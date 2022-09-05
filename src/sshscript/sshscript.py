@@ -27,10 +27,10 @@ warnings.formatwarning = warning_on_one_line
 
 try:
     from .sshscriptcore import SSHScript
-    from .sshscripterror import SSHScriptExit, SSHScriptBreak, setupLogger
+    from .sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptCareful, setupLogger
 except ImportError:
     from sshscriptcore import SSHScript
-    from sshscripterror import SSHScriptExit, SSHScriptBreak, setupLogger
+    from sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptCareful, setupLogger
 
 
 def runFile(givenPaths,
@@ -239,6 +239,9 @@ def main():
             except ImportError:
                 __version__ = 'unknown'
 
+        print()
+        parser.print_help()
+
         def checkversion():
             try:
                 import urllib.request
@@ -270,8 +273,6 @@ def main():
         import threading
         threading.Thread(target=checkversion).start()
         
-        print()
-        parser.print_help()
     
 
 # SSHScriptDollar need this value to work 
