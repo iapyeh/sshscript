@@ -6,6 +6,8 @@
 
 ![image](https://user-images.githubusercontent.com/4695577/186702052-d013bdbb-20ee-4b37-aac6-f38cea4cff43.png)
 
+**for version 1.1.16**
+
 # Syntax
 
 ## $
@@ -36,7 +38,7 @@ $@{cmd} -l @{path}
 # the above is evaluated to 
 $ls -l /root
 
-# you can also use f-string to assign the command
+# you can also use f-string or r-string to assign the command
 $f'{cmd} -l {path}
 
 # when using f-string, use it to define the command at all.
@@ -44,6 +46,7 @@ $f'{cmd} -l {path}
 $ls -l f'{path}'
 $@{cmd} -l f'{path}'
 # Both yield unpredictable results.
+# This rule also applies to commands in r-string.
 ```
 
 You can get the command’s exit code by $.exitcode.
@@ -82,7 +85,7 @@ $"""
 
 ```
 
-Every single line is executed individually. Their output of stdout or stderr are concatenated together. Commands are executed one by one. The value of $.exitcode is the exit code of the last command.
+Every single line is executed individually. Their output of stdout or stderr are concatenated together. Commands are executed one after one. The value of $.exitcode is the exit code of the last command.
 
 ## $$
 
@@ -176,12 +179,16 @@ Initially, the with-command is simply prefixing a “with” to a two-dollars co
 - with $ single line command
 - with $$ single line command
 - with $f”single line f-strting command”
+- with $r”single line r-strting command”
 - with $$f”single line f-strting command”
+- with $$r”single line r-strting command”
 - with $’’’ multiple line command ‘’’
 - with $$’’’ multiple line command ‘’’
 - with $f’’’ multiple line f-string command ‘’’
+- with $r’’’ multiple line r-string command ‘’’
 
 - with $$f’’’ multiple line f-string command ‘’’
+- with $$r’’’ multiple line r-string command ‘’’
 
 ```
 # a example of "with $"
@@ -229,8 +236,18 @@ with $$f'''
 The “console” object has the following methods to use:
 
 - sendline(command, waitingSeconds=1)
-    - command: str
-        - a string for inputing (ending newline is not necessary)
+    - command: str, multi-lines str, list of single line str
+        - command for inputing (ending newline is not necessary)
+    
+    ```
+    with $ as console:
+        console.sendline('''
+            echo hello
+            echo world
+        ''')
+        console.sendline(['echo hello','echo world'])
+    ```
+    
     - waitingSeconds: int, default is 1
         - seconds to wait after submitting the input string.
     
@@ -462,6 +479,22 @@ No default value.
 
 Note: starting from v1.1.14. you can force to use preferred shell and arguments by “#!” at the first line of a two-dollar command.
 
+### os.environ[’SSH_CMD_INTERVAL’]
+
+same as os.environ[’CMD_INTERVAL’] but for sending commands when connected on a remote host. For example:
+
+```
+os.environ[’SSH_CMD_INTERVAL’] = "2"
+$.connect('user@hostname')
+$$"""
+    hostname
+    cd /tmp
+    pwd
+"""
+```
+
+The default value is ‘0.5’. 
+
 ### os.environ[’VERBOSE]
 
 The verbose mode is enabled by setting this value to non-empty string. When the verbose mode is enabled, every message received from stdout and stderr of the executing command would be shown on console.
@@ -479,13 +512,13 @@ Default is “” (empty string), aka False
 
 In verbose mode, This string is prefixed to every line when showing a messages of stdout on console.
 
-Default is 🟩
+Default is 🟩. (On powershell, default is “| ”)
 
 ### os.environ[’VERBOSE_STDERR_PREFIX’]
 
 In verbose mode, This string is prefixed to every line when showing a messages of stderr on console.
 
- Default is 🟨.
+Default is 🟨. (On powershell, default is “- ”)
 
 ## __main__
 
@@ -693,7 +726,7 @@ with $.connect(host,proxyCommand=proxyCommand) as _:
 
 This function downloads a file from the remote host.
 
-- src(str): remote file path to download, should be in absolute path
+- src(str): remote file path to download. If the src is not an absoulute path, a warning would be issued. You may set os.environ[’MUTE_WARNING’]=’1’ to suppress it.
 - dst(str): optional, local path to save the file
     - If the dst is a relative path,  os.path.abspath() would be called to get its absolute path.
     - The dst could be a folder. The downloaded filename would be the same as the src.
@@ -781,9 +814,10 @@ if $.exitcode == 0:
 
 Please see [this article for details](https://iapyeh.github.io/sshscript/examples/logger) about logging.
 
-## $.panaroid(yes)
+## $.careful(yes)
 
 - yes(boolean): If True, raises a SSHScriptError if there is data received from stderr. Default is false.
+- Previously named “$.paranoid()”. Renamed from v1.1.16.
 
 ## $.pkey(filepath)
 
@@ -814,7 +848,7 @@ This is a wrapper function of threading.Thread(). Please use it to get an instan
 
 - src(str): the file path in the localhost to upload.
     - If the value is a relative path, os.path.abspath() is applied.
-- dst(str): the file path in remote host to save the uploaded file, must be a absolute path
+- dst(str): the file path in remote host to save the uploaded file. If the dst is not an absoulute path, a warning would be issued. You may set os.environ[’MUTE_WARNING’]=’1’ to suppress it.
 - makedirs(boolean): optional, default is False.
     - If True, intermediate folders of the dst path would be created if necessary.
     - When makedirs=1 is enabled, if the last component of the uploading destination has the same extension of the source file, the last component is taken as a file.
@@ -865,5 +899,7 @@ $upload('/home/user/mysql.cnf','/etc/mysql/master/backup/',makedirs=1)
 💡 If you are not satisfied by the $.upload , you can use the $.sftp for better control.
 
 </aside>
+
+![Untitled](Syntax,%20Variables%20and%20Functions%209c002afd174b4691b052c31139754b02/Untitled.png)
 
 ![image](https://user-images.githubusercontent.com/4695577/186576710-baf846ac-b88c-4b23-9f9e-49ea00b909f0.png)
