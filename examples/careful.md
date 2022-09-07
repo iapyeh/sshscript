@@ -37,7 +37,7 @@ except SSHScriptCareful:
 ```
 from sshscript import SSHScriptCareful
 
-$.connect('user@host')
+$.connect('user@host') # ⬅ difference is here. (compared with the above example-local.spy)
 
 $.careful(1)
 try:
