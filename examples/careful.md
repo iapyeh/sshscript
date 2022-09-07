@@ -1,3 +1,4 @@
+<div style="text-align:right"><a href="./index">Examples</a></div>
 
 ## $.careful()
 
