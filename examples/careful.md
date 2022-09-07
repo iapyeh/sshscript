@@ -2,7 +2,7 @@
 
 ## $.careful()
 
-Since $.careful() works depending on $.exitcode, for local execution, $.careful() works well. But for remote execution, $careful() might only work for one-dollar commands. The "might work" means that it depends on the remote shell and commands' behavior.
+Since $.careful() works depending on $.exitcode, for local executions, $.careful() works well. But for remote executions, $careful() might only work for one-dollar commands. The "might work" means that it depends on the remote shell and commands' behavior.
 
 
 #### file example-local.spy
@@ -50,14 +50,18 @@ except SSHScriptCareful:
 try:
     $$ls -l /non/existing
 except SSHScriptCareful:
-    # usually this does not work
+    # Usually this does not work.
+    # Since the $.exitcode is usually -1 -1 for remote two-dollars commands.
+    # There is not SSHScriptCareful was thrown.
     $.exit(1)
 
 try:
     with $ls -l /non/existing as _:
         pass
 except SSHScriptCareful:
-    # usually this does not work.
+    # Usually this does not work.
+    # Since the $.exitcode is usually -1 for remote with-dollar commands.
+    # There is not SSHScriptCareful was thrown.
     $.exit(1)
 
 ```
