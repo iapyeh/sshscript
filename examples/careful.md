@@ -51,7 +51,7 @@ try:
     $$ls -l /non/existing
 except SSHScriptCareful:
     # Usually this does not work.
-    # Since the $.exitcode is usually -1 -1 for remote two-dollars commands.
+    # Since the $.exitcode is usually -1 for remote two-dollars commands.
     # There is not SSHScriptCareful was thrown.
     $.exit(1)
 
