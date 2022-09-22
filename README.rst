@@ -1,3 +1,26 @@
+<<<<<<< HEAD
+=======
+
+
+Announcement
+############
+
+v1.1.16 has released on 2022/9/5. Users are recommanded to upgrade by 
+
+.. code::
+
+    pip3 install --upgrade sshscript
+
+
++---------------------------------------------------------------------------------------------------+
+|For installers of version v1.101, v1.102 and v1.103.  Please do upgrade with                       |
++---------------------------------------------------------------------------------------------------+
+.. code:: 
+
+    python3 -m pip install sshscript==1.1.16
+    
+Please see v1.1.16 Relaese Notes_ for details.
+>>>>>>> b66cb1cea37129ca31d9b0d33620ebcbc40ec793
     
 SSHScript
 #########
