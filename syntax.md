@@ -2,11 +2,9 @@
 
 # Syntax, Variables and Functions
 
-**for version 1.1.14**
+**for version 1.1.17**
 
 ![image](https://user-images.githubusercontent.com/4695577/186702052-d013bdbb-20ee-4b37-aac6-f38cea4cff43.png)
-
-**for version 1.1.16**
 
 # Syntax
 
@@ -235,36 +233,6 @@ with $$f'''
 
 The “console” object has the following methods to use:
 
-- sendline(command, waitingSeconds=1)
-    - command: str, multi-lines str, list of single line str
-        - command for inputing (ending newline is not necessary)
-    
-    ```
-    with $ as console:
-        console.sendline('''
-            echo hello
-            echo world
-        ''')
-        console.sendline(['echo hello','echo world'])
-    ```
-    
-    - waitingSeconds: int, default is 1
-        - seconds to wait after submitting the input string.
-    
-    ```python
-    with $ as console:
-        # at least wait 2 seconds before inputing password
-        console.sendline('sudo -S lastb -F -10',2) 
-        console.sendline('1234')
-    print($.stdout)
-    ```
-    
-- stdout
-    - you can get the stdout output of the last executed command from this property.
-- stderr
-    
-    you can get the stderr output of the last executed command from this property.
-    
 - expect(keyword, timeout=60)
     
     This function blocks the execution until the given keyword appears in stdout or stderr.
@@ -296,6 +264,103 @@ The “console” object has the following methods to use:
     
     same as expect() but only searching for stdout.
     
+- lines(timeout=None,dataType=1)
+    
+    When executing a long running command (eg. tcpdump). You can get its output by iterating console.lines(). The default value is os.environ.get(’CMD_TIMEOUT’,60). 
+    
+    - **timeout**
+        
+        The “timeout” parameter is a break condition to end the looping. When the interval length of no data being received has exceeded timeout(in seconds), a TimeoutError would be raised. 
+        
+        When the timeout is 0, this is an infinite loop.
+        
+    - **dataType**
+        - The “dataType” parameter controls the source of data being iterated.
+        - When dataType is 1, looping on the command's stdout data.
+        - When dataType is 2, looping on the command’s stderr data.
+        - When dataType is 3, looping on both. A tuple is returned. For example:
+    
+    ```
+    with $ as console:
+        console.sendline('tcpdump -n port 5060',0)
+        try:
+    		    for (t,line) in console.lines(10,dataType=3):
+                if t == 1: print('stdout:',line) # line is from stdout
+                if t == 2: print('stderr:',line) # line is from stderr
+        except TimeoutError:
+            ## no data received over 10 seconds (neither stdout nor stderr)
+            pass
+    		console.shutdown()
+    ```
+    
+- sendline(command, timeout=None,dataType=3)
+    - command: str, multi-lines str, list of single line str
+        - command for inputing (ending newline is not necessary)
+            
+            ```
+            with $ as console:
+                console.sendline('''
+                    echo hello
+                    echo world
+                ''')
+                console.sendline(['echo hello','echo world'])
+            ```
+            
+    - timeout: int, default is os.environ.get(’CMD_INTERVAL’,0.5) or os.environ.get(’SSH_CMD_INTERVAL’,0.5) depends on local or remote execution respectively.
+        
+        (The second parameter was originally named “waitingSeconds”, starting from v1 .1.17, it is renamed to “timeout”)
+        
+        - time interval(in seconds) to wait for output after command execution. If there is no data received on stdout and stderr till the setting value, then executes next commands.
+        Example 1:
+            
+            ```python
+            with $ as console:
+                # at least wait 2 seconds before inputing password
+                console.sendline('sudo -S lastb -F -10',2) 
+                console.sendline('1234')
+            print($.stdout)
+            ```
+            
+            Example 2: Please note that in this example, setting timeout to 0 is important.  If timeout is not zero, SSHScript would start to receive data on stdout till no any data being received. But the tcpdump generates so many outputs, there might be no such interval. The result is that next line (“for line in console.lines()”) would not  be executed.
+            
+            ```
+            with $ as console:
+                ## the following two statements are the same:
+                console.sendline('tcpdump -n port 5060',0)
+                ## the next statement (for loop) might not be executed
+                ## if timeout of sendline() is great than 0.
+                for line in console.lines():
+                    ...
+            ```
+            
+    - dataType: int, default is 3
+        - “dataType” controls the value of console.stdout, console.stderr, $.stdout and $.stderr.
+        - When dataType is 1, outputs on stdout are collected only. You can get data from console.stdout and console.stdout. But console.stderr and $.stderr have no data.
+        - When dataType is 2, outputs on stderr are collected only. You can get data from console.stderr and console.stderr. But console.stdout and $.stdout have no data.
+        - When dataType is 3, both outputs on stdout and stderr are collected. This is the default behavior.
+            
+            The main reason for the third parameter “dataType” is:
+            
+            When dataType is 0, none of the outputs on stdout and stderr are collected. This is for commands which generates tons of data (such as `tcpdump` ). To keep that data in memory is not necessary.
+            
+- send_signal(signal)
+    
+    This call would send a signal to the running command. This is only valid for local execution. 
+    
+- shutdown()
+    
+    This call would interrupt the running command. For local executions, it calls subprocess.Popen’s kill(). For remote executions, it calls Paramiko Channel’s shutdown(2) and close().
+    
+- stderr
+    
+    you can get the stderr output of the last executed command from this property.
+    
+- stdout
+    
+    you can get the stdout output of the last executed command from this property.
+    
+
+### Remark:
 
 The with-command would be converted to a regular python “with .. as …” syntax. Of course, you don’t need to name it “console”.  Any name is fine. For example:
 
@@ -818,6 +883,21 @@ Please see [this article for details](https://iapyeh.github.io/sshscript/example
 
 - yes(boolean): If True, raises a SSHScriptError if there is data received from stderr. Default is false.
 - Previously named “$.paranoid()”. Renamed from v1.1.16.
+- You can get the setting value by $.careful()
+    
+    ```
+    #save the current setting
+    c = $.careful()
+    
+    # change the setting
+    $.careful(1)
+    
+    #... whatever ...
+    
+    # restore the setting
+    $.careful(c)
+    ```
+    
 
 ## $.pkey(filepath)
 
@@ -899,6 +979,8 @@ $upload('/home/user/mysql.cnf','/etc/mysql/master/backup/',makedirs=1)
 💡 If you are not satisfied by the $.upload , you can use the $.sftp for better control.
 
 </aside>
+
+![Untitled](Syntax,%20Variables%20and%20Functions%20825af993f7fd4af0acd4e2aa35819678/Untitled.png)
 
 ![Untitled](Syntax,%20Variables%20and%20Functions%209c002afd174b4691b052c31139754b02/Untitled.png)
 
