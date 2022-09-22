@@ -2,7 +2,7 @@
 
 
 
-#### v1.1.16 works on Windows too. Released on 2022/9/5, [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.16)
+#### v1.1.17 supports streaming-style commands (tcpdump). Released on 2022/9/22, [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.17)
 
 ## en
 
@@ -150,8 +150,10 @@ The idea is that many automation tasks are running commands and dealing with out
 
 ## Releases
 
-#### v1.1.16 works on Windows too. Released on 2022/9/5, [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.16)
+#### 2022/09/22 v1.1.17 supports streaming-style commands. [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.17)
 
-#### v1.1.14 Released on 2022/8/24 [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.14)
+#### 2022/09/05 v1.1.16 supports powershell(Windows). [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.16)
+
+#### 2022/08/24 v1.1.14 supports thread. [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.14)
 
 [![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
