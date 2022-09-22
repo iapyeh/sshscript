@@ -1,11 +1,8 @@
-<<<<<<< HEAD
-=======
-
 
 Announcement
 ############
 
-v1.1.16 has released on 2022/9/5. Users are recommanded to upgrade by 
+v1.1.17 has released on 2022/9/22. Users are recommanded to upgrade by 
 
 .. code::
 
@@ -17,11 +14,10 @@ v1.1.16 has released on 2022/9/5. Users are recommanded to upgrade by
 +---------------------------------------------------------------------------------------------------+
 .. code:: 
 
-    python3 -m pip install sshscript==1.1.16
+    python3 -m pip install sshscript==1.1.17
     
-Please see v1.1.16 Relaese Notes_ for details.
->>>>>>> b66cb1cea37129ca31d9b0d33620ebcbc40ec793
-    
+Please see v1.1.17 Relaese Notes_ for details.
+
 SSHScript
 #########
 System automation is a process of realizing management logics by repeating networking and execution. SSHScript makes Python an easy tool for creating system automation processes. With syntax sugar of SSHScript, writing python scripts to execute commands on local host or remote hosts is easy.
@@ -33,7 +29,7 @@ Technically, SSHScript is an integration of the subprocess and Paramiko. It prov
 Releases
 ========
 
-The last version is 1.1.16. (2022/9/5). Relase Notes_
+The last version is 1.1.17. (2022/9/22). Relase Notes_
 
 More
 ====
@@ -52,4 +48,4 @@ More
 .. _Examples : https://iapyeh.github.io/sshscript/examples/index
 
 
-.. _Notes : https://iapyeh.github.io/sshscript/release-v1.1.16
+.. _Notes : https://iapyeh.github.io/sshscript/release-v1.1.17
