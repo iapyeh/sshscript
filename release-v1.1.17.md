@@ -76,7 +76,7 @@ with $ as console:
 
 Please note that in the above example, setting timeout to 0 is important. Which tells SSHScript to move to the next statement on execution. If timeout is not zero, SSHScript would start to receive data on stdout and stderr till an interval (timeout seconds) without any data being received. Some commands like the tcpdump generate so many outputs, there might be no such interval. The result is that next lines (such as “for line in console.lines()”) have not been executed.
 
-The default value of timeout is os.environ.get(’CMD_TIMEOUT’, 60). You can control it by setting os.environ[’CMD_TIMEOUT’]
+The default value of timeout is os.environ.get(’CMD_INTERVAL’, 0.5) or os.environ.get(’SSH_CMD_INTERVAL’, 0.5) . 
 
 ## New feature: console.lines(timeout=None, dataType=1)
 
@@ -127,6 +127,8 @@ with $ as console:
 ## Refine: console.shutdown()
 
 This call would interrupt the running command. For local executions, it calls subprocess.Popen’s kill(). For remote executions, it calls Paramiko Channel’s shutdown(2) and close().
+
+console.kill() is a alias of console.shutdown()
 
 ## Refine: console.send_signal(signal)
 
