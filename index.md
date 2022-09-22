@@ -127,7 +127,7 @@ pip install sshscript --upgrade
 ```
 or
 ```
-pip install sshscript==1.1.16
+pip install sshscript==1.1.17
 ```
 
 
