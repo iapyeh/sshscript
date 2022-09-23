@@ -91,12 +91,12 @@ The “timeout” parameter is a break condition to end the looping. When the in
 with $ as console:
     console.sendline('tcpdump -n port 5060',0)
     try:
-		    for line in console.lines(10):
-            ....
+	for line in console.lines(10):
+            pass
     except TimeoutError:
         ## no data received over 10 seconds
         pass
-		console.shutdown()
+console.shutdown()
 
 ```
 
@@ -115,13 +115,13 @@ When dataType is 3, looping on both. A tuple is returned. For example:
 with $ as console:
     console.sendline('tcpdump -n port 5060',0)
     try:
-		    for (t,line) in console.lines(10,dataType=3):
+	for (t,line) in console.lines(10,dataType=3):
             if t == 1: print('stdout:',line) # line is from stdout
             if t == 2: print('stderr:',line) # line is from stderr
     except TimeoutError:
         ## no data received over 10 seconds (neither stdout nor stderr)
         pass
-		console.shutdown()
+console.shutdown()
 ```
 
 ## Refine: console.shutdown()
