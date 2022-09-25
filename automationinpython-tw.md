@@ -1,36 +1,41 @@
 # 用 Python 作系統自動化
 
-# 技術性觀點下的系統自動化
+# 系統自動化的技術性觀點
 
-系統自動化是在本機或遠端伺服器上執行一連串的系統指令及Shell指令然後處理指令的輸出。一直重複這樣的過程直到達成目的。如下圖所示。
+從技術性的角度出發，筆者認為系統自動化是在本機或遠端伺服器上執行一連串的系統指令及Shell指令然後處理指令的輸出。一直重複這樣的過程直到達成目的。如下圖所示。
 
 ![Untitled](automationinpython/0.png)
 
-# 為什麼用Python
 
 一開始，工程師都是手動作業。等到工程師熟悉那些程序會有怎樣的行為為與結果之後，才會將程序自動化。實務上的關係架構如下圖所示。工程師將來自公司主管的任務與指示轉化為「管理性邏輯」，實現那些邏輯可大略分成「執行電腦指令」及「網路連線」兩種行為，將「執行電腦指令」及「網路連線」整合在一起的程式，稱之為「Automation Scripts」(自動化程式）。
 
 ![Untitled](automationinpython/1.png)
 
-有很多種程式語言可以寫系統自動化程式，Python是其中之一，傳統上系統自動化程式之王是shell script，雖然目前寫系統自動化程式的工具很多，但筆者相信hell script在系統自動化領域的王者地位仍屹立不搖。雖然有多種工具互相競爭，然而不同於社會性競爭，系統自動化程式語言之間可以互相串連互助合作。相對於程式語言，還有一種新的Declarative（宣告式）作法，Ansible的YAML屬於這種方式。
+# 為什麼用Python
+
+自動化的概念由來已久，所有的電腦程式幾乎都可看成是某種意義下的自動化，有很多種程式語言可以寫系統自動化程式，Python是其中之一。傳統上系統自動化程式之王是shell script，雖然目前寫系統自動化程式的工具很多，但筆者相信hell script在系統自動化領域的王者地位仍屹立不搖。雖然有多種工具互相競爭，然而不同於社會性競爭，程式語言之間是可以互相串連互助合作的關係。近年來，相對於以程式語言將一些日常任務進行自動化，還有一種新的Declarative（宣告式）作法，Ansible的YAML屬於這種方式，大意是將所要進行的任務以YAML的格式作表達（宣告），有些人甚至把Ansible當成系統自動化的代名詞。
 
 ![image](https://scontent.ftpe11-2.fna.fbcdn.net/v/t39.30808-6/308199213_6076506379029356_3237487921019298709_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=8bfeb9&_nc_ohc=1Vzuyj3n4mkAX9ZpjF1&_nc_ht=scontent.ftpe11-2.fna&oh=00_AT9qQIKifmfB98ns4o-aQdeFSAXpQwLU60616C-YX5HRsw&oe=63347670)
 
 [Image credit: nixCraft](https://www.facebook.com/nixcraft/posts/pfbid02b7uUDRR9jZpMzdKMzrVsmxm48PkS4TCDX9hJjiL2fBsGdov6s5FPJEy31zMKwmwKl)
 
-既然有那麼多種選擇，為什麼是 Python? 對於筆者，答案很單純「因為它是Python」。在程式語言中，技術上而言，沒有什麼是只有A做得到而B做不到的事情。差別只在寫程式的速度、執行速度、函式庫數量等無關緊要的差異。網路上有無數的「程式語言比較」，多半只是飯後閒聊而已。如果把大谷翔平帶去籃球場考三分球，或是把林書豪帶去棒球場考接殺外野滾地球，應該就發表好幾篇頭頭是道的論文，把這兩位運動員說成百年難得一見的白癡。為什麼選Python，純粹就是個風格的選擇。何況程式語言是可以互助的，雖然我選擇Python寫自動化程式，但我經常也需要整合shell script, php的程式以完成工作。我比較不考慮YAML。我如果有時間，我寧可用來替程式寫文件，而不是把文件寫得像程式，若要把文件寫的像程式我直接寫程式就好。但這沒有技術性的高低好壞，純就只是風格選擇不同。
+既然有那麼多種選擇，為什麼是 Python? 對於筆者，答案很單純「因為它是Python」。以結果論，在程式語言中，沒有什麼是只有A做得到而B做不到的事情。差別只在寫程式的速度、執行速度、函式庫數量等處有差異，而那些差異有因人而異的成分，難分軒輊各有千秋。網路上有不少「程式語言比較」，但如果把大谷翔平帶去籃球場考三分球，或是把林書豪帶去棒球場考接殺外野滾地球，再怎麼天才的運動員都能評比成白癡。選Python純粹就是個風格的抉擇。何況程式語言是可以互助的，雖然筆者選擇以Python寫自動化程式，但我經常也需要整合shell script, php的程式以完成工作。工具的選擇，沒有最好，只有最合適。
+
+我比較不考慮YAML。我是軟體工程師，我會寫程式。如果有時間，我寧可用來替程式寫文件，而不是把文件寫得像程式，若要把文件寫的像程式的話，對我而言直接寫程式比較節省時間。我沒有主張Ansible比較差，純就只是風格選擇不同。
 
 # 如何用 Python
 
-且將系統自動化流程分得更仔細些，裡面有三個主要功能：execution(執行指令)、data processing(資料處理)與networking(網路通訊;主要是ssh連線)。 
+且將前文提到的系統自動化流程分得更仔細些，裡面有三個主要功能：execution(執行指令)、data processing(資料處理)與networking(網路通訊;主要是ssh連線)。 
 
 ![Untitled](automationinpython/3.png)
 
-既然選擇了Python，就有無數的Python package（套件）可以利用，那些Package當中，有些與系統自動化直接相關。基於上述三個功能，我們可以將直接相關的package分成以下兩群：
+Python有無數的 package（套件）可以利用，那些Package當中，有好幾個package是為系統自動化而開發的。基於上述三個功能，我們可以將直接相關的package分成以下兩群：
 
 ## 一、執行指令與網路通訊
 
 ![Untitled](automationinpython/4.png)
+
+這一群套件協助工程師更簡易執行指令與進行ssh網路通訊。
 
 - [fabric](https://www.fabfile.org/) (based on invoke and paramiko)
 - [netmiko](https://github.com/ktbyers/netmiko) (based on paramiko)
