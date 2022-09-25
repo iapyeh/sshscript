@@ -21,6 +21,7 @@
 - [導覽(Tutorial)](https://iapyeh.github.io/sshscript/tutorial.zh-tw)
 - [使用SSHScript教學一(Learning SSHScript Chapter 1)](https://iapyeh.github.io/sshscript/learn-chap01.zh-tw)
 - [使用SSHScript教學二(Learning SSHScript Chapter 2)](https://iapyeh.github.io/sshscript/learn-chap02.zh-tw)
+- [用 Python 作系統自動化](https://iapyeh.github.io/sshscript/automationinpython-tw)
 - [安裝有問題](https://iapyeh.github.io/sshscript/sshscript-problem.zh-tw)
 
 ## Introduction
