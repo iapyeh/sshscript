@@ -14,9 +14,7 @@
 
 有很多種程式語言可以寫系統自動化程式，Python是其中之一，傳統上系統自動化程式之王是shell script，雖然目前寫系統自動化程式的工具很多，但筆者相信hell script在系統自動化領域的王者地位仍屹立不搖。雖然有多種工具互相競爭，然而不同於社會性競爭，系統自動化程式語言之間可以互相串連互助合作。相對於程式語言，還有一種新的Declarative（宣告式）作法，Ansible的YAML屬於這種方式。
 
-![image [credit: nixCraft](https://www.facebook.com/nixcraft/posts/pfbid02b7uUDRR9jZpMzdKMzrVsmxm48PkS4TCDX9hJjiL2fBsGdov6s5FPJEy31zMKwmwKl)](automationinpython/2.png)
-
-image [credit: nixCraft](https://www.facebook.com/nixcraft/posts/pfbid02b7uUDRR9jZpMzdKMzrVsmxm48PkS4TCDX9hJjiL2fBsGdov6s5FPJEy31zMKwmwKl)
+![image [credit: nixCraft](https://www.facebook.com/nixcraft/posts/pfbid02b7uUDRR9jZpMzdKMzrVsmxm48PkS4TCDX9hJjiL2fBsGdov6s5FPJEy31zMKwmwKl)](https://www.facebook.com/nixcraft/posts/pfbid02b7uUDRR9jZpMzdKMzrVsmxm48PkS4TCDX9hJjiL2fBsGdov6s5FPJEy31zMKwmwKl)
 
 既然有那麼多種選擇，為什麼是 Python? 對於筆者，答案很單純「因為它是Python」。在程式語言中，技術上而言，沒有什麼是只有A做得到而B做不到的事情。差別只在寫程式的速度、執行速度、函式庫數量等無關緊要的差異。網路上有無數的「程式語言比較」，多半只是飯後閒聊而已。如果把大谷翔平帶去籃球場考三分球，或是把林書豪帶去棒球場考接殺外野滾地球，應該就發表好幾篇頭頭是道的論文，把這兩位運動員說成百年難得一見的白癡。為什麼選Python，純粹就是個風格的選擇。何況程式語言是可以互助的，雖然我選擇Python寫自動化程式，但我經常也需要整合shell script, php的程式以完成工作。我比較不考慮YAML。我如果有時間，我寧可用來替程式寫文件，而不是把文件寫得像程式，若要把文件寫的像程式我直接寫程式就好。但這沒有技術性的高低好壞，純就只是風格選擇不同。
 
