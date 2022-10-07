@@ -4,8 +4,8 @@
 
 Requirement: forward.py. Please get the forward.py from [paramiko's repository](https://raw.githubusercontent.com/paramiko/paramiko/bba5b4ce1ee156e0f5aa685e80c9a172e607ff38/demos/forward.py)
 
-## Example1
-![image](https://user-images.githubusercontent.com/4695577/194467519-4201e6fa-00c9-4f23-a734-0e9aef230192.png)
+## Example 1
+![image](https://user-images.githubusercontent.com/4695577/194468408-ea090155-609d-493b-a918-eac64be19b18.png)
 
 ```
 from forward import ForwardServer, Handler
@@ -24,9 +24,9 @@ ForwardServer(('127.0.0.1',8080), SubHander).serve_forever()
 ```
 
 
-## Example2
+## Example 2
 For security reason, if host2:443 is listening on 127.0.0.1, or only host2:22 is available for host1. you can do it by nested ssh as below:
-![image](https://user-images.githubusercontent.com/4695577/194468094-b308e097-e215-4972-9111-279049c060cb.png)
+![image](https://user-images.githubusercontent.com/4695577/194468445-1c991179-c09c-4bd7-9c30-5800dcca5835.png)
 
 
 ```
