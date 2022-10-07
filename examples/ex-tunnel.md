@@ -36,7 +36,7 @@ from forward import ForwardServer, Handler
 $.connect('user1@host1',password='123456')
 ## connect to remote host2
 c = $.connect('user2@host2',password='654321')
-## create the tunnel from localhost:8080 to host2:80 directly
+## create the tunnel from localhost:8080 to host2:443 via both host1:22 and host2:22
 class SubHander(Handler):
     chain_host = '127.0.0.1'
     chain_port = 443
