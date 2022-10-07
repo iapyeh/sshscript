@@ -1,6 +1,6 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
-## Scenario: Create a ssh tunnel from a nested ssh connection
+## Scenario: Create a ssh tunnel from an existing ssh connection
 
 Requirement: forward.py. Please get the forward.py from [paramiko's repository](https://raw.githubusercontent.com/paramiko/paramiko/bba5b4ce1ee156e0f5aa685e80c9a172e607ff38/demos/forward.py)
 
@@ -25,9 +25,8 @@ ForwardServer(('127.0.0.1',8080), SubHander).serve_forever()
 
 
 ## Example2
-If host2:443 is listening on 127.0.0.1 for security reason.
-Only host2:22 is available for host1. you can do it by nested ssh as below:
-![image](https://user-images.githubusercontent.com/4695577/194467552-5e0d3ecb-66cf-4064-a98b-1fdde387180b.png)
+For security reason, if host2:443 is listening on 127.0.0.1, or only host2:22 is available for host1. you can do it by nested ssh as below:
+![image](https://user-images.githubusercontent.com/4695577/194468094-b308e097-e215-4972-9111-279049c060cb.png)
 
 
 ```
