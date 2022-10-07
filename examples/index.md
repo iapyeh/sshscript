@@ -14,7 +14,7 @@
 - [ssh via proxyCommand, nested ssh with interactive ssh and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh2) 
 - [Install or upgrade python packages](https://iapyeh.github.io/sshscript/examples/install-python-package) 
 - [$.careful() usage](https://iapyeh.github.io/sshscript/examples/careful) 
-- [ssh tunnel, nested ssh tunnel](https://iapyeh.github.io/sshscript/examples/ex-tunnal) 
+- [ssh tunnel, nested ssh tunnel](https://iapyeh.github.io/sshscript/examples/ex-tunnel) 
 
 ## Using Thread
 - [py_cui with threads](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading) 
