@@ -15,6 +15,7 @@
 - [Install or upgrade python packages](https://iapyeh.github.io/sshscript/examples/install-python-package) 
 - [$.careful() usage](https://iapyeh.github.io/sshscript/examples/careful) 
 - [ssh tunnel, nested ssh tunnel](https://iapyeh.github.io/sshscript/examples/ex-tunnel) 
+- [ping many hosts at once](https://iapyeh.github.io/sshscript/examples/ex-ping) 
 
 ## Using Thread
 - [py_cui with threads](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading) 
