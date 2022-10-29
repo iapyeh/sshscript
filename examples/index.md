@@ -23,7 +23,7 @@
 - [ssh reverse tunnel](https://iapyeh.github.io/sshscript/examples/ex-rtunnel-1) 
 - [socks5 server over nested reverse ssh tunnel](https://iapyeh.github.io/sshscript/examples/ex-rtunnel-2) 
 
-## Using Thread
+## Working with Threads
 - [py_cui with threads](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading) 
 - [connecting to hosts in threads,usage scenario 1](https://iapyeh.github.io/sshscript/examples/ex-threads-2) 
 - [connecting to hosts in threads,usage scenario 2](https://iapyeh.github.io/sshscript/examples/ex-threads-3) 
