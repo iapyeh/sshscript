@@ -33,13 +33,12 @@ ssh -p 8022 user@localhost
 ```
 
 
-## Example 2
+## Example 2: (Nested Connections)
 
-![image](https://user-images.githubusercontent.com/4695577/198823568-2f1ab5fd-cfec-4a48-876c-819d8c379d63.png)
-
+![image](https://user-images.githubusercontent.com/4695577/198823648-a72ee1ea-9460-4a8f-bc1b-d47caa99cdf8.png)
 
 ```
-## filename: example1.spy
+## filename: example2.spy
 from rforward import reverse_forward_tunnel
 server_port =  8443
 remote_host =  'www.google.com'
