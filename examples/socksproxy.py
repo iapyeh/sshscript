@@ -7,7 +7,9 @@ import select
 import socket
 import struct
 import traceback
+import threading
 SOCKS_VERSION = 5
+from logging import DEBUG
 
 class SocksProxy():
     def __init__(self,transport,username=None,password=None,logger=None) -> None:
