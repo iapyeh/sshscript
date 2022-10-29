@@ -1,6 +1,6 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
-## Scenario: Create a ssh tunnel from an existing ssh connection
+## Scenario: Create reverse ssh tunnels
 
 Requirement: rforward.py. Please get the rforward.py from [paramiko's repository](https://github.com/paramiko/paramiko/blob/main/demos/forward.py)
 
