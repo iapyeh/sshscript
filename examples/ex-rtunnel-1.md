@@ -20,22 +20,28 @@ with $.connect('user@host-1',passwod='123456') as c:
   reverse_forward_tunnel(server_port, remote_host, remote_port, transport)
 ```
 
-## Execution
+## Execution & Testing
 
 ```
+## on localhost
 sshscript example1.spy
+```
+
+```
+## on host-1
+ssh -p 8022 user@localhost
 ```
 
 
 ## Example 2
 
-![image](https://user-images.githubusercontent.com/4695577/198821107-631365d8-3658-4604-be07-a11c7e3f5fa4.png)
+![image](https://user-images.githubusercontent.com/4695577/198821926-75da6e99-4f2e-4c28-8e23-384cadbc5624.png)
 
 ```
 ## filename: example1.spy
 from rforward import reverse_forward_tunnel
 server_port =  8443
-remote_host =  'host-3'
+remote_host =  'www.google.com'
 remote_port =  443
 with $.connect('user@host-1',passwod='123456') as c1:
   with $.connect('user@host-2',passwod='123456') as c2:
@@ -43,7 +49,13 @@ with $.connect('user@host-1',passwod='123456') as c1:
      reverse_forward_tunnel(server_port, remote_host, remote_port, transport)
 ```
 
-## Execution
+## Execution  & Testing
 ```
+## on localhost
 sshscript example2.spy
+```
+
+```
+## on host-2
+curl -k -H 'Host: www.google.com' https://127.0.0.1:8443/
 ```
