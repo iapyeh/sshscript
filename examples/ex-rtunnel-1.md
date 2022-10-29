@@ -6,7 +6,7 @@ Requirement: rforward.py. Please get the rforward.py from [paramiko's repository
 
 ## Example 1
 
-![image](https://user-images.githubusercontent.com/4695577/198821100-eb565541-bd6e-4f0d-90ca-9002c55f561f.png)
+![image](https://user-images.githubusercontent.com/4695577/198823526-61607810-fbc5-4952-bcc4-a1579041b8d9.png)
 
 
 ```
@@ -20,22 +20,23 @@ with $.connect('user@host-1',passwod='123456') as c:
   reverse_forward_tunnel(server_port, remote_host, remote_port, transport)
 ```
 
-## Execution & Testing
+## Execution & Tests
 
 ```
-## on localhost
+## Execution on localhost
 sshscript example1.spy
 ```
 
 ```
-## on host-1
+## Tests on host-1
 ssh -p 8022 user@localhost
 ```
 
 
 ## Example 2
 
-![image](https://user-images.githubusercontent.com/4695577/198821926-75da6e99-4f2e-4c28-8e23-384cadbc5624.png)
+![image](https://user-images.githubusercontent.com/4695577/198823568-2f1ab5fd-cfec-4a48-876c-819d8c379d63.png)
+
 
 ```
 ## filename: example1.spy
@@ -49,13 +50,13 @@ with $.connect('user@host-1',passwod='123456') as c1:
      reverse_forward_tunnel(server_port, remote_host, remote_port, transport)
 ```
 
-## Execution  & Testing
+## Execution  & Tests
 ```
-## on localhost
+## Execution on localhost
 sshscript example2.spy
 ```
 
 ```
-## on host-2
+## Tests on host-2
 curl -k -H 'Host: www.google.com' https://127.0.0.1:8443/
 ```
