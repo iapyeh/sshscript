@@ -141,3 +141,28 @@ class SocksProxy():
                 data = remote.recv(4096)
                 if client.send(data) <= 0:
                     break
+
+class ThreadingSocksProxy(object):
+    def __init__(self, transport,remote_port,username=None,password=None,logger=None) -> None:
+        self.transport = transport
+        self.remote_port = remote_port
+        self.username = username
+        self.password = password
+        self.logger = logger
+    def start(self):
+        def task():
+            global SocksProxy
+            while self.transport.is_active():
+                chan = self.transport.accept(1)
+                if chan is None: continue
+                sp = SocksProxy(self.transport,self.username,self.password,self.logger)
+                thr = threading.Thread(
+                    target=sp.handle,args=(chan,)
+                )
+                thr.setDaemon(True)
+                thr.start()
+        self.transport.request_port_forward("127.0.0.1", self.remote_port)
+        thr = threading.Thread(target=task)
+        thr.setDaemon(True)
+        thr.start()
+        return thr
