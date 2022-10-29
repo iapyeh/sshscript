@@ -16,7 +16,8 @@
 - [$.careful() usage](https://iapyeh.github.io/sshscript/examples/careful) 
 
 ## Long Running Processes
-- [ping many hosts at once](https://iapyeh.github.io/sshscript/examples/ex-ping) 
+- [ping many hosts](https://iapyeh.github.io/sshscript/examples/ex-ping) 
+- [get bad ip addresses by tcpdump](https://iapyeh.github.io/sshscript/examples/ex-tcpdump) 
 
 ## Tunnel and Reverse Tunnel
 - [ssh tunnel, nested ssh tunnel](https://iapyeh.github.io/sshscript/examples/ex-tunnel) 
