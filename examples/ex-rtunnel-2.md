@@ -2,7 +2,7 @@
 
 ## Scenario: Create socks5 proxy over ssh
 
-This would enable a heavily protected host to access internet for updating packages, executing ["pip install"](https://stackoverflow.com/questions/22915705/how-to-use-pip-with-socks-proxy) or something like that.
+This would enable a heavily protected host to access internet for updating packages, executing "pip install" [(how to)](https://stackoverflow.com/questions/22915705/how-to-use-pip-with-socks-proxy) or something like that.
 
 ### Dependence:
 
