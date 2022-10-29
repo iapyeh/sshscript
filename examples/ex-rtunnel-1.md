@@ -2,7 +2,7 @@
 
 ## Scenario: Create a ssh tunnel from an existing ssh connection
 
-Requirement: forward.py. Please get the forward.py from [paramiko's repository](https://github.com/paramiko/paramiko/blob/main/demos/forward.py)
+Requirement: rforward.py. Please get the rforward.py from [paramiko's repository](https://github.com/paramiko/paramiko/blob/main/demos/forward.py)
 
 ## Example 1
 
