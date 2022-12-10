@@ -1,8 +1,8 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
-## Some Notes about "sudo"
+# Some Notes about "sudo"
 
-### sudo requires shell to work
+## sudo requires shell to work
 
 When running commands with sudo, you need to have two-dollars or with-dollar to make it working.
 
@@ -23,7 +23,7 @@ with $ as console:
     print ($.stdout)
 ```
 
-### `-p` is our good friend to omit prompt from output
+## `-p` is our good friend to omit prompt from output
 
 sudo argument "-p" could set the password prompt of sudo. If it is an empty string, there would be no prompt mixed in the output text.
 
@@ -35,7 +35,7 @@ $$echo "password" | sudo -S  ls /root
 $$echo "password" | sudo -S -p "" ls /root
 ```
 
-### `sed` is our good friend to strip ANSI control characters
+## `sed` is our good friend to strip ANSI control characters
 
 Some commands produce ANSI control characters when the shell is invoked. 
 That's the situation of sudo execution. You can omit those ANSI characters by the "sed". . For example:
@@ -47,3 +47,5 @@ $$echo "password" | sudo -p "" -S systemctl list-timers --all
 ## this would not output ANSI control characters
 $$echo "password" | sudo -p "" -S systemctl list-timers --all | sed -e 's/\x1b\[[0-9;]*m//g'
 ```
+
+[REF: https://superuser.com/questions/380772/removing-ansi-color-codes-from-text-stream](https://superuser.com/questions/380772/removing-ansi-color-codes-from-text-stream)
