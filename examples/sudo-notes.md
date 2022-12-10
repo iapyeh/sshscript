@@ -1,6 +1,6 @@
 <div style="text-align:right"><a href="./index">Examples</a></div>
 
-## Some Notes on "sudo"
+## Some Notes about "sudo"
 
 ### sudo requires shell to work
 
