@@ -9,6 +9,7 @@
 - [exchange file between hosts](https://iapyeh.github.io/sshscript/examples/ex-filetransfer) 
 - [check disk space utilization](https://iapyeh.github.io/sshscript/examples/ex-disk.space.checking) 
 - [generate list of ip addresses for blocking](https://iapyeh.github.io/sshscript/examples/ex-blackip) 
+- [some notes about sudo](https://iapyeh.github.io/sshscript/examples/sudo-notes) 
 - [ssh via proxyCommand, nested ssh with password and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh) 
 - [ssh via proxyCommand, nested ssh with ssh key and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh3) 
 - [ssh via proxyCommand, nested ssh with interactive ssh and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh2) 
