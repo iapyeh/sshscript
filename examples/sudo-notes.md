@@ -2,18 +2,24 @@
 
 # Some Notes about "sudo"
 
-## sudo requires shell to work
+## sudo works without shell
 
-When running commands with sudo, you need to have two-dollars or with-dollar to make it working.
+Examples of running sudo commands with one-dollar
 
 ```
-# don't work (single dollar)
-$echo "password" | sudo -S ls /root
+# single dollar
+$sudo -p "" -S <<< "password" ls /root
+```
 
-# do work (two-dollars)
-$$echo "password" | sudo -S ls /root
+## sudo works with shell
 
-# do work (with-dollar)
+Examples of running sudo commands with two-dollars or with-dollar:
+
+```
+# two-dollars
+$$echo "password" | sudo -p "" -S ls /root
+
+# with-dollar
 with $ as console:
     console.sendline('sudo -S whoami')
     console.sendline('password')
