@@ -51,7 +51,8 @@ That's the situation of sudo execution. You can omit those ANSI characters by th
 $$echo "password" | sudo -p "" -S systemctl list-timers --all
 
 ## this would not output ANSI control characters
-$$echo "password" | sudo -p "" -S systemctl list-timers --all | sed -e 's/\x1b\[[0-9;]*m//g'
+## command => sed -e 's/\x1b\[[0-9;]*m//g'
+$$echo "passwd" | sudo -S systemctl list-timers| sed -e 's/\\x1b\\[[0-9;]*m//g'
 ```
 
 [REF: https://superuser.com/questions/380772/removing-ansi-color-codes-from-text-stream](https://superuser.com/questions/380772/removing-ansi-color-codes-from-text-stream)
