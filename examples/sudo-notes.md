@@ -13,7 +13,7 @@ $sudo -p "" -S <<< "password" ls /root
 ```
 This format "<<<" works on localhost only, if you want to use it, you have to use two-dollars on localhost.
 
-## sudo works with shell (two-dollars and with-dollars)
+## with shell (two-dollars and with-dollars)
 
 Examples of running sudo commands with two-dollars or with-dollar:
 
