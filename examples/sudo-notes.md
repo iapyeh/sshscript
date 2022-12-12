@@ -7,7 +7,8 @@
 Examples of running sudo commands with one-dollar
 
 ```
-# single dollar
+# single dollar (works on paramiko, not subprocess)
+$.connect('user@host')
 $sudo -p "" -S <<< "password" ls /root
 ```
 
