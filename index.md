@@ -26,9 +26,7 @@
 
 ## Introduction
 
-System automation is a process of realizing management logics by repeating networking and execution. SSHScript makes Python an easy tool for creating system automation processes. With syntax sugar of SSHScript, writing python scripts to execute commands on local host or remote hosts is easy. 
-
-You just need to embed commands and networking in python scripts. SSHScript would execute them and let you handle outputs all in Python. You need not to know programming about the subprocess module and Paramiko(ssh).
+System automation is the process of using computer software to automatically perform routine or repetitive tasks. SSHScript is a tool that makes it easy to use Python for system automation by providing a simple syntax for executing commands on local or remote hosts. With SSHScript, you can embed commands and networking in your Python scripts, and SSHScript will handle the execution and output, so you don't need to have expertise in the subprocess module or Paramiko (ssh) to use it.
 
 Below is an example. It makes an ssh connection to the host1, then from the host1 makes a connection to the host2. Then It executes “netstat -antu” on the host2.
 
@@ -138,13 +136,19 @@ pip install sshscript==1.1.17
 
 ## Why and Features
 
-The idea is that many automation tasks are running commands and dealing with outputs on localhost and remote hosts. Among these scripts, there are many common routines. Eg. making ssh connections, execution and collecting data. That's where the SSHScript comes into play. The most charming part is that you could directly process the resulting data in Python. It then enables you to efficiently build complex data structures and processing flow with object-oriented approaches.
+The idea behind SSHScript is to provide a simple and intuitive way to automate common tasks that involve running commands and dealing with outputs on local and remote hosts. SSHScript makes it easy to write scripts that can connect to remote hosts via ssh and execute commands, and it allows you to process the resulting data directly in Python. This enables you to build complex data structures and processing flows using an object-oriented approach.
 
-- Easy to script. If you know what commands to run and which host to ssh, then you can write your script. No extra stuff to learn.
-- Embedding shell commands in Python scripts are intuitive and self-explaining. It is good for teamwork and maintenance.
-- Handling execution output or exceptions with Python is easier than shell script.
-- Your scripts are powered by tons of Python packages.
-- SSHScript supports thread, aka jobs in parallel.
+Some key benefits of using SSHScript include:
+
+- Easy to use. If you know what commands to run and which host to connect to via ssh, you can write your script without having to learn any extra concepts.
+
+- Embedding shell commands in Python scripts is intuitive and self-explanatory, making it easy to collaborate and maintain your scripts.
+
+- Handling execution outputs and exceptions is easier in Python than it is in shell scripts.
+
+- Your scripts can leverage the vast ecosystem of Python packages.
+
+- SSHScript supports parallel execution of commands using threads.
 
 ![image](https://user-images.githubusercontent.com/4695577/186998717-ef372f78-daa5-4893-b9e9-2b6b8bff6114.png)
 
