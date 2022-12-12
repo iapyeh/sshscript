@@ -2,21 +2,25 @@
 
 # Some Notes about "sudo"
 
-## sudo works without shell
+## with one-dollar command (remote only)
 
 Examples of running sudo commands with one-dollar
 
 ```
-# single dollar (works on paramiko, not subprocess)
+# single dollar, works on remote (paramiko), not works on localhost(subprocess)
 $.connect('user@host')
 $sudo -p "" -S <<< "password" ls /root
 ```
+This format "<<<" works on localhost only, if you want to use it, you have to use two-dollars on localhost.
 
-## sudo works with shell
+## sudo works with shell (two-dollars and with-dollars)
 
 Examples of running sudo commands with two-dollars or with-dollar:
 
 ```
+# two-dollars 
+$$sudo -p "" -S <<< "password" ls /root
+
 # two-dollars
 $$echo "password" | sudo -p "" -S ls /root
 
