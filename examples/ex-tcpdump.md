@@ -2,7 +2,7 @@
 
 ## Scenario:
 
-A SIP server with a public IP address is always under attack. It might not be a big security problem. But they generate a large amount of logs and are quite noisy, especially when we are relying on log files for debugging. This example demonstrates how to filter out attacking IP addresses of a SIP server by watching the output of tcpdump.
+A SIP server with a public IP address is always under attack. This may not be a big problem in terms of security. However, especially if we rely on log files for debugging, they generate a large amount of logs and are quite noisy. This example shows how to filter out attack IP addresses from a SIP server by looking at the output of tcpdump.
 
 
 ## example.spy
