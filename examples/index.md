@@ -15,6 +15,7 @@
 - [ssh via proxyCommand, nested ssh with interactive ssh and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh2) 
 - [Install or upgrade python packages](https://iapyeh.github.io/sshscript/examples/install-python-package) 
 - [$.careful() usage](https://iapyeh.github.io/sshscript/examples/careful) 
+- [talk to smtp server to send mails](https://iapyeh.github.io/sshscript/examples/ex-smtptest) 
 
 ## Long Running Processes
 - [ping many hosts](https://iapyeh.github.io/sshscript/examples/ex-ping) 
