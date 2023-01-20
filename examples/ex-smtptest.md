@@ -11,7 +11,7 @@ import re, datetime
 host = 'smtp.your.domain'
 port = 25
 mailfrom = 'you@your.domain'
-mailto = 'she@your.domain'
+mailto = 'she@her.domain'
 subject = f'test at {datetime.datetime.now()}'
 
 ## uncomment the next line if you want to test on remote host.
