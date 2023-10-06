@@ -543,7 +543,6 @@ class SSHScriptSession(object):
             with open(pathOfRsaPrivate) as fd:
                 return paramiko.RSAKey.from_private_key(fd)
 
-
     @export2Dollar
     def upload(self,src,dst,makedirs=False,overwrite=True):
         """
