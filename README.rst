@@ -10,7 +10,9 @@ Technically, SSHScript is an integration of the subprocess and Paramiko. It prov
 Releases
 ========
 
-The last version is 1.1.17. (2022/9/22). Relase Notes_
+The new experimental release is 2.0.2 (2023/10/6).
+
+The last stable version is 1.1.17. (2022/9/22). Relase Notes_
 
 More
 ====
