@@ -5,36 +5,53 @@ System automation is the process of repeating network and execution operations t
 
 SSHScript is technically an integration of the subprocess and Paramiko modules, but it presents an unified interface that is more convenient and expressive for system automation tasks. It is also pure Python, which means that SSHScript scripts can be easily integrated with other Python libraries and tools.
 
-Here is an example of a simple script in SSHScript syntax:
+Here is an example of a simple script in SSHScript syntax(v2 syntax):
 
 .. code-block:: python
 
     ## filename: example.spy
     ## run: sshscript example.spy
-    stdout, stderr, exitcode = $ls -l
+    $hostname
+    ## get output by $.stdout, $.stderr and $.exitcode
+    print('localhost name is ', $.stdout.strip())
+    ## get an interactive sudo console of locahost
+    with $.sudo('password') as sudoconsole:
+        sudoconsole.exec_command('whoami')
+        assert 'root' in sudoconsole.stdout
+        sudoconsole.exec_command('ls -l $HOME')
+
+    ## connect to remote by ssh
     with $.connect('user@host', 'password):
-        stdout, stderr, exitcode = $ls -l
-
-
-Here is an example of a simple script with SSHScript module:
+        $hostname
+        ## get output by $.stdout, $.stderr and $.exitcode
+        print('remote name is ', $.stdout.strip())
+        ## get an interactive sudo console of remote host
+        with $.sudo('password') as sudoconsole:
+            sudoconsole.exec_command('whoami')
+            assert 'root' in sudoconsole.stdout
+            sudoconsole.exec_command('ls -l $HOME')
+    
+Here is an example of a simple script with SSHScript module(v2):
 
 .. code-block:: python
 
     ## filename: example.py
     ## run: python3 example.py
     import sshscript
-    # Connect to a remote host
     from sshscript import SSHScriptSession
     session = SSHScriptSession()
     # Execute a command on the local host
-    stdout, stderr, exitcode = session.exec_command('ls -l')
-    remote_session = session.connect('user@host', 'password)
-    # Execute a command on the remote host
-    stdout, stderr, exitcode = remote_session.exec_command('ls -l')
-    # Print the output of the command
-    print(stdout)
-    # Disconnect from the remote host
-    remote_session.close()
+    session.exec_command('df')
+    for line in session.stdout.split('\n'):
+        cols = line.split()
+        print(f'ussage of {cols[0]} is {cols[4]}')
+    ## connect to remote by ssh
+    with session.connect('user@host', 'password) as remote_session:
+        # Execute a command on the remote host
+        remote_session.exec_command('df')
+        for line in remote_session.stdout.split('\n'):
+            cols = line.split()
+            print(f'ussage of {cols[0]} is {cols[4]}')
 
 
 Releases
