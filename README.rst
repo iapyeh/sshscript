@@ -54,6 +54,15 @@ Here is an example of a simple script with SSHScript module(v2):
             print(f'ussage of {cols[0]} is {cols[4]}')
 
 
+SSHScript can be used to automate a wide variety of system tasks, such as:
+
+* Deploying and configuring servers
+* Managing backups and restores
+* Monitoring and troubleshooting systems
+* Automating repetitive tasks
+
+SSHScript is a powerful tool for system automation, and it is easy to use, even for those with limited programming experience.
+
 Releases
 ========
 
