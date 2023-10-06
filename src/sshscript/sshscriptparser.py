@@ -445,10 +445,8 @@ with __ret as topconsole:
                     if nodeitem.optional_vars is None:
                         nodeitem.optional_vars = ast.Name(id=self.genConsoleName(),ctx=ast.Load())
                     self.currentConsole.append(nodeitem.optional_vars.id)
-                    print('posu self.currentConsole=',self.currentConsole)
                     def callback(node):
                         self.currentConsole.pop()
-                        print('pop self.currentConsole=',self.currentConsole)
                         return node
                     node._callback_ = callback
                 ## eg.
