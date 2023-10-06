@@ -16,9 +16,11 @@
 from paramiko.common import (
     DEBUG,
 )
-import os, sys,glob
+import os
+import sys
+import glob
 import __main__
-
+import copy
 # set here used in sshscriptdollar
 import warnings
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
@@ -26,11 +28,11 @@ def warning_on_one_line(message, category, filename, lineno, file=None, line=Non
 warnings.formatwarning = warning_on_one_line
 
 try:
-    from .sshscriptcore import SSHScript
-    from .sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptCareful, setupLogger
+    from .sshscriptsession import SSHScriptSession
+    from .sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptError, setupLogger
 except ImportError:
-    from sshscriptcore import SSHScript
-    from sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptCareful, setupLogger
+    from sshscriptsession import SSHScriptSession
+    from sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptError, setupLogger
 
 
 def runFile(givenPaths,
@@ -38,14 +40,9 @@ def runFile(givenPaths,
         varLocals=None,
         showScript=False,
         showRunOrder=False,
-        unisession=True):
-    """
-    @unisession:bool, if true, use the same session(an instance of SSHScript) 
-                for all files.
-    """
-    
+        unisession=True)->int:
+    ## @unisession:bool, if true, use the same session(an instance of SSHScriptSession) for all files.
     if isinstance(givenPaths, str): givenPaths = [givenPaths]
-    
     ext = os.environ.get('SSHSCRIPT_EXT','.spy')
 
     paths = []
@@ -79,14 +76,13 @@ def runFile(givenPaths,
             paths.append(p)
 
     if showRunOrder:
-        for path in paths:
-            print(path)
-        return
+        for path in paths: print(path)
+        return 0
     
-    _locals = locals()
-    _globals = globals()
+    _locals = locals().copy()
+    _globals = globals().copy()
     if unisession:
-        session = SSHScript()
+        session = SSHScriptSession()
     else:
         session = None
     if varGlobals: _globals.update(varGlobals)
@@ -95,7 +91,7 @@ def runFile(givenPaths,
     for file in paths:
         # 每一個檔案產生一個sshscript物件
         if not unisession:
-            session = SSHScript()
+            session = SSHScriptSession()
 
         session.log(DEBUG,f'run {file}')
 
@@ -103,7 +99,7 @@ def runFile(givenPaths,
         absfile = os.path.abspath(file)
         # 有點怪，但比較能windows時也適用
         with open(absfile,'rb') as fd:
-            script = fd.read().decode('utf-8')
+            script = fd.read().decode('utf-8','replace')
 
         # add folder to sys.path,so "import <module in the same folder of __file__>" works
         scriptFolder = os.path.dirname(abspath)
@@ -114,7 +110,8 @@ def runFile(givenPaths,
 
         try:
             _locals['__file__'] = absfile
-            newglobals = session.run(script,_locals.copy(),_globals.copy(),showScript=showScript)
+            ## parse the file only if it is .spy
+            newglobals = session.run(script,_locals,_globals,showScript=showScript)
         except SSHScriptBreak as e:
             session.log(DEBUG,f'break by {e}')
             exitcode = e.code
@@ -133,16 +130,15 @@ def runFile(givenPaths,
 
             exported = newglobals.get('__export__')        
             if exported:
-                # __export__ = '*' will export all
+                ## __export__ = '*' will export all
                 if '*' == exported:
-                    #_locals.update(newlocals)
                     _globals.update(newglobals)
                 else:
                     basename = os.path.basename(file)
                     for key in exported:
                         session.log(DEBUG,f'{basename} export {key}')
-                        #_locals[key] = newlocals[key]
                         _globals[key] = newglobals[key]
+            _globals['_sshscriptstacks_'] = newglobals['_sshscriptstacks_']
         finally:
             if not unisession:    
                 session.close()
@@ -154,12 +150,10 @@ def runFile(givenPaths,
     
     return exitcode
 
-def runScript(script,varGlobals=None,varLocals=None):
-    session = SSHScript()
-    session.run(script,varGlobals,varLocals,showScript=False)
-    session.close()
-
-   
+def runScript(script,varGlobals=None,varLocals=None,showScript=False):
+    session = SSHScriptSession()
+    session.run(script,varGlobals,varLocals,showScript=showScript)
+    session.close()  
 
 def main():
     import argparse
@@ -233,10 +227,10 @@ def main():
                     if __version__ == info['version']:
                         print(f'Installed SSHScript version "{__version__}" is the most updated version.')
                     else:
-                        canupgrade = False
-                        for m,c in zip(mime,current):
-                            if int(m) < int(c):
-                                canupgrade = True
+                        canupgrade = True
+                        for i in range(3):
+                            if mime[i] > current[i]:
+                                canupgrade = False
                                 break
                         if canupgrade:
                             print(f"Installed SSHScript Version is \"{__version__}\", SSHScript has new version \"{info['version']}\".")
@@ -249,9 +243,12 @@ def main():
                             print(f"Installed SSHScript Version is \"{__version__}\"(official release is \"{info['version']}\").")
                 except:
                     pass
-            
-            import threading
-            threading.Thread(target=checkversion).start()
+
+            ## Temporary disable in v2.0
+            ## don't check version automatically, because this might be blocked, since the host
+            ## might not have internet connectivity (inside firewall)
+            #import threading
+            #threading.Thread(target=checkversion,name="sshscript-check-version").start()
 
     elif len(args.paths):
         
@@ -297,10 +294,5 @@ def main():
         print()
         parser.print_help()        
     
-
-# SSHScriptDollar need this value to work 
-# when sshscript is imported as a module (main() not been called)
-__main__.SSHScript = SSHScript
-
 if __name__ == '__main__':
     main()

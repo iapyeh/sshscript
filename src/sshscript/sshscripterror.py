@@ -20,13 +20,13 @@ class SSHScriptError(Exception):
         self.message = message
         self.code = code
     def __str__(self):
-        return f'<{self.__class__.__name__}({self.code}){self.message}>'
+        return f'<{self.__class__.__name__}#{self.code}>\n{self.message}>'
 class SSHScriptBreak(SSHScriptError):
     pass
 class SSHScriptExit(SSHScriptError):
     pass
-class SSHScriptCareful(SSHScriptError):
-    pass
+
+## SSHScriptCareful is deprecated, SSHScriptError instead.
 
 import paramiko
 import logging
@@ -36,15 +36,8 @@ from paramiko.common import (
 )
 
 global logger
-# default logger
+## default logger
 logger = paramiko.util.get_logger('sshscript')
-def getLogger():
-    global logger
-    return logger
-
-def setLogger(_logger):
-    global logger
-    logger = _logger
 
 def setupLogger(_logger=None):
     global logger
@@ -59,5 +52,10 @@ def setupLogger(_logger=None):
             logger.addHandler(handler)
             logger.log(DEBUG,'sys.stdout added to logger')
     else:
-        setLogger(_logger)
+        #setLogger(_logger)
+        logger = _logger
+    return logger
+
+def getLogger():
+    global logger
     return logger
