@@ -5,18 +5,23 @@ System automation is the process of repeating network and execution operations t
 
 SSHScript is technically an integration of the subprocess and Paramiko modules, but it presents an unified interface that is more convenient and expressive for system automation tasks. It is also pure Python, which means that SSHScript scripts can be easily integrated with other Python libraries and tools.
 
-Here is an example of a simple SSHScript:
+Here is an example of a simple script in SSHScript syntax:
 
 .. code-block:: python
   :linenos:
+
 ## filename: example.spy
 ## run: sshscript example.spy
 stdout, stderr, exitcode = $ls -l
 with $.connect('user@host', 'password):
     stdout, stderr, exitcode = $ls -l
 
+
+Here is an example of a simple script with SSHScript module:
+
 .. code-block:: python
   :linenos:
+
 ## filename: example.py
 ## run: python3 example.py
 import sshscript
