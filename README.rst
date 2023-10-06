@@ -8,35 +8,35 @@ SSHScript is technically an integration of the subprocess and Paramiko modules, 
 Here is an example of a simple script in SSHScript syntax:
 
 .. code-block:: python
-  :linenos:
+    :linenos:
 
-## filename: example.spy
-## run: sshscript example.spy
-stdout, stderr, exitcode = $ls -l
-with $.connect('user@host', 'password):
+    ## filename: example.spy
+    ## run: sshscript example.spy
     stdout, stderr, exitcode = $ls -l
+    with $.connect('user@host', 'password):
+        stdout, stderr, exitcode = $ls -l
 
 
 Here is an example of a simple script with SSHScript module:
 
 .. code-block:: python
-  :linenos:
+    :linenos:
 
-## filename: example.py
-## run: python3 example.py
-import sshscript
-# Connect to a remote host
-from sshscript import SSHScriptSession
-session = SSHScriptSession()
-# Execute a command on the local host
-stdout, stderr, exitcode = session.exec_command('ls -l')
-remote_session = session.connect('user@host', 'password)
-# Execute a command on the remote host
-stdout, stderr, exitcode = remote_session.exec_command('ls -l')
-# Print the output of the command
-print(stdout)
-# Disconnect from the remote host
-remote_session.close()
+    ## filename: example.py
+    ## run: python3 example.py
+    import sshscript
+    # Connect to a remote host
+    from sshscript import SSHScriptSession
+    session = SSHScriptSession()
+    # Execute a command on the local host
+    stdout, stderr, exitcode = session.exec_command('ls -l')
+    remote_session = session.connect('user@host', 'password)
+    # Execute a command on the remote host
+    stdout, stderr, exitcode = remote_session.exec_command('ls -l')
+    # Print the output of the command
+    print(stdout)
+    # Disconnect from the remote host
+    remote_session.close()
 
 
 Releases
