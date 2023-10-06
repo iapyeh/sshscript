@@ -8,7 +8,6 @@ SSHScript is technically an integration of the subprocess and Paramiko modules, 
 Here is an example of a simple script in SSHScript syntax:
 
 .. code-block:: python
-    :linenos:
 
     ## filename: example.spy
     ## run: sshscript example.spy
@@ -20,7 +19,6 @@ Here is an example of a simple script in SSHScript syntax:
 Here is an example of a simple script with SSHScript module:
 
 .. code-block:: python
-    :linenos:
 
     ## filename: example.py
     ## run: python3 example.py
