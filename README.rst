@@ -1,16 +1,43 @@
     
 SSHScript
 #########
-System automation is a process of realizing management logics by repeating networking and execution. SSHScript makes Python an easy tool for creating system automation processes. With syntax sugar of SSHScript, writing python scripts to execute commands on local host or remote hosts is easy.
+System automation is the process of repeating network and execution operations to achieve desired results. SSHScript is a Python library that makes it easy to create system automation processes. It provides a simple and intuitive interface for executing commands on local and remote hosts, without requiring any knowledge of the subprocess module or Paramiko (SSH).
 
-You just need to embed commands and networking in python scripts. SSHScript would execute them and let you handle outputs all in Python. You need not know programming about the subprocess module and Paramiko(ssh).
+SSHScript is technically an integration of the subprocess and Paramiko modules, but it presents an unified interface that is more convenient and expressive for system automation tasks. It is also pure Python, which means that SSHScript scripts can be easily integrated with other Python libraries and tools.
 
-Technically, SSHScript is an integration of the subprocess and Paramiko. It provides an unique interface to invoke commands on local host and remote hosts. It could perform the same functionality as a shell script. But it is pure Python.
+Here is an example of a simple SSHScript:
+
+.. code-block:: python
+  :linenos:
+## filename: example.spy
+## run: sshscript example.spy
+stdout, stderr, exitcode = $ls -l
+with $.connect('user@host', 'password):
+    stdout, stderr, exitcode = $ls -l
+
+.. code-block:: python
+  :linenos:
+## filename: example.py
+## run: python3 example.py
+import sshscript
+# Connect to a remote host
+from sshscript import SSHScriptSession
+session = SSHScriptSession()
+# Execute a command on the local host
+stdout, stderr, exitcode = session.exec_command('ls -l')
+remote_session = session.connect('user@host', 'password)
+# Execute a command on the remote host
+stdout, stderr, exitcode = remote_session.exec_command('ls -l')
+# Print the output of the command
+print(stdout)
+# Disconnect from the remote host
+remote_session.close()
+
 
 Releases
 ========
 
-The new experimental release is 2.0.2 (2023/10/6).
+The new experimental release is 2.0.2 (2023/10/6). There are lots of changes, but documentation is not available yet.
 
 The last stable version is 1.1.17. (2022/9/22). Relase Notes_
 
