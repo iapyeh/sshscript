@@ -88,6 +88,8 @@ class SSHScriptDollar(object):
         self.cp = None # got value if run by subprocess and inWith
         self._stdout = lambda: ""
         self._stderr = lambda: ""
+        self._rawstdout = lambda: ""
+        self._rawstderr = lambda: ""
         self.stdin = None
         self.exitcode = None
         self.inWith = inWith
@@ -107,6 +109,13 @@ class SSHScriptDollar(object):
     @property
     def stderr(self):
         return self._stderr()
+
+    @property
+    def rawstdout(self):
+        return self._rawstdout()
+    @property
+    def rawstderr(self):
+        return self._rawstderr()
 
     @property
     def waitingInterval(self):
@@ -436,7 +445,6 @@ class SSHScriptDollar(object):
                 self.channel.updateStdoutStderr('not self.inWith')
                 ## this would assign value of self.exitcode
                 self.channel.close()
-                print('^' * 100,self.exitcode)
                 error = self.checkExitcode(self.exitcode,self.channel.stderr)
                 if error: raise error
         else:

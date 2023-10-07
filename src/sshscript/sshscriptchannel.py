@@ -189,11 +189,16 @@ class WithChannelWrapper(GenericConsole):
     @property
     def stdout(self):
         return self.channel._exitcodePatternForClean.sub(r'\1',self.channel.stdout)
-        #return self.channel.stdout
     @property
     def stderr(self):
         return self.channel._exitcodePatternForClean.sub(r'\1',self.channel.stderr)
-        #return self.channel.stderr
+    @property
+    def rawstdout(self):
+        return self.channel.rawstdoutForOwner()
+    @property
+    def rawstderr(self):
+        return self.channel.rawstderrForOwner()
+    
     def trim(self,text):
         return self.channel.trim(text)
 
@@ -248,6 +253,8 @@ class GenericChannel(object):
         ## assign owner's stdout and stderr
         self.owner._stdout = self.stdoutForOwner
         self.owner._stderr = self.stderrForOwner
+        self.owner._rawstdout = self.rawstdoutForOwner
+        self.owner._rawstderr = self.rawstderrForOwner
         self.shellToRun = self.owner.shellToRun
         self.stdoutDumpBuf = []
         self.stderrDumpBuf = []
@@ -517,6 +524,13 @@ class GenericChannel(object):
     def stderrForOwner(self):
         ## because we no more setup prompt, to strip out prompt is not necessary
         return (self._exitcodePatternForClean.sub(r'\1',self.trim((b''.join(self.allStderrBuf)).decode('utf8','replace'))))
+    def rawstdoutForOwner(self):
+        ## because we no more setup prompt, to strip out prompt is not necessary
+        return (b''.join(self.allStdoutBuf))
+    def rawstderrForOwner(self):
+        ## because we no more setup prompt, to strip out prompt is not necessary
+        return (b''.join(self.allStderrBuf))
+
     def trimedStdoutForOwner(self):
         ## because we no more setup prompt, to strip out prompt is not necessary
         return self.trim((b''.join(self.allStdoutBuf)).decode('utf8','replace'))
@@ -752,7 +766,6 @@ class GenericChannel(object):
             if idx > 0 : self.wait(self.waitingInterval,30)
             '''
             self.send(line+newline)
-            
             if idx < len(lines) - 1:
                 ## not the last one
                 self.waitCommandToComplete(outputTimeout,waitPrompt)
@@ -855,8 +868,9 @@ class GenericChannel(object):
         if lines is not None:
             if self.stderrListener:
                 self.stderrListener(2,[x+bNewline for x in lines])
-            sys.stderr.buffer.write(bNewline.join([self.stderrPrefix + x  for x in lines])+bNewline)
-            sys.stderr.buffer.flush()
+            if self.dump2sys:
+                sys.stderr.buffer.write(bNewline.join([self.stderrPrefix + x  for x in lines])+bNewline)
+                sys.stderr.buffer.flush()
     def close(self):
         ## dump the last content in stdoutDumpBuf and stderrDumpBuf
         ## No need to call self.updateStdoutStderr()
@@ -927,10 +941,10 @@ class POpenChannel(GenericChannel):
                 def _reading():
                     buffer = {
                         self.masterFd[0]: self.addStdoutData,  #stdout
-                        #self.masterFd[1]: self.addStderrData  #stderr
+                        self.masterFd[1]: self.addStderrData  #stderr
                     }
-                    if len(self.masterFd) == 2:
-                        buffer[self.masterFd[1]]= self.addStderrData
+                    #if len(self.masterFd) == 2:
+                    #    buffer[self.masterFd[1]]= self.addStderrData
                     #while (not self.closed) and buffer:
                     while (self.cp.poll() is None):
                         try:
@@ -976,8 +990,10 @@ class POpenChannel(GenericChannel):
         return self.owner.commandTimeout
     
     def send(self,s):
-        self.log(DEBUG,f'{threading.current_thread().native_id} send:{[s]}')
+        ## disable, sensitive data might be shown
+        #self.log(DEBUG,f'{threading.current_thread().native_id} send:{[s]}')
         os.write(self.stdin,s.encode('utf-8'))
+        ## this would crashed in linux for pty 
         #os.fsync(self.stdin)
     
     def close(self):

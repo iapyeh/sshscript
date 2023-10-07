@@ -82,7 +82,7 @@ SSHScript is a powerful tool for system automation, and it is easy to use, even 
 Releases
 ========
 
-The new experimental release is 2.0.2 (2023/10/6). There are lots of changes, but documentation is not available yet.
+The new experimental release is 2.0.2 (2023/10/6). There are lots of changes, but documentation is on working.
 
 The last stable version is 1.1.17. (2022/9/22). Relase Notes_
 
