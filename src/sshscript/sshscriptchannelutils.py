@@ -42,30 +42,25 @@ class Prompt(object):
         timeout = 3
         if self.pattern is None:
             ## failover to channel's default wait() method
-            logger.debug(f'****** ****** ******1 prompt {self} failover to wait()')
             self.channel.wait(outputTimeout)
         elif self._type == 1:
             try:
                 m = self.channel.expect(self.pattern,timeout=timeout,stdout=True,stderr=False,position=self.position)
             except TimeoutError:
-                logger.debug(f'****** ****** ****** prompt {self} not matched')
                 logger.debug(f'stdout={self.channel.stdout}')
                 raise
             else:
                 self.position += m.end() + 1
-                logger.debug(f'****** ****** ******2 prompt {self} matched')
                 ## ensure all data has been received
                 self.channel.wait(0.1)
         elif self._type == 2:
             try:
                 m = self.channel.expect(self.pattern,timeout=timeout,stdout=False,stderr=True,position=self.position)
             except TimeoutError:
-                logger.debug(f'****** ****** ****** prompt {self} not matched')
                 logger.debug(f'stderr={self.channel.stderr}')
                 raise
             else:
                 self.position += m.end() + 1
-                logger.debug(f'****** ****** ******3 prompt {self} matched')
                 ## ensure all data has been received
                 self.channel.wait(0.1)
         else:
@@ -77,7 +72,7 @@ class Prompt(object):
         self.keyword = keyword
         if stdout: self.type = 1
         elif stderr: self.type = 2
-        logger.debug(f'** __call__ set prompt to "{self}" ({stdout},{stderr})')
+        logger.debug(f'__call__ set prompt to "{self}" ({stdout},{stderr})')
     @property
     def keyword(self):
         return self._keyword

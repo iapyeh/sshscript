@@ -764,7 +764,6 @@ class SSHScriptSession(object):
                 digits = len(str(len(lines)+1))
                 for line in lines:
                     self.lineNumberCount += 1
-                    #print(f'{str(self.lineNumberCount).zfill(digits)}:{line}')
                     print(f'{line}')
                 print()
                 return {}
