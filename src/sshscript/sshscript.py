@@ -184,20 +184,24 @@ def main():
     parser.add_argument(dest='paths', action='store', nargs='*',
                         help='path of .spy files or folders')
 
-    # new on v1.1.13
+    ## new on v1.1.13
     parser.add_argument('--folder', dest='folder', action='store',default='',
                         help='base folder of paths')
 
-    # new on v1.1.17
+    ## new on v1.1.17
     parser.add_argument('--version', dest='version', action='store_true',default=False,
                         help='dump the version number')
+
+    ## new on v2.0.2
+    parser.add_argument('--check-version', dest='checkversion', action='store_true',default=False,
+                        help='check the last version of SSHScript (need internet)')
 
     args, unknown = parser.parse_known_args()
     __main__.unknown_args = unknown
 
     os.environ['SSHSCRIPT_EXT'] = args.sshscriptExt
 
-    if (args.version):
+    def get_current_version():
         try:
             from __init__ import __version__
         except ImportError:
@@ -205,50 +209,33 @@ def main():
                 from . import __version__
             except ImportError:
                 __version__ = 'unknown'
-        print(__version__)
+        return __version__
 
-        if sys.stdout.isatty():       
-            # check new version, new from 1.1.13
-            try:
-                from __init__ import __version__
-            except ImportError:
-                try:
-                    from . import __version__
-                except ImportError:
-                    __version__ = 'unknown'
+    if (args.version):
 
-            def checkversion():
-                try:
-                    import urllib.request
-                    import json
-                    info = json.loads(urllib.request.urlopen("https://iapyeh.github.io/sshscript/info.json",timeout=3).read())
-                    mime = [x for x in __version__.split('.')]
-                    current = [x for x in info['version'].split('.')]
-                    if __version__ == info['version']:
-                        print(f'Installed SSHScript version "{__version__}" is the most updated version.')
-                    else:
-                        canupgrade = True
-                        for i in range(3):
-                            if mime[i] > current[i]:
-                                canupgrade = False
-                                break
-                        if canupgrade:
-                            print(f"Installed SSHScript Version is \"{__version__}\", SSHScript has new version \"{info['version']}\".")
-                            print("  You can upgrade it by: (choose one)")
-                            print(f"  1.  pip install sshscript --upgrade")
-                            print(f"  2.  pip install sshscript=={info['version']} --upgrade")
-                            print(f"  3.  {sys.executable} -m pip install sshscript --upgrade")
-                            print(f"  4.  {sys.executable} -m pip install sshscript=={info['version']} --upgrade")
-                        else:
-                            print(f"Installed SSHScript Version is \"{__version__}\"(official release is \"{info['version']}\").")
-                except:
-                    pass
+        print(get_current_version())
 
-            ## Temporary disable in v2.0
-            ## don't check version automatically, because this might be blocked, since the host
-            ## might not have internet connectivity (inside firewall)
-            #import threading
-            #threading.Thread(target=checkversion,name="sshscript-check-version").start()
+    elif (args.checkversion):
+        __version__ = get_current_version()
+        import urllib.request
+        import json
+        info = json.loads(urllib.request.urlopen("https://iapyeh.github.io/sshscript/info.json",timeout=3).read())
+        mime = [x for x in __version__.split('.')]
+        current = [x for x in info['version'].split('.')]
+        print(f'The latest release of SSHScript is {info["version"]}, you have version {__version__} installed.')
+        if not __version__ == info['version']:
+            canupgrade = True
+            for i in range(3):
+                if mime[i] > current[i]:
+                    canupgrade = False
+                    break
+            if canupgrade:
+                print(f"Installed SSHScript Version is \"{__version__}\", SSHScript has new version \"{info['version']}\".")
+                print("  You can upgrade it by: (choose one)")
+                print(f"  1.  pip install sshscript --upgrade")
+                print(f"  2.  pip install sshscript=={info['version']} --upgrade")
+                print(f"  3.  {sys.executable} -m pip install sshscript --upgrade")
+                print(f"  4.  {sys.executable} -m pip install sshscript=={info['version']} --upgrade")
 
     elif len(args.paths):
         
