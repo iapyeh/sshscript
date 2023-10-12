@@ -52,11 +52,9 @@ https://regex101.com/
 DEBUG = 0
 import os
 import copy
-import sys
 import re
 import ast
 import hashlib
-import time
 import traceback
 try:
     ast.unparse
@@ -70,10 +68,9 @@ except AttributeError:
         setattr(ast,'unparse', astunparse.unparse)
 
 try:
-    from .sshscripterror import  getLogger
+    from .sshscripterror import  logDebug8, logDebug
 except ImportError:
-    from sshscripterror import getLogger
-logger = getLogger()
+    from sshscripterror import logDebug8, logDebug
 
 if DEBUG:
     def dumpToLines(script,title='',linesep='='):
@@ -90,6 +87,8 @@ try:
     from sshscriptdollar import SSHScriptDollar, pstd, pstdSub
 except ImportError:
     from .sshscriptdollar import SSHScriptDollar, pstd, pstdSub
+
+import __main__
 
 def stripLeadingSpace(script):
     nonemptyline = ''
@@ -330,6 +329,7 @@ with __ret as topconsole:
     tmplLinesBlowDef = ast.parse("_sshscriptstack_ = sys._getframe(1).f_locals.get('_sshscriptstack_') or threading.current_thread().sshscriptstack").body[0]
     tmplLineAfterDef = ast.parse('_sshscriptstack_()').body[0]
     tmplLineAssignAtBottom = ast.parse('a=_c.stdout, _c.stderr, _c.exitcode').body[0]
+    tmplLineAssignStdoutAtBottom = ast.parse('a=_c.stdout').body[0]
     def __init__(self):
         super().__init__()
         self.insideWith = [False]
@@ -395,7 +395,6 @@ with __ret as topconsole:
 
             ## add initial value into self.containsSSHScriptStack for this scope
             self.containsSSHScriptStack.append(False)
-
 
         ## check should we set self.containsSSHScript to True
         if isinstance(node, ast.Call) and \
@@ -465,7 +464,8 @@ with __ret as topconsole:
                         for value in command.values:
                             if isinstance(value,ast.Constant):
                                 ## restore "$." in f-string if it does not in {} for evaluation
-                                value.value = value.value.replace('DOLLARDOT.','$.')
+                                ## since this value would put into a f-string again, so we need to escape the escape again
+                                value.value = value.value.replace('DOLLARDOT.','$.').replace('\\','\\\\')
                             elif isinstance(value,ast.FormattedValue):
                                 ## restore and convert "$." in f-string if it is in {} for evaluation
                                 walkAndConvert(value.value)
@@ -530,12 +530,12 @@ with __ret as topconsole:
                     ## with $.connect():
                     ##     $.connect() <- won't translate correctly if wihtout this iteration
                     ##     $.close()   <- won't translate correctly if wihtout this iteration
-                    if 0:
-                        ##  disabled, it seems to be work also
-                        self.insideWith.append(False)
-                        for item in node.body:
-                            self.generic_visit(item)
-                        self.insideWith.pop()
+                    #if 0:
+                    #    ##  disabled, it seems that this is not necessary
+                    #    self.insideWith.append(False)
+                    #    for item in node.body:
+                    #        self.generic_visit(item)
+                    #    self.insideWith.pop()
                     
                     #node.body.insert(0, nodeToInsert0)
                     #node.body.append(copy.deepcopy(self.tmplLineAfterWithConnect))
@@ -698,7 +698,8 @@ with __ret as topconsole:
             else:
                 if len(self.currentConsole) :
                     node.value.id = self.currentConsole[-1]
-                elif node.attr in SSHScriptDollar.exportedProperties:
+                    #elif node.attr in SSHScriptDollar.exportedProperties:
+                elif node.attr in __main__.SSHScriptDollarExportedNames:
                     ## eg. _c.stdout, _c.stderr,_c.exitcode keep _c, do not change to _sshscriptstack_[-1]
                     pass
                 else:
@@ -717,13 +718,34 @@ with __ret as topconsole:
                         if isinstance(node.args[0],ast.Constant):
                             node.args[0].value = node.args[0].value.strip()
                         ## eg. $f'{command}'
+                        elif isinstance(node.args[0],ast.JoinedStr):
+                            for value in node.args[0].values:
+                                if isinstance(value,ast.Constant):
+                                    ## restore "$." in f-string if it does not in {} for evaluation
+                                    ## since this value would put into a f-string again, so we need to escape the escape again
+                                    value.value = value.value.replace('DOLLARDOT.','$.').replace('\\','\\\\')
+                                elif isinstance(value,ast.FormattedValue):
+                                    ## restore and convert "$." in f-string if it is in {} for evaluation
+                                    walkAndConvert(value.value)
                         else:
-                            pass
+                            raise ValueError(f'unexpected node:{ast.dump(node.args[0])}')
                     elif node.func.id=='twodollars': 
                         node.func = ast.Attribute(value=ast.Name(id=consolename,ctx=ast.Load()),attr='sendline')
                         del node.args[1:]
                         if isinstance(node.args[0],ast.Constant):
                             node.args[0].value = node.args[0].value.strip()
+                        ## eg. $f'{command}'
+                        elif isinstance(node.args[0],ast.JoinedStr):
+                            for value in node.args[0].values:
+                                if isinstance(value,ast.Constant):
+                                    ## restore "$." in f-string if it does not in {} for evaluation
+                                    ## since this value would put into a f-string again, so we need to escape the escape again
+                                    value.value = value.value.replace('DOLLARDOT.','$.').replace('\\','\\\\')
+                                elif isinstance(value,ast.FormattedValue):
+                                    ## restore and convert "$." in f-string if it is in {} for evaluation
+                                    walkAndConvert(value.value)
+                        else:
+                            raise ValueError(f'unexpected node:{ast.dump(node.args[0])}')
                 else:
                     inwith = False
                     withshell = False
@@ -743,13 +765,14 @@ with __ret as topconsole:
                         raw = node.args[1].value
                         if isinstance( command,ast.JoinedStr):
                             for value in command.values:
-                            
                                 if isinstance(value,ast.Constant):
                                     ## restore "$." in f-string if it does not in {} for evaluation
-                                    value.value = value.value.replace('DOLLARDOT.','$.')
+                                    ## since this value would put into a f-string again, so we need to escape the escape again
+                                    value.value = value.value.replace('DOLLARDOT.','$.').replace('\\','\\\\')
                                 elif isinstance(value,ast.FormattedValue):
                                     ## restore and convert "$." in f-string if it is in {} for evaluation
                                     walkAndConvert(value.value)
+                            
                             newnode.body[0].value = command
                             fr = 1
                         elif isinstance(command,ast.Constant):
@@ -814,7 +837,10 @@ with __ret as topconsole:
             else:
                 ## upgrade "try" block one level
                 newnode = originNode.value  
+                ## this is stdout,stderr,exitcode = $hostname
                 originNode.value = copy.deepcopy(self.tmplLineAssignAtBottom).value
+                ## disabled, this is stdout = $hostname
+                #originNode.value = copy.deepcopy(self.tmplLineAssignStdoutAtBottom).value
                 ## append original assignment to last statement
                 newnode.finalbody.append(originNode)
 

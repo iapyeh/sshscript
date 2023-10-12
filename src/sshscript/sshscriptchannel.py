@@ -14,8 +14,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 import __main__
-from gc import DEBUG_SAVEALL
-#from queue import Empty, SimpleQueue
 import threading, os, sys, re
 import paramiko
 from logging import DEBUG
@@ -23,16 +21,14 @@ import time
 import subprocess
 from select import select
 import errno
-import random
+import traceback
 #import asyncio
 try:
-    from .sshscripterror import  getLogger
+    from .sshscripterror import  logDebug, logDebug8
     from .sshscriptchannelutils import Prompt, InnerConsoleSu, InnerConsoleSudo,GenericConsole,EnterConsole ,IterableEnterConsole,InnerConsoleWithDollar
 except ImportError:
-    from sshscripterror import  getLogger
+    from sshscripterror import  logDebug, logDebug8
     from sshscriptchannelutils import Prompt, InnerConsoleSu, InnerConsoleSudo,GenericConsole,EnterConsole,IterableEnterConsole,InnerConsoleWithDollar
-
-logger = getLogger()
 
 ##https://stackoverflow.com/questions/34504970/non-blocking-read-on-os-pipe-on-windows
 if sys.platform == 'win32':
@@ -67,18 +63,57 @@ class WithChannelWrapper(GenericConsole):
         assert isinstance(channel,GenericChannel)
         self.channel = channel
         self.returnObjectWhenEnter = self
+
+    @property
+    def waitingInterval(self):
+        return self.channel.waitingInterval
+
+    @property
+    def prompt(self):
+        ## self.prompt would be updated by the channel
+        return self.channel.prompt
+    
+    ## propably only needed by $.enter('python')
+    @prompt.setter
+    def prompt(self,keywoard):
+        self.channel.prompt = keywoard
+        logDebug8(f'** set prompt to "{self.channel.prompt}"')
+
+    @property
+    def exitcode(self):
+        return self.channel.exitcode
+
+    @property
+    def stdout(self):
+        return self.channel._exitcodePatternForClean.sub(r'\1',self.channel.stdout)
+    @property
+    def stderr(self):
+        return self.channel._exitcodePatternForClean.sub(r'\1',self.channel.stderr)
+    @property
+    def rawstdout(self):
+        return self.channel.rawstdoutForOwner()
+    @property
+    def rawstderr(self):
+        return self.channel.rawstderrForOwner()
+
+    @property
+    def closed(self):
+        return self.channel.closed
+
     def send(self,s):
         return self.channel.send(s)
+
     def input(self,s):
         return self.channel.send(s+'\n')
+
     def sendline(self,s,timeout=None,stderr=None,stdout=None,prompt=None):
-        # prompt:bool,  enable "prompt-method" to recognize the end of a command execution
-        #        if this is False and prompt is not been figuring out, use "timeout"
-        # timeout:int,  wait output untill timeout seconds, default to OUTPUT_TIMEOUT and 
-        #         SSH_OUTPUT_TIMEOUT ,  it is 0.5seconds (previous CMD_INTERVAL, SSH_OUTPUT_TIMEOUT).
-        #         If timeout is 0, prompt is automatically False. which means waiting infinitely.
-        # stdout:
-        # stderr:  
+        ## prompt:bool,  enable "prompt-method" to recognize the end of a command execution
+        ##        if this is False and prompt is not been figuring out, use "timeout"
+        ## timeout:int,  wait output untill timeout seconds, default to OUTPUT_TIMEOUT and 
+        ##         SSH_OUTPUT_TIMEOUT ,  it is 0.5seconds (previous CMD_INTERVAL, SSH_OUTPUT_TIMEOUT).
+        ##         If timeout is 0, prompt is automatically False. which means waiting infinitely.
+        ## stdout:
+        ## stderr:  
         ## convert stdout and stderr arguments to the outputType argument
         if stderr is None and stdout is None:
             if timeout == 0:
@@ -99,18 +134,26 @@ class WithChannelWrapper(GenericConsole):
     ## alias for sendline
     __call__ = sendline
     exec_command = sendline
+    ## alias, for compatibility with sshscriptsession
+    onedollar = sendline
+    twodollars = sendline
 
     def expect(self,rawpat,timeout=60,stdout=True,stderr=True,position=0,silent=False):
         return self.channel.expect(rawpat,timeout,stdout,stderr,position,silent)
+
     def expectStderr(self,rawpat,timeout=60,position=0,silent=False):
         return self.channel.expect(rawpat,timeout,False,True,position,silent)
+
     def expectStdout(self,rawpat,timeout=60,position=0,silent=False):
         return self.channel.expect(rawpat,timeout,True,False,position,silent)
+
     def wait(self,seconds=None,timeout=0):
         return self.channel.wait(seconds,timeout)
+
     def send_signal(self,s):
         ## wrap to popen (only work in subprocess)
         return self.channel.cp.send_signal(s)
+
     ## v2.0 
     def environ(self,key=None,value=None,**kw):
         ## Experimental, wrap to paramiko channel update_environment()
@@ -122,42 +165,31 @@ class WithChannelWrapper(GenericConsole):
         self.channel.channel.update_environment(kw)
     ## v2.0 disabled 
     #def lines(self,timeout=None,dataType=None):
-    #    return WithChannelWrapperLines(self)(timeout,dataType)
     #def ctrlC(self):
-    #    ## close the current process in channel
-    #    self.channel.sendlineLock.release()
-    #    self.channel.send(chr(3)+'\n')
     #def shutdown(self):
-    #    ## directly close this channel(? why)
-    #    if self.channel.owner.sshscript.host:
-    #        self.channel.channel.shutdown(2)
-    #        self.channel.channel.close()
-    #    else:
-    #        self.channel.cp.kill()
-    # alias
     #kill = shutdown
     
-
     ## v2.0
     def sudo(self,password=None,expect=None,failureExpect=None,initials=None):
         return InnerConsoleSudo(self,password,expect=expect,failureExpect=failureExpect,initials=initials)
+
     ## v2.0
     def su(self,username,password=None,expect=None,failureExpect=None,initials=None):
         return InnerConsoleSu(self,username,password,expect=expect,failureExpect=failureExpect,initials=initials)
+
     ## v2.0
     def enter(self,command,expect=None,input=None,exit=None,prompt=None):
         return EnterConsole(self,command,expect,input,exit,prompt)
+
     ## v2.0 
     def iterate(self,command,stdout=None,stderr=None,exit=None):
         return IterableEnterConsole(self,command,stdout,stderr,exit)
+
     ## v2.0 
     ## experimental for fish, but not locky, it always complains
     ## No TTY for interactive shell (tcgetpgrp failed), and setpgid: Inappropriate ioctl for device
-    def shell(self,command):
+    def shell(self,command=None):
         return InnerConsoleWithDollar(self,command)
-    ## alias, for compatibility with sshscriptsession
-    onedollar = sendline
-    twodollars = sendline
     ## eg: with session.withdollar() as newsession:
     ##          with newsession.withdollar() as newnewsession: <-- custome style
     ##          with newsession.shell() as newnewsession:      <-- technically should be this
@@ -166,65 +198,31 @@ class WithChannelWrapper(GenericConsole):
     ## v2.0
     def getPrompt(self):
         return self.channel.getPrompt()
-    @property
-    def waitingInterval(self):
-        return self.channel.waitingInterval
 
-    @property
-    def prompt(self):
-        ## self.prompt would be updated by the channel
-        return self.channel.prompt
-    
-    
-    ## propably only needed by $.enter('python')
-    @prompt.setter
-    def prompt(self,keywoard):
-        self.channel.prompt = keywoard
-        self.channel.log(DEBUG, f'** set prompt to "{self.channel.prompt}"')
-
-    @property
-    def exitcode(self):
-        return self.channel.exitcode
-
-    @property
-    def stdout(self):
-        return self.channel._exitcodePatternForClean.sub(r'\1',self.channel.stdout)
-    @property
-    def stderr(self):
-        return self.channel._exitcodePatternForClean.sub(r'\1',self.channel.stderr)
-    @property
-    def rawstdout(self):
-        return self.channel.rawstdoutForOwner()
-    @property
-    def rawstderr(self):
-        return self.channel.rawstderrForOwner()
-    
     def trim(self,text):
         return self.channel.trim(text)
 
     def log(self, level, msg, *args):
         return self.channel.log(level,msg, *args)
-    '''
+    
+    ## wrappers to sshscriptsession(only those seem to be called from a "console". eg.
+    ## with $.sudo() as console:
+    ##      $.upload() <<-- our wrappers would be called here
+    def upload(self,*args):
+        return self.channel.owner.sshscript.upload(*args)
+    def download(self,*args):
+        return self.channel.owner.sshscript.download(*args)
+    def pkey(self,*args):
+        return self.channel.owner.sshscript.pkey(*args)
+    def thread(self,*args):
+        return self.channel.owner.sshscript.thread(*args)
     @property
-    def stdout(self):
-        ## strip off the __exitcode__command and response
-        if self.channel.prompt and self.channel.prompt.keyword:
-            stdout = self.channel.trim(self.channel.stdout).replace(self.channel.prompt.keyword,'')
-        else:
-            stdout = self.channel.trim(self.channel.stdout)
-        return self.channel._exitcodePatternForClean.sub(r'\1',stdout)
+    def sftp(self):
+        return self.channel.owner.sshscript.sftp
     @property
-    def stderr(self):
-        ## strip off the __exitcode__command and response
-        if self.channel.prompt and self.channel.prompt.keyword:
-            stderr = self.channel.trim(self.channel.stderr).replace(self.channel.prompt.keyword,'')
-        else:
-            stderr = self.channel.trim(self.channel.stderr)
-        return self.channel._exitcodePatternForClean.sub(r'\1',stderr)
-    '''
-    @property
-    def closed(self):
-        return self.channel.closed
+    def logger(self):
+        self.channel.owner.sshscript.logger
+    
 
 class GenericChannel(object):
     ## ref: https://stackoverflow.com/questions/7857352/python-regex-to-match-vt100-escape-sequences
@@ -331,9 +329,9 @@ class GenericChannel(object):
                 type = 1
                 stuff = self.stdout
                 if not stuff:
-                    self.log(DEBUG, f'** no stuff to find prompt **')
+                    self.log(f'** no stuff to find prompt **')
                     return
-            self.log(DEBUG, f'searching prompt in {[stuff]}, type={[type]}.')
+            self.log8(f'searching prompt in {[stuff]}, type={[type]}.')
             p = stuff.rfind('\n')
             q = stuff.rfind('\r')
             if p == -1 and q == -1:
@@ -342,10 +340,10 @@ class GenericChannel(object):
                 pos = p if q == -1 else (q if p == -1 else max(p,q))
                 keyword = self.trim(stuff[pos+1:].strip())
             if not keyword:
-                self.log(DEBUG, f'** no keyword found for prompt **')
+                self.log8(f'** no keyword found for prompt **')
                 return
             prompt = Prompt(self,keyword,type)
-            self.log(DEBUG, f'** found prompt keyword={[keyword]}')
+            self.log8(f'** found prompt keyword={[keyword]}')
             return prompt
         self.wait(0.2)        
         self.updateStdoutStderr('getPrompt()')
@@ -388,16 +386,16 @@ class GenericChannel(object):
                     mustHasOutput = False
             if waitingInterval <= now - self._lastIOTime: break
             elif endtime and now > endtime: raise TimeoutError(f'wait exceeded {timeout}')
-        ##如果有螢幕輸出的話，幫助它順序維持正確的順序
+                
+        ## help outputs on screen in order (to do:why here?)
         sys.stdout.flush()
         sys.stderr.flush()
     def after(self,waitingInterval):
         ## Block the execution, based on the current _lastIOTime (aka sleep)
         ## regardless of updating of the _lastIOTime
         remain = waitingInterval - (time.time() - self._lastIOTime)
-        if remain > 0:
-            time.sleep(remain)
-        ##如果有螢幕輸出的話，幫助它順序維持正確的順序
+        if remain > 0: time.sleep(remain)
+        ## help outputs on screen in order (to do:why here?)
         sys.stdout.flush()
         sys.stderr.flush()
 
@@ -419,8 +417,10 @@ class GenericChannel(object):
         ## 2 Remove "__exitcode__" in output
         return self._exitcodePatternForClean.sub(r'\1',self.terminalControlCodePattern.sub('',text))
 
-    def log(self, level, msg, *args):
-        logger.log(level, self.prefixOfLog + msg, *args)
+    def log(self,msg, *args):
+        logDebug(self.prefixOfLog + msg, *args)
+    def log8(self,msg, *args):
+        logDebug8(self.prefixOfLog + msg, *args)
 
     '''
     def setupSSHScriptPrompt(self,stdout=None,stderr=None,shellToRun=None):
@@ -465,9 +465,8 @@ class GenericChannel(object):
         self._resetBuffer()
 
     def _resetBuffer(self):
-        ## 清掉 console.stdout, console.stderr的數值
-        ## 順便執行 verbose ，然後清掉verbose的stdout, stderr 的資料
-        
+        ## clean up console.stdout, console.stderr
+        ## dump to screen for verbose mode, then clean up its buffers
         self.lock(1,'_resetBuffer()')
         del self.stdoutBuf[:]
         del self.stderrBuf[:]
@@ -478,8 +477,6 @@ class GenericChannel(object):
         newline = os.linesep.encode('utf8')
         if len(self.stdoutDumpBuf):
             if self.stdoutListener:
-                ## why should we add newline at the end?
-                #self.stdoutListener(1,[b''.join(self.stdoutDumpBuf) + newline])
                 self.stdoutListener(1,[b''.join(self.stdoutDumpBuf)])
             if self.dump2sys:
                 sys.stdout.buffer.write(self.stdoutPrefix + b''.join(self.stdoutDumpBuf) + newline)
@@ -487,11 +484,10 @@ class GenericChannel(object):
             del self.stdoutDumpBuf[:]    
         if len(self.stderrDumpBuf):
             if self.stderrListener:
-                ## why should we add newline at the end?
-                #self.stderrListener(2,[b''.join(self.stderrDumpBuf) + newline])
                 self.stderrListener(2,[b''.join(self.stderrDumpBuf)])
-            sys.stderr.buffer.write(self.stderrPrefix + b''.join(self.stderrDumpBuf) + newline)
-            sys.stderr.buffer.flush()        
+            if self.dump2sys:
+                sys.stderr.buffer.write(self.stderrPrefix + b''.join(self.stderrDumpBuf) + newline)
+                sys.stderr.buffer.flush()        
             del self.stderrDumpBuf[:]
         self.lock(0)
     def lock(self, yes, reason=None):
@@ -502,11 +498,11 @@ class GenericChannel(object):
         else:
             self._lock.release() 
             self._lockReason = None
-    ## original name of this routine is recv(),commitIo()
+
     def updateStdoutStderr(self,caller=None):
         ## generate the values of console.stdout(self._stdout), console.stderr(self._stderr)
-        #self.lock.acquire() ## 確保不要在還在接收資料時做結算
         try:
+            ## ensure not to do this while receiving data
             self.lock(1, f'updateStdoutStderr({"" if caller is None else caller})')
             if self._stdoutTainted:
                 self._stdout =  b''.join(self.stdoutBuf).decode('utf8',errors='replace')
@@ -521,6 +517,7 @@ class GenericChannel(object):
     def stdoutForOwner(self):
         ## because we no more setup prompt, to strip out prompt is not necessary
         return self._exitcodePatternForClean.sub(r'\1', ((b''.join(self.allStdoutBuf)).decode('utf8','replace')))
+
     def stderrForOwner(self):
         ## because we no more setup prompt, to strip out prompt is not necessary
         return (self._exitcodePatternForClean.sub(r'\1',self.trim((b''.join(self.allStderrBuf)).decode('utf8','replace'))))
@@ -587,12 +584,13 @@ class GenericChannel(object):
                 if silent:
                     pass
                 else:
-                    self.log(DEBUG,f'expect position={[position]}')
+                    ## outputs for debugging before TimeoutError was raised
+                    self.log8(f'expect() position={[position]}')
                     for text in searchedText:
-                        self.log(DEBUG,f'expect searched={[text]}')
+                        self.log8(f'expect() searched={[text]}')
                     ret = TimeoutError(f'Not found: {rawpat}')
                 break
-            self.updateStdoutStderr('watching')
+            self.updateStdoutStderr('expect() watching')
             del searchedText[:]
             for dataSource in targets:
                 text = dataSource()
@@ -605,23 +603,22 @@ class GenericChannel(object):
                     if m:
                         ## 2023/8/14, since we now called updateStdoutStderr() when it was accessed by self.stdout or self.stderr
                         ## this might not be necessary anymore
-                        ## 再蒐集一次，這樣最後一行才會收到_stdout裡面
-                        self.updateStdoutStderr('watching end')
+                        ## call updateStdoutStderr() again to ensure all data is updated to _stdout
+                        ## 2023/10/8, To do: do we really need to call updateStdoutStderr() here?
+                        self.updateStdoutStderr('expect() watching end')
                         ## v2.0, re.pattern returned
                         ret = m
                         break
                 if ret is not None: break
-            ## 2023/8/14, since in the sendline, updateStdoutStderr() is no more been called,
-            ## this block might not be necessary anymore
-            ## 為了麼需要一直呼叫updateStdoutStderr()?
-            ## 因為此時sendline的那個updateStdoutStderr()已經結束，需要靠expect延長時間的情況下，
-            ## 協助呼叫 updateStdoutStderr()
             if ret is not None: break
             time.sleep(0.05)
         if isinstance(ret, TimeoutError):
             raise ret
         else:
-            self.updateStdoutStderr('watching end')
+            ## 2023/8/14, since in the sendline, updateStdoutStderr() is no more been called,
+            ## this block might not be necessary anymore
+            ## 2023/10/8, To do: do we really need to call updateStdoutStderr() here?
+            self.updateStdoutStderr('expect() watching end')
             return ret
 
     def __enter__(self):
@@ -683,7 +680,6 @@ class GenericChannel(object):
             self.wait(outputTimeout)       
 
     def getExitcode(self,timeout=None):
-        ## 
         self.send(f'{self._exitcodeSymbol[0]} __exitcode{self._exitcodeSno}--{self._exitcodeSymbol[1]}--\n')
         m = self.expect(self._exitcodePatternOfCode[self._exitcodeSno],timeout=timeout,silent=True)
         if m is None:
@@ -753,21 +749,12 @@ class GenericChannel(object):
         ## But updateStdoutStderr() was called after the last line (so, it does not cleanup buffers)
         self._resetBuffer()
 
-        ## for powershell 好像是這邊送\n,收會收\n,這邊送\r\n，收會收\r\n,
+        ## for powershell, send \n would get \n back; send \r\n would get \r\n back
         newline = '\n'
         for idx,line in enumerate(lines):
-            '''
-            disabled, seems not necessary
-            ## Before sending a new command, wait a while to keep "distance" from the previous command
-            ## Because we might still in receiving outputs of it.
-            ## Note: process like tcpdump would continuously outputing.
-            ##       it would block the self.wait()，so we have to give the call a timeout (30)
-            ##       But a good practice should put tcpdump only in an individual call to sendline()
-            if idx > 0 : self.wait(self.waitingInterval,30)
-            '''
             self.send(line+newline)
+            ## when this command is not the last one
             if idx < len(lines) - 1:
-                ## not the last one
                 self.waitCommandToComplete(outputTimeout,waitPrompt)
                     
         ## Here, all lines were sent
@@ -802,7 +789,6 @@ class GenericChannel(object):
 
     def addStdoutData(self,newbytes):  
         ## x: bytes
-        #print(f'<<<o:{time.time()}',newbytes)
         if not newbytes:return
         self.touchIO(1)
         lines = None
@@ -823,13 +809,16 @@ class GenericChannel(object):
             self.stdoutDumpBuf.append(newbytes)
         else:
             lines = (b''.join(self.stdoutDumpBuf)+newbytes[:p]).split(bNewline)
-            del self.stdoutDumpBuf[:]
+            #del self.stdoutDumpBuf[:]
+            #if p < len(newbytes) - 1:
+            #    self.stdoutDumpBuf.append(newbytes[p+1:])
             if p < len(newbytes) - 1:
-                self.stdoutDumpBuf.append(newbytes[p+1:])
+                del self.stdoutDumpBuf[:p+1]
+            else:
+                del self.stdoutDumpBuf[:]
         self._stdoutTainted = True
         self.lock(0)
-
-        if lines:
+        if lines is not None:
             if self.stdoutListener:
                 self.stdoutListener(1,[x+bNewline for x in lines])
             if self.dump2sys:
@@ -837,7 +826,6 @@ class GenericChannel(object):
                 sys.stdout.buffer.flush()
 
     def addStderrData(self,newbytes):
-        #print(f'<<<e:{time.time()}',newbytes)
         if not newbytes: return
         self.touchIO(2)
         lines = None
@@ -858,11 +846,16 @@ class GenericChannel(object):
             self.stderrDumpBuf.append(newbytes)
         else:
             lines = (b''.join(self.stderrDumpBuf)+newbytes[:p]).split(bNewline)
-            del self.stderrDumpBuf[:]
+            #del self.stderrDumpBuf[:]
+            #if p < len(newbytes) - 1:
+            #    ## leave residual bytes in the stderrDumpBuf
+            #    self.stderrDumpBuf.append(newbytes[p+1:])
             if p < len(newbytes) - 1:
-                ## leave residual bytes in the stderrDumpBuf
-                self.stderrDumpBuf.append(newbytes[p+1:])
-        
+                del self.stderrDumpBuf[:p+1]
+            else:
+                del self.stderrDumpBuf[:]
+
+
         self._stderrTainted = True
         self.lock(0)
         if lines is not None:
@@ -952,7 +945,7 @@ class POpenChannel(GenericChannel):
                             for fd in select(buffer, [], [],1)[0]:
                                 try:
                                     if isinstance(fd,int):
-                                        data = os.read(fd, 1024) # read available
+                                        data = os.read(fd, 512) # read available
                                     else:
                                         data = fd.read1()
                                 except OSError as e:
@@ -990,15 +983,14 @@ class POpenChannel(GenericChannel):
         return self.owner.commandTimeout
     
     def send(self,s):
-        ## disable, sensitive data might be shown
-        #self.log(DEBUG,f'{threading.current_thread().native_id} send:{[s]}')
+        self.log8(f'[subprocess] send:{[s]}')
         os.write(self.stdin,s.encode('utf-8'))
         ## this would crashed in linux for pty 
         #os.fsync(self.stdin)
     
     def close(self):
         super().close()
-        self.log(DEBUG,f'closing popen channel {self.cp}')
+        self.log8(f'closing popen channel {self.cp}')
         ## force "sendline" not to expect(self.prompt)
         self.prompt = None
         error = None
@@ -1006,7 +998,11 @@ class POpenChannel(GenericChannel):
             ## in both case of with-dollar and two-dollars
             ## send "exit" to ensure that the retcode is 0 (otherwise it will be 1)
             ## because in the sshscriptdollars.py both of them invoking a subprocess with "prompt".
-            #if self.owner.inWith: self.send('exit\n')
+            #try:
+            #    self.cp.send_signal(signal.SIGINT)
+            #except:
+            #    traceback.print_exc()
+                
             try:
                 self.send('exit\n')
             except OSError:
@@ -1014,16 +1010,23 @@ class POpenChannel(GenericChannel):
                 ## eg with $ as console:
                 ##        console('ls -l /non/existing/folder')
                 pass
+            
             timeout = self.commandTimeout 
             try:
                 self._exitcode = self.cp.wait(timeout)
             except subprocess.TimeoutExpired as e:
-                self.log(DEBUG,f'timeout({timeout}s) expired when waiting for subprocess to exit')
+                self.log(f'timeout({timeout}s) expired when waiting for subprocess to exit')
                 error = e
                 self.cp.terminate()   
                 self._exitcode = self.cp.returncode             
-            ## copy one to owner
-            self.owner.exitcode = self._exitcode 
+            if self.owner.inWith:
+                self.owner.exitcode = self._exitcode 
+            else:
+                ## for "$$" (not with-$), it's exitcode is the last command's exitcode, not the shell's exitcode
+                ## self.owner (sshscriptdollar instance) would get exitcode by itself.
+                ## that is the exitcode before calling this close() method. (see sshscriptdollar.py)
+                pass
+
             ## help to close the pty
             try:
                 os.close(self.ptyForClose[0])
@@ -1033,18 +1036,6 @@ class POpenChannel(GenericChannel):
                 ## eg with $ as console:
                 ##        console('ls -l /non/existing/folder')
                 pass
-        '''
-        if self.cp and self.owner.exitcode != 0:
-            if sys.platform == 'win32':
-                error = WinError()       # OSError
-                lasterror = GetLastError() # int
-                self.log(DEBUG,f'[subprocess][win]last error = {[lasterror]}')
-                self.log(DEBUG,f'[subprocess][win]error= {[error.errno]}')
-                self.owner.exitcode = lasterror
-            else:
-                self.log(DEBUG,f'[subprocess] error={error}')
-        '''
-        #self.log(DEBUG,f'[subprocess] exitcode={self.owner.exitcode}')
 
         
 class ParamikoChannel(GenericChannel):
@@ -1089,33 +1080,6 @@ class ParamikoChannel(GenericChannel):
             else:
                 ## twodollars, no pty support, no output, don't wait
                 pass                
-            '''
-        elif 0 and isinstance(client,paramiko.client.SSHClient):
-                ## paramiko's invoke_shell
-                self.client = client
-                ## a paramiko.Channel
-                self.channel = client._transport.open_session()
-                ## should enable pty, because without it, interactive python, mysql client won't work.
-                ## but it also produce "prompt" into stdout. that is a problem.
-                self.channel.get_pty()
-                self.channel.set_combine_stderr(False)
-                self.channel.invoke_shell()            
-                self.channel.settimeout(self.commandTimeout)
-                threading.Thread(target=_reading,name='sshscriptchannel-ssh-read1').start()
-        elif isinstance(client,paramiko.channel.Channel):
-            ## custom shell
-            self.client = None
-            self.channel = client
-            self.stdin = self.channel.makefile_stdin('wb',-1)
-            self.stdoutStream = self.channel.makefile('rb', -1)
-            self.stderrStream = self.channel.makefile_stderr('r', -1) 
-            self.channel.settimeout(self.commandTimeout)
-            threading.Thread(target=_reading,name='sshscriptchannel-ssh-read2').start()
-            self.wait(0.5,mustHasOutput=True)
-            #prompt = self.getPrompt()
-            #if prompt is not None: self._prompt = prompt
-            #print('promit=',prompt)
-            '''
         else:
             ## dummy
             self.client = None
@@ -1145,7 +1109,7 @@ class ParamikoChannel(GenericChannel):
         return self.owner.commandTimeoutSSH
 
     def send(self,s):
-        self.log(DEBUG,f'{threading.current_thread().native_id},{self.owner.sshscript.host} send:{[s]}')
+        self.log8(f'[{self.owner.sshscript.host}] send:{[s]}')
         while not self.channel.send_ready(): time.sleep(0.01)
         self.channel.sendall(s)
 
@@ -1158,7 +1122,7 @@ class ParamikoChannel(GenericChannel):
         if self.channel is None:
             pass
         else:
-            self.log(DEBUG,f'[{self.owner.sshscript.host}] closing ssh channel')
+            self.log(f'[{self.owner.sshscript.host}] closing ssh channel')
 
             ## automatically send exit to shell
             try:
@@ -1181,16 +1145,11 @@ class ParamikoChannel(GenericChannel):
                         break
                     time.sleep(0.01)
                 if self.channel.exit_status_ready():
-                    self.owner.exitcode = self.channel.recv_exit_status()
-                    self.log(DEBUG,f'[{self.owner.sshscript.host}] smoothly closed, exitcode= {self.owner.exitcode}')
-                else:
-                    #self.channel.close()
-                    if self.channel.exit_status_ready():
-                        self.owner.exitcode = self.channel.recv_exit_status()                        
-                    self.log(DEBUG,f'[{self.owner.sshscript.host}] unsmoothly closed, exitcode= {self.owner.exitcode}')
+                    if self.owner.inWith: self.owner.exitcode = self.channel.recv_exit_status()
+                    self.log8(f'[{self.owner.sshscript.host}] smoothly closed, exitcode= {self.owner.exitcode}')
                 self.channel.close()                    
             except paramiko.ssh_exception.SSHException as e:
-                self.log(DEBUG,f'[{self.owner.sshscript.host}] error on closing:{e}')
+                self.log(f'[{self.owner.sshscript.host}] error on closing:{e}')
             except OSError as e:
-                self.log(DEBUG,f'[{self.owner.sshscript.host}] error on closing:{e}')
+                self.log(f'[{self.owner.sshscript.host}] error on closing:{e}')
 

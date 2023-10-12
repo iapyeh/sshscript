@@ -52,14 +52,14 @@ try:
     from .sshscriptdollar import SSHScriptDollar
     from .sshscriptchannel import GenericChannel
     from .sshscriptchannelutils import InnerConsole
-    from .sshscripterror import SSHScriptError, SSHScriptExit, SSHScriptBreak, getLogger, setupLogger, SSHScriptError
+    from .sshscripterror import getLogger, SSHScriptError, SSHScriptExit, SSHScriptBreak, SSHScriptError, logDebug, logDebug8
     from . import sshscriptparser
 except ImportError:
     ## called directly from the same folder
     from sshscriptdollar import SSHScriptDollar
     from sshscriptchannel import GenericChannel
     from sshscriptchannelutils import InnerConsole
-    from sshscripterror import SSHScriptError, SSHScriptExit, SSHScriptBreak, getLogger, setupLogger, SSHScriptError
+    from sshscripterror import getLogger, SSHScriptError, SSHScriptExit, SSHScriptBreak, SSHScriptError, logDebug, logDebug8
     import sshscriptparser
 
 logger = getLogger()
@@ -94,6 +94,7 @@ SSHScriptExportedNamesByAlias = {}
 ## expose to __main__ for sshdollar.py
 __main__.SSHScriptExportedNames = SSHScriptExportedNames
 __main__.SSHScriptExportedNamesByAlias = SSHScriptExportedNamesByAlias
+
 def export2Dollar(nameOrFunc):    
     if callable(nameOrFunc):
         SSHScriptExportedNames.add(nameOrFunc.__name__)
@@ -239,11 +240,13 @@ class SSHScriptSession(object):
         self.lineNumberCount = 0
 
 
+        self.logger = logger
         ## when onedollar(), twodollars(), withdollar were called,
         ## this value was stored, so user can access its stdout, stderr and exitcode
         ## by self.stdout and self.stderr, self.exitcode
         self._lastDollar = None
-        self.log(DEBUG,f'{self.id} was created')
+
+        logDebug(f'{self.id} was created')
 
     @property
     def session(self):
@@ -311,24 +314,15 @@ class SSHScriptSession(object):
 
     @property
     def sftp(self):
-        ## 先問自己
         assert self.connected
         if self._sftp is not None:
-            ## 是否要確定連線還在？
             return self._sftp
         elif self.client:
             self._sftp = self.client.open_sftp()
             return self._sftp
         else:
             return None
-            ## since we already requery self.client,
-            ## no need to search for parents
-            ## 再往上找 
-            #connectedParent = self.connectedParent
-            #if connectedParent:
-            #    return connectedParent.sftp
 
-    ## self._lastDollar related properties
     @property
     def stdout(self):
         if self._lastDollar is None: raise ValueError('no execution result yet')
@@ -372,9 +366,10 @@ class SSHScriptSession(object):
         ## by doing so, we don't need to add "_sshscriptstack_.pop()" at the bottom of the "with" block
         if self.ownerstack is not None: self.ownerstack.pop()
   
-    @export2Dollar
-    def log(self, level, msg, *args):
-        logger.log(level, "[sshscript] %s" % msg, *args)
+    ## V2 disabled, use $.logger instead
+    #@export2Dollar
+    #def log(self, level, msg, *args):
+    #    logger.log(level, "[sshscript] %s" % msg, *args)
 
     @export2Dollar
     def thread(self,*args,**kw):
@@ -384,12 +379,12 @@ class SSHScriptSession(object):
     
     @export2Dollar('break')
     def _break(self,code=0,message=''):
-        self.log(DEBUG,f'break, message={message}')
+        logDebug(f'break, message={message}')
         raise SSHScriptBreak(message,code)
 
     @export2Dollar
     def exit(self,code=0,message=''):
-        self.log(DEBUG,f'exit, message={message}')
+        logDebug(f'exit, message={message}')
         raise SSHScriptExit(message,code)
 
     @export2Dollar
@@ -406,7 +401,7 @@ class SSHScriptSession(object):
                 password = username
             username,host = host.split('@')
 
-        self.log(DEBUG,f'{self} is going to connect {host}')
+        logDebug8(f'{self} is going to connect {host}')
 
         ## disabled in v2.0
         #if host == self.host:
@@ -425,14 +420,15 @@ class SSHScriptSession(object):
         ## to be the new parent session for this connection.
         subsession = SSHScriptSession(self)
 
-        ## self.host是.spy當中用來判斷有沒有ssh連線的依據（如果沒有則是subprocess)
+        ## self.host was used in .spy to check if it is a remote connection or 
+        ## a local subprocess.
         subsession._host = host
         subsession._port = port
         subsession._username = username
         
         ## user can set policy=0 to disable client.set_missing_host_key_policy
         if policy is None:
-            # 允許連線不在known_hosts檔案中的主機
+            ## allow connect to host not which is in known_hosts
             policy = paramiko.AutoAddPolicy()
 
         ## keep alive (added from v1.1.18);(todo: "implement" in sub-session)
@@ -446,22 +442,19 @@ class SSHScriptSession(object):
             else:
                 try:
                     subsession.runLocker.acquire(timeout=60)
-                    self.log(DEBUG,f'{self} is nestly connecting to {username}@{host}:{port}')
+                    logDebug8(f'{self} is nestly connecting to {username}@{host}:{port}')
                     ## REF: https://stackoverflow.com/questions/35304525/nested-ssh-using-python-paramiko
                     vmtransport = self.client.get_transport()
                     dest_addr = (host,port)
                     local_addr = (self.host,self.port)
                     subsession._sock = vmtransport.open_channel("direct-tcpip", dest_addr, local_addr)
                     subsession._client = connectClient(host,username,password,port,policy,sock=subsession._sock,**kw)
-                    self.log(DEBUG,f'{self} has connected to {username}@{host}:{port},(subsession={subsession})')
+                    logDebug8(f'{self} has connected to {username}@{host}:{port},(subsession={subsession})')
                     self.subsessions.append(subsession)
                 except Exception as e:
                     ## paramiko.ChannelException, paramiko.ssh_exception.SSHException 
-                    #subsession._client = None (why?)
-                    #subsession._sock = None   (why?)
-                    #subsession._addr = None   (why?)
-                    self.log(WARN,f'{self} failed to connect {username}@{host}:{port}, reason: {e}')
-                    self.log(DEBUG,traceback.format_exc())  
+                    logger.warn(f'{self} failed to connect {username}@{host}:{port}, reason: {e}')
+                    logDebug(traceback.format_exc())  
                     raise e
                 finally:
                     subsession.runLocker.release()
@@ -469,29 +462,25 @@ class SSHScriptSession(object):
             try:
                 subsession.runLocker.acquire(timeout=60)
                 if 'proxyCommand' in kw:
-                    self.log(DEBUG,f"{self} is connecting to {username}@{host}:{port} by proxyCommand:{ kw['proxyCommand']}")
+                    logDebug8(f"{self} is connecting to {username}@{host}:{port} by proxyCommand:{ kw['proxyCommand']}")
                     subsession._sock = subsession.getSocketWithProxyCommand(kw['proxyCommand'])
-                    #self.log(DEBUG,f'{self} proxycommand sock = {subsession._sock}')
                     del kw['proxyCommand']
                     kw['banner_timeout'] = 200000
                     kw['timeout'] = 200000
                     kw['auth_timeout' ] = 200000
                     subsession._client = connectClient(host,username,password,port,policy,sock=subsession._sock,**kw)
                 else:
-                    self.log(DEBUG,f'{self} is connecting to {username}@{host}:{port}')
+                    logDebug8(f'{self} is connecting to {username}@{host}:{port}')
                     subsession._client = connectClient(host,username,password,port,policy,**kw)
             except Exception as e:
                 ## eg.
                 ## paramiko.ChannelException, paramiko.ssh_exception.SSHException 
                 ## paramiko.ssh_exception.SSHException: Error reading SSH protocol banner
-                #subsession._client = None (why?)
-                #subsession._sock = None   (why?)
-                #subsession._addr = None   (why?)
-                self.log(DEBUG,f'{subsession} failed to connect {username}@{host}:{port}, reason: {e}')
-                self.log(DEBUG,traceback.format_exc())
+                logDebug(f'{subsession} failed to connect {username}@{host}:{port}, reason: {e}')
+                logDebug(traceback.format_exc())
                 raise e
             else:
-                self.log(DEBUG,f'{self} has connected to {username}@{host}:{port},(subsession={subsession})')
+                logDebug8(f'{self} has connected to {username}@{host}:{port},(subsession={subsession})')
                 self.subsessions.append(subsession)
             finally:
                 subsession.runLocker.release()  
@@ -506,8 +495,7 @@ class SSHScriptSession(object):
             callback_func = types.FunctionType(callback.__code__,{'subsession':subsession,'inactive_callback':inactive_callback}, callback.__name__, callback.__defaults__, callback.__closure__)    
             subsession._client.get_transport().set_keepalive(60,callback_func)
 
-        self.log(DEBUG,f'{subsession} keep alive interval={keepAliveInterval} seconds')
-        self.log(DEBUG,f'{subsession} _client={subsession._client}')
+        logDebug8(f'{subsession} keep alive interval={keepAliveInterval} seconds')
 
         return subsession
 
@@ -515,12 +503,6 @@ class SSHScriptSession(object):
     @export2Dollar
     def open(self,*args,**kw):
         return self.connect(*args,**kw)
-
-    ## deprecated in V2
-    #@export2Dollar
-    #def paranoid(self,yes):
-    #    warnings.warn(f'''paranoid() has renamed to careful()''',UserWarning,stacklevel=0)        
-    #    self._careful = yes
 
     @export2Dollar
     def careful(self,yes=None):
@@ -568,7 +550,7 @@ class SSHScriptSession(object):
         #if not dst.startswith('/') and not self.mute:
         #    warnings.warn(f'''uploading dst "{dst}" is not absolute path, would be {os.path.join(remoteCwd,dst)}''',UserWarning,stacklevel=0)
         
-        self.log(DEBUG,f'upload {src} to {os.path.join(remoteCwd,dst)}')
+        logDebug(f'upload {src} to {os.path.join(remoteCwd,dst)}')
         
         ## check exists of dst folders
         srcbasename = os.path.basename(src)
@@ -610,13 +592,13 @@ class SSHScriptSession(object):
             ## check un-existing folder(from down to top; suppose last one is a file)
             foldersToMake = checking(dst,[])
             if isinstance(foldersToMake,str):
-                self.log(DEBUG,f'{foldersToMake}')
+                logDebug8(f'{foldersToMake}')
                 return (None,None)
     
             if len(foldersToMake):
                 foldersToMake.reverse()
                 for folder in foldersToMake:
-                    self.log(DEBUG,f'making folder: {folder}')
+                    logDebug(f'making folder: {folder}')
                     self.sftp.mkdir(folder)
         else:
             ## cases:
@@ -673,11 +655,11 @@ class SSHScriptSession(object):
         if os.path.isdir(dst):
             dst = os.path.join(dst,os.path.basename(src))
 
-        self.log(DEBUG,f'downaloading from {src} to {dst}')            
+        logDebug(f'downaloading from {src} to {dst}')            
         
         self.sftp.get(src,dst)
         
-        self.log(DEBUG,f'downaloaded from {src} to {dst}')            
+        logDebug8(f'downaloaded from {src} to {dst}')            
         return (src,dst)
 
     def getSocketWithProxyCommand(self,argsOfProxyCommand):
@@ -748,12 +730,12 @@ class SSHScriptSession(object):
             try:
                 ast.parse(script)
             except SyntaxError:
-                self.log(DEBUG,f'{self} run() starts with .spy script')
+                logDebug(f'{self} run() starts with .spy script')
                 rows = self.parseScript(script,_locals=varLocals)
                 scriptChunk = os.linesep.join(rows)
             else:
                 ## saved content of --script output
-                self.log(DEBUG,f'{self} run() starts with regular python script')
+                logDebug(f'{self} run() starts with regular python script')
                 noparse = True
                 scriptChunk = script
             
@@ -780,7 +762,7 @@ class SSHScriptSession(object):
                     ## it might be from the file(script) which run in advance of this file(script)
                     _sshscriptstacks_ = _globals.get('_sshscriptstacks_')
                     threading.current_thread().sshscriptstack = _sshscriptstacks_ or sshscriptpatching.SshscriptStack(threading.current_thread(),[self])
-                    self.log(DEBUG, f'set starting session to {_sshscriptstacks_ or self}')
+                    logDebug8( f'set starting session to {_sshscriptstacks_ or self}')
                     _globals['threading']= threading
                     _globals['types']= types
                     _globals['SSHScriptDollar'] = SSHScriptDollar
@@ -829,7 +811,7 @@ class SSHScriptSession(object):
                             if start == tb_lineno:
                                 print('^' * len(line))
                             start += 1
-                    self.log(DEBUG,f"lineno={lineno},etype={etype}")
+                    logDebug(f"lineno={lineno},etype={etype}")
                     raise
             return sandbox(scriptChunk,exec_globals,exce_locals)
 
@@ -852,11 +834,11 @@ class SSHScriptSession(object):
             except Exception as e:
                 traceback.print_exc()
                 ret['error'] = e
-                self.log(DEBUG,f"{runSession}: sshscript.run() error, error={e}")
+                logDebug(f"{runSession}: sshscript.run() error, error={e}")
             else:
                 pass
             finally:
-                self.log(DEBUG,f"{runSession}: sshscript.run() finished")
+                logDebug(f"{runSession}: sshscript.run() finished")
         thread = threading.Thread(target=runner,args=(script,locals,globals,showScript),name=f'sshscript-run@{self.host}',daemon=False)
         thread.start()
         
@@ -873,15 +855,15 @@ class SSHScriptSession(object):
                 break
         ## self.runLocker might be already released by caller because of timeout
         if self.runLocker.locked(): self.runLocker.release()
-        self.log(DEBUG,f'{self} run() release lock, locked= {self.runLocker.locked()}')
+        logDebug8(f'{self} run() release lock, locked= {self.runLocker.locked()}')
 
         if error or ret.get('error'):
-            self.log(DEBUG,f"{runSession}: sshscript.run() error={error or ret.get('error')}")
-            #self.log(DEBUG,f"{runSession}: script={script})")
-            self.log(DEBUG,f'{self} run() complete with error')
+            logDebug(f"{runSession}: sshscript.run() error={error or ret.get('error')}")
+            #logDebug(f"{runSession}: script={script})")
+            logDebug(f'{self} run() complete with error')
             raise error or ret.get('error')
         else:
-            self.log(DEBUG,f'{self} run() complete')
+            logDebug(f'{self} run() complete')
             ret['value']['_sshscriptstacks_'] = thread.sshscriptstack
             ## Don't do this, because the return value is not guaranteed to have "_c". 
             ## Since _c could be in locals(), not in global variables
@@ -891,7 +873,7 @@ class SSHScriptSession(object):
     @export2Dollar
     def close(self):
         ## could be called multiple times
-        self.log(DEBUG,f'{self} is closing {self.username}@{self.host}:{self.port}')
+        logDebug8(f'{self} is closing {self.username}@{self.host}:{self.port}')
 
         for subsession in reversed(self.subsessions):
             subsession.close()
@@ -903,11 +885,10 @@ class SSHScriptSession(object):
         if self.parent:
             try:
                 self.parent.subsessions.remove(self)
-
             except ValueError:
-                self.log(DEBUG, f"{self} is not in parent {self.parent}'s subsessions, called twice?")
+                logDebug( f"{self} is not in parent {self.parent}'s subsessions, called twice?")
             else:
-                self.log(DEBUG, f"{self} is removed from parent {self.parent}'s subsessions")
+                logDebug8( f"{self} is removed from parent {self.parent}'s subsessions")
           
         if self._sftp:
             self._sftp.close()
@@ -922,7 +903,7 @@ class SSHScriptSession(object):
             self._sock.close()
             self._sock = None
 
-        self.log(DEBUG,f'{self} has closed {self.username}@{self.host}:{self.port}')
+        logDebug(f'{self} has closed {self.username}@{self.host}:{self.port}')
         self._host = None
         self._port = None
         self._username = None

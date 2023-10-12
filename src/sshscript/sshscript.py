@@ -13,14 +13,11 @@
 # You should have received a copy of the MIT License along with Sshscript;
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
-from paramiko.common import (
-    DEBUG,
-)
 import os
 import sys
 import glob
 import __main__
-import copy
+from logging import DEBUG
 # set here used in sshscriptdollar
 import warnings
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
@@ -29,11 +26,10 @@ warnings.formatwarning = warning_on_one_line
 
 try:
     from .sshscriptsession import SSHScriptSession
-    from .sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptError, setupLogger
+    from .sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptError, setupLogger, logDebug, logDebug8
 except ImportError:
     from sshscriptsession import SSHScriptSession
-    from sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptError, setupLogger
-
+    from sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptError, setupLogger, logDebug, logDebug8
 
 def runFile(givenPaths,
         varGlobals=None,
@@ -48,20 +44,20 @@ def runFile(givenPaths,
     paths = []
     for path in givenPaths:
         abspath = os.path.abspath(path)
-        # if path is a directory, add all *.spy files in it
+        ## if path is a directory, add all *.spy files in it
         if os.path.isdir(abspath):
             # files in folder are sorted by name
             unsortedFilesInPath = list(filter(lambda x: x[-4:] == ext,[os.path.abspath(os.path.join(path,y)) for y in os.listdir(path)]))
         else:
-            # glob.glob returns a list of files, or empty list if no file matches
+            ## glob.glob returns a list of files, or empty list if no file matches
             unsortedFilesInPath = list(filter(lambda x: os.path.splitext(x)[1] == ext ,glob.glob(abspath)))
             if len(unsortedFilesInPath) == 0:
                 if not os.path.exists(abspath):
-                    # In context of sshscript, this may be a argument to the script.
-                    # If the script also wants to accept command line arguments,
-                    # it should assign the argument in form of
-                    # --arg=value , not in form of --arg value
-                    # otherwise, this exception would raised
+                    ## In context of sshscript, this may be a argument to the script.
+                    ## If the script also wants to accept command line arguments,
+                    ## it should assign the argument in form of
+                    ## --arg=value , not in form of --arg value
+                    ## otherwise, this exception would raised
                     raise RuntimeError(f'{os.path.abspath(path)} not found')
                 elif os.path.isfile(abspath):
                     unsortedFilesInPath.append(abspath)
@@ -70,9 +66,8 @@ def runFile(givenPaths,
         
         unsortedFilesInPath.sort()
         for p in unsortedFilesInPath:
-            if p in paths:
-                print('ignoring duplicate path: %s' % p)
-                continue
+            ## ignoring duplicate path
+            if p in paths: continue
             paths.append(p)
 
     if showRunOrder:
@@ -89,19 +84,18 @@ def runFile(givenPaths,
     if varLocals: _locals.update(varLocals)
     exitcode = 0
     for file in paths:
-        # 每一個檔案產生一個sshscript物件
-        if not unisession:
-            session = SSHScriptSession()
+        ## when unisession is not True,
+        ## generate a new session for every file
+        if not unisession: session = SSHScriptSession()
 
-        session.log(DEBUG,f'run {file}')
+        logDebug(f'running {file}')
 
-        
         absfile = os.path.abspath(file)
-        # 有點怪，但比較能windows時也適用
+        ## maybe strange, but probably also works on windows
         with open(absfile,'rb') as fd:
             script = fd.read().decode('utf-8','replace')
 
-        # add folder to sys.path,so "import <module in the same folder of __file__>" works
+        ## add folder to sys.path,so "import <module in the same folder of __file__>" works
         scriptFolder = os.path.dirname(abspath)
         scriptFolderInsertedToSysPath = False
         if not scriptFolder in sys.path:
@@ -113,18 +107,18 @@ def runFile(givenPaths,
             ## parse the file only if it is .spy
             newglobals = session.run(script,_locals,_globals,showScript=showScript)
         except SSHScriptBreak as e:
-            session.log(DEBUG,f'break by {e}')
+            logDebug8(f'break by {e}')
             exitcode = e.code
             continue
         except SSHScriptExit as e:
-            session.log(DEBUG,f'exit by {e}')
+            logDebug8(f'exit by {e}')
             exitcode = e.code
             raise
         except Exception as e:
-            session.log(DEBUG,f'exit by {e}')
+            logDebug(f'exit by {e}')
             raise
         else:
-            # restore sys.path
+            ## restore sys.path
             if scriptFolderInsertedToSysPath:
                 sys.path.remove(scriptFolder)
 
@@ -136,7 +130,7 @@ def runFile(givenPaths,
                 else:
                     basename = os.path.basename(file)
                     for key in exported:
-                        session.log(DEBUG,f'{basename} export {key}')
+                        logDebug8(f'{basename} export {key}')
                         _globals[key] = newglobals[key]
             _globals['_sshscriptstacks_'] = newglobals['_sshscriptstacks_']
         finally:
@@ -177,16 +171,13 @@ def main():
                         default='.spy',
                         help='the extension of sshscript file. default is .spy')
 
-    parser.add_argument('--debug', dest='debug', action='store_true',
-                        default=False,
-                        help='set log level to debug')
+    parser.add_argument('--debug', dest='debug', nargs='*', help='set log level to debug(default 10, could be 9 for more details but insecure)')
 
     parser.add_argument(dest='paths', action='store', nargs='*',
                         help='path of .spy files or folders')
 
     ## new on v1.1.13
-    parser.add_argument('--folder', dest='folder', action='store',default='',
-                        help='base folder of paths')
+    parser.add_argument('--folder', dest='folder', help='base folder of paths')
 
     ## new on v1.1.17
     parser.add_argument('--version', dest='version', action='store_true',default=False,
@@ -211,10 +202,19 @@ def main():
                 __version__ = 'unknown'
         return __version__
 
+    ## handle the contradiction between args.debug and args.paths
+    ## eg.  python3 sshscript.py --verbose --debug unittest/0.spy ==>  python3 sshscript.py --verbose --debug 10 unittest/0.spy
+
+    if args.debug is not None:
+        if len(args.debug) == 0:
+            ## case like: python3 sshscript.py --verbose --debug unittest/0.spy
+            args.debug = 10
+        else:
+            ## case like: python3 sshscript.py --verbose --debug 9 unittest/0.spy
+            args.debug = int(args.debug[0])
+
     if (args.version):
-
         print(get_current_version())
-
     elif (args.checkversion):
         __version__ = get_current_version()
         import urllib.request
@@ -240,7 +240,8 @@ def main():
     elif len(args.paths):
         
         if args.debug:
-            os.environ['DEBUG'] = '1'
+            os.environ['DEBUG'] = str(args.debug)
+            print('#' * 100,os.environ['DEBUG'])
         
         if args.verbose:
             os.environ['VERBOSE'] = '1'
