@@ -16,11 +16,10 @@
 import re
 import time
 try:
-    from .sshscripterror import  getLogger
+    from .sshscripterror import  logDebug, logDebug8
 except ImportError:
-    from sshscripterror import  getLogger
+    from sshscripterror import logDebug, logDebug8
 
-logger = getLogger()
 
 class Prompt(object):
     def __init__(self,channel,keyword,type=1):
@@ -47,7 +46,7 @@ class Prompt(object):
             try:
                 m = self.channel.expect(self.pattern,timeout=timeout,stdout=True,stderr=False,position=self.position)
             except TimeoutError:
-                logger.debug(f'stdout={self.channel.stdout}')
+                logDebug8(f'stdout={self.channel.stdout}')
                 raise
             else:
                 self.position += m.end() + 1
@@ -57,7 +56,7 @@ class Prompt(object):
             try:
                 m = self.channel.expect(self.pattern,timeout=timeout,stdout=False,stderr=True,position=self.position)
             except TimeoutError:
-                logger.debug(f'stderr={self.channel.stderr}')
+                logDebug8(f'stderr={self.channel.stderr}')
                 raise
             else:
                 self.position += m.end() + 1
@@ -72,7 +71,7 @@ class Prompt(object):
         self.keyword = keyword
         if stdout: self.type = 1
         elif stderr: self.type = 2
-        logger.debug(f'__call__ set prompt to "{self}" ({stdout},{stderr})')
+        logDebug8(f'__call__ set prompt to "{self}" ({stdout},{stderr})')
     @property
     def keyword(self):
         return self._keyword
@@ -181,7 +180,7 @@ class InnerConsole(GenericConsole):
                 ## when we sudo twice, this would be the case. sudo doesnot ask for password at the second time.
                 succeded()
             else:
-                logger.debug('sending password')
+                logDebug8('sending password')
                 ## have to call resetBuffer, otherwise the already recieved "password" prompt
                 ## will confuse up when checking if "password" was asked again
                 self.channel._resetBuffer()
@@ -259,8 +258,9 @@ class InnerConsoleWithDollar(InnerConsole):
     def __init__(self,wcw,command):
         ## command: the shell command
         super().__init__(wcw,'',None,expect=None,failureExpect=None,initials=None)
-        assert isinstance(command,str)
-        command = command.strip()
+        ## command might be None if it is called by session.with_dollar()
+        assert command is None or isinstance(command,str)
+        command = command.strip() if command else ''
         if command.startswith('#!'): command = command[2:].strip()
         if command == '':
             ## case like "with $ as console" inside another shell   
@@ -370,8 +370,11 @@ class IterableEnterConsole(object):
             True and True: set type to 3 (both)
             True and None/False: set to stdout
             Non/False and True: set to stderr
-        :exit:
-            default to chr(3) (Ctrl-C)
+        :exit: str or None
+            if this is None:
+                put command to background by adding "&" at end, and kill the process when __exit__ is called
+            else:
+                run on foreground, and send this exit command, usually it is chr(3) (Ctrl-C)
         """
         assert isinstance(parentConsole,GenericConsole) 
         self.parentConsole = parentConsole
@@ -382,7 +385,12 @@ class IterableEnterConsole(object):
         self.type = 3 if (stdout and stderr) else (2 if stderr else 1)
         self.loopTimeout = 0
         ## default exit comand to ^C
-        self.exit = exit or chr(3)
+        if  exit:
+            self.exit = exit
+            self.backgroundMode = False
+        else:
+            self.exit = 'kill "$!"'
+            self.backgroundMode = True
         self.returnObjectWhenEnter = self.parentConsole.returnObjectWhenEnter
     def addToQueue(self,type,lines):
         if self.type == 3:
@@ -399,16 +407,22 @@ class IterableEnterConsole(object):
         self.channel._checkExitcodeForSendline = False
         self.running = True
         self.setupListener()
-        self.parentConsole.send(self.command+'\n')
+        self.channel.send(self.command+(' &' if self.backgroundMode else '')+' \n')
         return self
-    def setupListener(self):
-        self.channel.stdoutListener = None
-        self.channel.stderrListener = None
-        if self.type in (1,3):
-            self.channel.stdoutListener = self.addToQueue
-        if self.type in (2,3):
-            self.channel.stderrListener = self.addToQueue
-
+    def setupListener(self,unset=False):
+        if unset:
+            ## remove the listeners
+            if self.type in (1,3):
+                self.channel.stdoutListener = None
+            if self.type in (2,3):
+                self.channel.stderrListener = None
+        else:
+            self.channel.stdoutListener = None
+            self.channel.stderrListener = None
+            if self.type in (1,3):
+                self.channel.stdoutListener = self.addToQueue
+            if self.type in (2,3):
+                self.channel.stderrListener = self.addToQueue
     def __call__(self,timeout=0):
         """
         eg.
@@ -420,22 +434,26 @@ class IterableEnterConsole(object):
         return self
     def __exit__(self, exc_type, exc_value, trace):
         self.running = False
+        self.setupListener(unset=True)
         self.channel.send(self.exit+'\n')
-        self.channel.wait(1)
+        #self.channel.wait(0.25)
+        self.channel.waitCommandToComplete(self.channel.waitingInterval,False)
+        self.channel.getExitcode()
         self.channel.sendlineLock.release()
         self.channel._checkExitcodeForSendline = self._originValue
     def __next__(self):
         item = next(self.iter)
         return item
     def __iter__(self):
-        
         def consumQueue():
-            def iterTuple(item):
-                for line in item[1]:
-                    yield (item[0],line.decode('utf8','replace'))
-            def iterList(item):
-                for line in item:
-                    yield line.decode('utf8','replace')
+            def iterTuple(items):
+                for item in items:
+                    for line in item[1]:
+                        yield (item[0],line.decode('utf8','replace'))
+            def iterList(items):
+                for item in items:
+                    for line in item:
+                        yield line.decode('utf8','replace')
             iterator = iterTuple if self.type == 3 else iterList            
             endtime = time.time() + self.loopTimeout if self.loopTimeout else 0
             while self.running and not self.parentConsole.closed:
@@ -446,11 +464,19 @@ class IterableEnterConsole(object):
                     else:
                         time.sleep(0.1)
                         continue
-                ## why lock?
-                for i in range(n):
-                    ## convert to str for loop's value
-                    g = iterator(self.queue[i])
-                    while True:
+                if 0:
+                    for i in range(n):
+                        ## convert to str for loop's value
+                        g = iterator(self.queue[i])
+                        while self.running:
+                            try:
+                                yield next(g)
+                            except StopIteration:
+                                break
+                        if not self.running: break
+                else:
+                    g = iterator(self.queue)
+                    while self.running:
                         try:
                             yield next(g)
                         except StopIteration:
@@ -458,5 +484,7 @@ class IterableEnterConsole(object):
                 del self.queue[0:n]
                 ## reschedule endtime
                 if self.loopTimeout: endtime = time.time() + self.loopTimeout
+                time.sleep(0.01)
+            ## code below here would not run
         self.iter = consumQueue()
         return self

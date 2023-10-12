@@ -31,20 +31,29 @@ class SSHScriptExit(SSHScriptError):
 import paramiko
 import logging
 import os, sys
-from paramiko.common import (
-    DEBUG,
-)
-
+from logging import DEBUG
+assert DEBUG == 10
+DEBUG8 = 8
 global logger
 ## default logger
-logger = paramiko.util.get_logger('sshscript')
+logger = logging.getLogger('sshscript')
+
+def logDebug(mesg,*args):
+    logger.log(DEBUG,mesg, *args)
+def logDebug8(mesg,*args):
+    logger.log(DEBUG8, mesg,*args)
 
 def setupLogger(_logger=None):
     global logger
     if _logger is None:
         logger = getLogger()
         # default is WARNING
-        if os.environ.get('DEBUG'): logger.setLevel(DEBUG)         
+        if os.environ.get('DEBUG'):
+            try:
+                level = int(os.environ['DEBUG'])
+            except ValueError:
+                level = DEBUG ## default is 10 (logging.DEBUG)
+            logger.setLevel(level)
 
         if sys.stdout.isatty():
             handler = logging.StreamHandler(sys.stdout)
