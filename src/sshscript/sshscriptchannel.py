@@ -134,9 +134,6 @@ class WithChannelWrapper(GenericConsole):
     ## alias for sendline
     __call__ = sendline
     exec_command = sendline
-    ## alias, for compatibility with sshscriptsession
-    onedollar = sendline
-    twodollars = sendline
 
     def expect(self,rawpat,timeout=60,stdout=True,stderr=True,position=0,silent=False):
         return self.channel.expect(rawpat,timeout,stdout,stderr,position,silent)
@@ -990,7 +987,7 @@ class POpenChannel(GenericChannel):
     
     def close(self):
         super().close()
-        self.log8(f'closing popen channel {self.cp}')
+        self.log8(f'closing popen channel {self}:{self.cp}')
         ## force "sendline" not to expect(self.prompt)
         self.prompt = None
         error = None

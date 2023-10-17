@@ -273,11 +273,17 @@ class InnerConsoleWithDollar(InnerConsole):
 
 
 class EnterConsole(object):
-    def __init__(self,parentConsole,command,expect=None,input=None,exit=None,prompt=None):
+    def __init__(self,parentConsole,command,expect=None,password=None,exit=None,prompt=None):
         """
         ## parentConsole in ( WithChannelWrapper , InnerConsoleSu, InnerConsoleSudo )
         :prompt:
             if not given(None), this function would try to figure out the prompt
+            if is an instance of Prompt, it was used
+            if is an instance of str, a prompt of that string would be used
+            if is "False" or else, there is no prompt
+        :exit:
+            if None, default to chr(4) Ctrl+D
+            for program that would quit by itself, set exit=False would be what you want.
         """
         assert isinstance(parentConsole,GenericConsole) 
         self.parentConsole = parentConsole
@@ -285,16 +291,15 @@ class EnterConsole(object):
         self.channel = self.parentConsole.channel
         self.command = command
         self.expect = expect
-        self.input = input
-        self.prompt = prompt
+        self.password = password
+        self.prompt = prompt 
         ## default exit comand to ^D
-        self.exit = exit or chr(4)
+        self.exit = chr(4) if exit is None else exit
         self.returnObjectWhenEnter = self.parentConsole.returnObjectWhenEnter
     def __enter__(self):
         ## wait a moment to let  self.channel._resetBuffer() really work
         ## that we can get a clear buffer
         self.channel.sendlineLock.acquire()
-
         self.channel._resetBuffer()
         baseLastIOTime = self.channel._lastIOTime
         self.parentConsole.send(self.command+'\n')
@@ -302,15 +307,15 @@ class EnterConsole(object):
             ## eg. mysql client
             try:
                 ## somthing like "Enter password" of mysql
-                ## or just something to wait if there is no self.input was given
+                ## or just something to wait if there is no self.password was given
                 self.parentConsole.expect(self.expect,timeout=5)
             except TimeoutError:
                 raise RuntimeError(f'{self.command} failure, {self.expect} does not show up')
             else:
-                if self.input:
+                if self.password:
                     self.channel._resetBuffer()
                     baseLastIOTime = self.channel._lastIOTime
-                    self.parentConsole.send(self.input+'\n')
+                    self.parentConsole.send(self.password+'\n')
                     self.channel.wait(0.5,mustHasOutput=baseLastIOTime)
                     #self.channel.waitCommandToComplete(self.channel.waitingInterval,False)
                     m = self.parentConsole.expect(self.expect,timeout=1,silent=True)
@@ -325,16 +330,28 @@ class EnterConsole(object):
             ## this helps to get correct prompt, it is important for getting correct stdout for every line of input.
             self.channel.wait(1,mustHasOutput=baseLastIOTime)
         
+        def setNoPrompt():
+            self.prompt = self.parentConsole.prompt.clone()
+            self.prompt.keyword = None
+            self.channel.pushPromptState(self.prompt,False)
+
         if self.prompt is None:
+            ## automatically find out what is prompt
             prompt = self.parentConsole.getPrompt()
             if prompt is None:
-                prompt = self.parentConsole.prompt.clone()
-                prompt.keyword = None
-                self.channel.pushPromptState(prompt,False)
+                ## no prompt
+                setNoPrompt()
             else:
+                self.prompt = prompt
                 self.channel.pushPromptState(prompt,True)
-        else:
+        elif isinstance(self.prompt, str):
+            self.prompt = self.parentConsole.prompt.clone()
+            self.prompt.keyword = self.prompt
             self.channel.pushPromptState(self.prompt,True)
+        elif isinstance(self.prompt, Prompt):
+            self.channel.pushPromptState(self.prompt,True)
+        else:
+            setNoPrompt()
 
         ## don't try to get exitcode  after every sendline() call
         self._originValue = self.channel._checkExitcodeForSendline
@@ -351,7 +368,7 @@ class EnterConsole(object):
         self.channel.sendlineLock.acquire()
         self.channel.popPromptState()
         self.channel._checkExitcodeForSendline = self._originValue
-        self.channel.send(self.exit+'\n')
+        if self.exit: self.channel.send(self.exit+'\n')
         self.channel.waitCommandToComplete(self.channel.waitingInterval,False)
         self.channel.getExitcode()
         ## don't need to cleanup, let user can get value of .stdout and .stderr from outer console
@@ -368,8 +385,8 @@ class IterableEnterConsole(object):
             None and None: default to stdout
             False and False: default to stdout
             True and True: set type to 3 (both)
-            True and None/False: set to stdout
-            Non/False and True: set to stderr
+            True and (None|False): set to stdout
+            (None|False) and True: set to stderr
         :exit: str or None
             if this is None:
                 put command to background by adding "&" at end, and kill the process when __exit__ is called
@@ -384,7 +401,6 @@ class IterableEnterConsole(object):
         self.queue = []
         self.type = 3 if (stdout and stderr) else (2 if stderr else 1)
         self.loopTimeout = 0
-        ## default exit comand to ^C
         if  exit:
             self.exit = exit
             self.backgroundMode = False

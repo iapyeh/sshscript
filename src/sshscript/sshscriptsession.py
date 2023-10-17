@@ -246,7 +246,7 @@ class SSHScriptSession(object):
         ## by self.stdout and self.stderr, self.exitcode
         self._lastDollar = None
 
-        logDebug(f'{self.id} was created')
+        logDebug(f'{self} was created')
 
     @property
     def session(self):
