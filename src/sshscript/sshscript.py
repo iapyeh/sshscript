@@ -207,11 +207,19 @@ def main():
 
     if args.debug is not None:
         if len(args.debug) == 0:
-            ## case like: python3 sshscript.py --verbose --debug unittest/0.spy
+            ## case like: python3 sshscript.py --verbose --debug --folder unittest 0.spy
             args.debug = 10
         else:
-            ## case like: python3 sshscript.py --verbose --debug 9 unittest/0.spy
-            args.debug = int(args.debug[0])
+            try:
+                debugLevel = int(args.debug[0])
+            except ValueError:
+                ## case like: python3 sshscript.py --verbose --debug 0.spy
+                args.paths = args.debug[:] + args.paths
+                args.debug = 10
+            else:
+                ## case like: python3 sshscript.py --verbose --debug 8 unittest/0.spy
+                args.paths = args.debug[1:] + args.paths            
+                args.debug = debugLevel
 
     if (args.version):
         print(get_current_version())
@@ -241,7 +249,6 @@ def main():
         
         if args.debug:
             os.environ['DEBUG'] = str(args.debug)
-            print('#' * 100,os.environ['DEBUG'])
         
         if args.verbose:
             os.environ['VERBOSE'] = '1'

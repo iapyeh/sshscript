@@ -430,7 +430,6 @@ with __ret as topconsole:
                 isinstance(nodeitem.context_expr.func,ast.Name) and \
                 nodeitem.context_expr.func.id=='withdollar':
                 self.containsSSHScriptStack[-1] = True                
-
                 ## eg:
                 ## with $.sudo 
                 ##     with $#!/bin/bash
