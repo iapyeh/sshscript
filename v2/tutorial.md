@@ -4,7 +4,7 @@
 
 # Automating Shell Tasks in Python
 
-## Execute commands
+## ⬛ Execute commands
 
 ### ⏚＄ Execute commands on localhost using the SSHScript dollar-syntax
 ```
@@ -68,7 +68,7 @@ with session.connect('user@host','1234') as remote_session:
     print(f'I am {remote_session.stdout.strip()}')
 ```
 
-## Execute shell commands
+## ⬛ Execute shell commands
 
 Shell commands are commands that must be executed by a shell. They can be used to perform a variety of tasks, such as:
 
@@ -119,7 +119,7 @@ with session.connect('user@host','1234') as remote_session:
 ```
 
 
-## Invoke an interactive console to run commands
+## ⬛ Invoke an interactive console to run commands
 
 ### ⏚＄ Invoke an interactive console to run commands on localhost using the SSHScript dollar-syntax
 ```
