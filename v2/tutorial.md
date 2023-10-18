@@ -195,8 +195,16 @@ with session.connect('user@host','1234') as remote_session:
 ## run: sshscript example.spy
 with $.sudo('1234'):
     $cd /root
+    assert $.exitcode == 0 ## success
     $whoami
     assert 'root' in $.stdout
+
+with $.sudo('1234') as console:
+    console('cd /root')
+    assert console.exitcode == 0
+    console('whoami')
+    assert 'root' in console.stdout
+
 ```
 
 ### ⏚🐍 Invoke an interactive console on localhost using the SSHScript module
@@ -206,6 +214,7 @@ import sshscript
 session = sshscript.SSHScriptSession()
 with session.sudo('1234') as console:
     console('cd /root')
+    assert console.exitcode == 0
     console('whoami')
     assert 'root' in console.stdout
 ```
@@ -217,6 +226,7 @@ with session.sudo('1234') as console:
 with $.connect('user@host','1234'):
     with $.sudo('1234'):
         $cd /root
+        assert $.exitcode == 0 ## success
         $whoami
         assert 'root' in $.stdout
 ```
@@ -229,6 +239,7 @@ session = sshscript.SSHScriptSession()
 with session.connect('user@host','1234') as remote_session:
     with remote_session.sudo('1234') as console:
         console('cd /root')
+        assert console.exitcode == 0
         console('whoami')
         assert 'root' in console.stdout
 ```
