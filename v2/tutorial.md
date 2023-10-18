@@ -56,6 +56,10 @@ with session.connect('user@host','1234') as remote_session:
 
 ## Execute shell commands
 
+Shell commands are commands that must be executed by a shell. They can be used to perform a variety of tasks, such as:
+- Running multiple commands in sequence (pipe lines)
+- Accessing and modifying environment variables (e.g., ls $HOME)
+
 ### ⏚＄ Execute shell commands on localhost using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
