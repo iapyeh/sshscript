@@ -6,23 +6,23 @@
 
 ## en
 
-- [Tutorial](https://iapyeh.github.io/sshscript/tutorial) 
-- [Learning SSHScript Chapter 1](https://iapyeh.github.io/sshscript/learn-chap01)
-- [Learning SSHScript Chapter 2](https://iapyeh.github.io/sshscript/learn-chap02)
-- [Syntax, Variables and Functions](https://iapyeh.github.io/sshscript/syntax)
-- [sshscript CLI](https://iapyeh.github.io/sshscript/cli)
-- [sshscript Module](https://iapyeh.github.io/sshscript/module) 
-- [Ways to get a root’s console](https://iapyeh.github.io/sshscript/examples/root-console)
-- [Do logging](https://iapyeh.github.io/sshscript/examples/logger)
-- [Troubleshooting of installation](https://iapyeh.github.io/sshscript/sshscript-problem)
+- [Tutorial](https://iapyeh.github.io/sshscript/v1/tutorial) 
+- [Learning SSHScript Chapter 1](https://iapyeh.github.io/sshscript/v1/learn-chap01)
+- [Learning SSHScript Chapter 2](https://iapyeh.github.io/sshscript/v1/learn-chap02)
+- [Syntax, Variables and Functions](https://iapyeh.github.io/sshscript/v1/syntax)
+- [sshscript CLI](https://iapyeh.github.io/sshscript/v1/cli)
+- [sshscript Module](https://iapyeh.github.io/sshscript/v1/module) 
+- [Ways to get a root’s console](https://iapyeh.github.io/sshscriptv1/examples/root-console)
+- [Do logging](https://iapyeh.github.io/sshscript/v1/examples/logger)
+- [Troubleshooting of installation](https://iapyeh.github.io/sshscript/v1/sshscript-problem)
 
 ## zh-TW
 
-- [導覽(Tutorial)](https://iapyeh.github.io/sshscript/tutorial.zh-tw)
-- [使用SSHScript教學一(Learning SSHScript Chapter 1)](https://iapyeh.github.io/sshscript/learn-chap01.zh-tw)
-- [使用SSHScript教學二(Learning SSHScript Chapter 2)](https://iapyeh.github.io/sshscript/learn-chap02.zh-tw)
-- [用 Python 作系統自動化](https://iapyeh.github.io/sshscript/automationinpython-tw)
-- [安裝有問題](https://iapyeh.github.io/sshscript/sshscript-problem.zh-tw)
+- [導覽(Tutorial)](https://iapyeh.github.io/sshscript/v1/tutorial.zh-tw)
+- [使用SSHScript教學一(Learning SSHScript Chapter 1)](https://iapyeh.github.io/sshscript/v1/learn-chap01.zh-tw)
+- [使用SSHScript教學二(Learning SSHScript Chapter 2)](https://iapyeh.github.io/sshscript/v1/learn-chap02.zh-tw)
+- [用 Python 作系統自動化](https://iapyeh.github.io/sshscript/v1/automationinpython-tw)
+- [安裝有問題](https://iapyeh.github.io/sshscript/v1/sshscript-problem.zh-tw)
 
 ## Introduction
 
@@ -155,9 +155,9 @@ Some key benefits of using SSHScript include:
 
 ## Releases
 
-#### 2022/09/22 v1.1.17 supports streaming-style commands. [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.17)
+#### 2022/09/22 v1.1.17 supports streaming-style commands. [Release Notes](https://iapyeh.github.io/sshscript/v1/release-v1.1.17)
 
-#### 2022/09/05 v1.1.16 supports powershell(Windows). [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.16)
+#### 2022/09/05 v1.1.16 supports powershell(Windows). [Release Notes](https://iapyeh.github.io/sshscript/v1/release-v1.1.16)
 
 #### 2022/08/24 v1.1.14 supports thread. [Release Notes](https://iapyeh.github.io/sshscript/release-v1.1.14)
 
