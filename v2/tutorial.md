@@ -56,6 +56,17 @@ with $.connect('user@host','1234'):
     print(f'I am {$.stdout.strip()}')
 ```
 
+Example of connecting to a nested remote host:
+```
+with $.connect('user@host','1234'):
+    with $.connect('user@host2','5678'):
+        $hostname
+        print(f'hostname is {$.stdout.strip()}')
+        $whoami
+        print(f'I am {$.stdout.strip()}')
+```
+
+
 ### 🌎🐍 Execute commands on remote host using the SSHScript module
 
 ```
@@ -66,6 +77,17 @@ with session.connect('user@host','1234') as remote_session:
     print(f'hostname is {remote_session.stdout.strip()}')
     remote_session('whoami')
     print(f'I am {remote_session.stdout.strip()}')
+```
+
+Example of connecting to a nested remote host:
+
+```
+with session.connect('user@host','1234') as remote_session:
+    with remote_session.connect('user@host2','5678') as nested_remote:
+        nested_remote('hostname')
+        print(f'hostname is {nested_remote.stdout.strip()}')
+        nested_remote('whoami')
+        print(f'I am {nested_remote.stdout.strip()}')
 ```
 
 ## 🔵 Execute shell commands
@@ -198,13 +220,12 @@ with $.sudo('1234'):
     assert $.exitcode == 0 ## success
     $whoami
     assert 'root' in $.stdout
-
+## Equivalent
 with $.sudo('1234') as console:
     console('cd /root')
     assert console.exitcode == 0
     console('whoami')
     assert 'root' in console.stdout
-
 ```
 
 ### ⏚🐍 Invoke an interactive root console on localhost using the SSHScript module
