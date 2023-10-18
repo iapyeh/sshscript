@@ -118,6 +118,77 @@ with session.connect('user@host','1234') as remote_session:
         print('Folder:' + line)
 ```
 
+
+## Invoke an interactive console to run commands
+
+### ⏚＄ Invoke an interactive console to run commands on localhost using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+with $:
+    $cd $HOME
+    $[ -e .ssh/id_rsa ]
+    if $.exitcode == 1:
+        ## ~/.ssh/id_rsa does not exist.
+        ## Lets run ssh-keygen without prompt to create it.
+        $ssh-keygen -t rsa -N ''
+```
+
+You can also assign the shell by "$#!/bin/bash", eg:
+```
+with $#!/bin/bash:
+    $cd $HOME
+```
+
+
+### ⏚🐍 Invoke an interactive console to run commands on localhost using the SSHScript module
+
+```
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.shell() as console:
+    console('cd $HOME')
+    console('[ -e .ssh/id_rsa ]')
+    if console.exitcode == 1:
+        console("ssh-keygen -t rsa -N ''")
+```
+
+You can also assign the shell by "$#!/bin/bash", eg:
+```
+with session.shell('#!/bin/bash') as console:
+    console('cd $HOME')
+```
+
+
+### 🌎＄ Invoke an interactive console to run commands on remote host using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+with $.connect('user@host','1234'):
+    with $:
+        $cd $HOME
+        $[ -e .ssh/id_rsa ]
+        if $.exitcode == 1:
+            ## ~/.ssh/id_rsa does not exist.
+            ## Lets run ssh-keygen without prompt to create it.
+            $ssh-keygen -t rsa -N ''
+```
+
+### 🌎🐍 Invoke an interactive console to run commands on remote host using the SSHScript module
+
+```
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.connect('user@host','1234') as remote_session:
+    with remote_session.shell() as console:
+        console('cd $HOME')
+        console('[ -e .ssh/id_rsa ]')
+        if console.exitcode == 1:
+            console("ssh-keygen -t rsa -N ''")
+```
+
+
+
 ### Symbols
 
 - ⏚ : local
