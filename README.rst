@@ -82,14 +82,14 @@ SSHScript is a powerful tool for system automation, and it is easy to use, even 
 Releases
 ========
 
-The new experimental release is 2.0.2 (2023/10/6). There are lots of changes, but documentation is on working.
+The new experimental release is 2.0.2 (2023/10/17). There are lots of changes, but documentation is on working.
 
 The last stable version is 1.1.17. (2022/9/22). Relase Notes_
 
 More
 ====
 
-* docs_
+* SSHScript V1.0 Reference Guide_
 
 * Examples_
 
@@ -98,7 +98,7 @@ More
 
 .. _paramiko : https://www.paramiko.org/
 
-.. _docs : https://iapyeh.github.io/sshscript/index
+.. _Guide : https://iapyeh.github.io/sshscript/v1/index
 
 .. _Examples : https://iapyeh.github.io/sshscript/examples/index
 
