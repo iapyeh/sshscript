@@ -83,7 +83,10 @@ Example of connecting to a nested remote host:
 
 ```
 with session.connect('user@host','1234') as remote_session:
-    with remote_session.connect('user@host2','5678') as nested_remote:
+    ## instead of using password, you can provide a paramiko pkey.
+    ## (should give a absolute path to the key file)
+    pkey = remote_session.pkey('/home/user/.ssh/id_rsa')
+    with remote_session.connect('user@host2',pkey=pkey) as nested_remote:
         nested_remote('hostname')
         print(f'hostname is {nested_remote.stdout.strip()}')
         nested_remote('whoami')
