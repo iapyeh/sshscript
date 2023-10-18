@@ -3,7 +3,7 @@
 
 ## Execute commands
 
-### Execute commands on localhost using the SSHScript dollar-syntax
+### ⏚＄ Execute commands on localhost using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
 ## run 1: sshscript example.spy
@@ -15,7 +15,7 @@ $whoami
 print(f'I am {$.stdout.strip()}')
 ```
 
-### Execute commands on localhost using the SSHScript module
+### ⏚🐍 Execute commands on localhost using the SSHScript module
 
 ```
 import sshscript
@@ -26,7 +26,7 @@ session('whoami')
 print(f'I am {session.stdout.strip()}')
 ```
 
-### Execute commands on remote host using the SSHScript dollar-syntax
+### 🌎＄ Execute commands on remote host using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
@@ -38,7 +38,7 @@ with $.connect('user@host','1234'):
     print(f'I am {$.stdout.strip()}')
 ```
 
-### Execute commands on remote host using the SSHScript module
+### 🌎🐍 Execute commands on remote host using the SSHScript module
 
 ```
 import sshscript
@@ -52,7 +52,7 @@ with session.connect('user@host','1234') as remote_session:
 
 ## Execute shell commands
 
-### Execute shell commands on localhost using the SSHScript dollar-syntax
+### ⏚＄ Execute shell commands on localhost using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
@@ -61,7 +61,7 @@ for line in $.stdout.splitlines():
     print('Folder:' + line)
 ```
 
-### Execute shell commands on localhost using the SSHScript module
+### ⏚🐍 Execute shell commands on localhost using the SSHScript module
 
 ```
 import sshscript
@@ -71,18 +71,17 @@ for line in session.stdout.splitlines():
     print('Folder:' + line)
 ```
 
-### Execute shell commands on remote host using the SSHScript dollar-syntax
+### 🌎＄ Execute shell commands on remote host using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
-## '1234' is the password to user@host. If no password is provided, "~/.ssh/id_rsa" will be used (paramiko's feature).
 with $.connect('user@host','1234'):
     $$ls -l | grep ^d
     for line in $.stdout.splitlines():
         print('Folder:' + line)
 ```
 
-### Execute shell commands on remote host using the SSHScript module
+### 🌎🐍 Execute shell commands on remote host using the SSHScript module
 
 ```
 import sshscript
@@ -92,3 +91,13 @@ with session.connect('user@host','1234') as remote_session:
     for line in remote_session.stdout.splitlines():
         print('Folder:' + line)
 ```
+
+### Symbol
+
+- ⏚ : local
+
+- 🌎 : remote
+
+- ＄ : SSHScript dollar-syntax
+
+- 🐍  : SSHScript module
