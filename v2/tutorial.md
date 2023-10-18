@@ -82,7 +82,7 @@ with $.connect('user@host','1234'):
         print('Folder:' + line)
 ```
 
-### Execute commands on remote host using the SSHScript module
+### Execute shell commands on remote host using the SSHScript module
 
 ```
 import sshscript
