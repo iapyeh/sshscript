@@ -1,5 +1,8 @@
+# SSHScript v2.0 Tutorial
+
 <div style="text-align:right"><a href="./index">Index</a></div>
-# SSHScript v2.0 Tutorial: Automating Shell Tasks in Python
+
+# Automating Shell Tasks in Python
 
 ## Execute commands
 
