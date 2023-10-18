@@ -1,4 +1,4 @@
-#### SSHScript 2.0 Tutorial
+# SSHScript 2.0 Tutorial
 
 <div style="text-align:right"><a href="./index">Index</a></div>
 
