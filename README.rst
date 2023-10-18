@@ -89,7 +89,7 @@ The last stable version is 1.1.17. (2022/9/22). Relase Notes_
 More
 ====
 
-* SSHScript V1.0 Reference Guide_
+* `SSHScript V1.0 Reference Guide`_
 
 * Examples_
 
@@ -98,7 +98,7 @@ More
 
 .. _paramiko : https://www.paramiko.org/
 
-.. _Guide : https://iapyeh.github.io/sshscript/v1/index
+.. _`SSHScript V1.0 Reference Guide` : https://iapyeh.github.io/sshscript/v1/index
 
 .. _Examples : https://iapyeh.github.io/sshscript/examples/index
 
