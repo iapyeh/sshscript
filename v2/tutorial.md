@@ -207,7 +207,7 @@ with $.sudo('1234') as console:
 
 ```
 
-### ⏚🐍 Invoke an interactive console on localhost using the SSHScript module
+### ⏚🐍 Invoke an interactive root console on localhost using the SSHScript module
 
 ```
 import sshscript
@@ -219,7 +219,7 @@ with session.sudo('1234') as console:
     assert 'root' in console.stdout
 ```
 
-### 🌎＄ Invoke an interactive console on remote host using the SSHScript dollar-syntax
+### 🌎＄ Invoke an interactive root console on remote host using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
@@ -231,7 +231,7 @@ with $.connect('user@host','1234'):
         assert 'root' in $.stdout
 ```
 
-### 🌎🐍 Invoke an interactive console on remote host using the SSHScript module
+### 🌎🐍 Invoke an interactive root console on remote host using the SSHScript module
 
 ```
 import sshscript
