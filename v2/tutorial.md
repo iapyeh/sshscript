@@ -4,7 +4,7 @@
 
 # Automating Shell Tasks in Python
 
-## ⬛ Execute commands
+## 🔵 Execute commands
 
 ### ⏚＄ Execute commands on localhost using the SSHScript dollar-syntax
 ```
@@ -68,7 +68,7 @@ with session.connect('user@host','1234') as remote_session:
     print(f'I am {remote_session.stdout.strip()}')
 ```
 
-## ⬛ Execute shell commands
+## 🔵 Execute shell commands
 
 Shell commands are commands that must be executed by a shell. They can be used to perform a variety of tasks, such as:
 
@@ -119,9 +119,9 @@ with session.connect('user@host','1234') as remote_session:
 ```
 
 
-## ⬛ Invoke an interactive console to run commands
+## 🔵 Invoke an interactive console
 
-### ⏚＄ Invoke an interactive console to run commands on localhost using the SSHScript dollar-syntax
+### ⏚＄ Invoke an interactive console on localhost using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
@@ -141,7 +141,7 @@ with $#!/bin/bash:
 ```
 
 
-### ⏚🐍 Invoke an interactive console to run commands on localhost using the SSHScript module
+### ⏚🐍 Invoke an interactive console on localhost using the SSHScript module
 
 ```
 import sshscript
@@ -160,7 +160,7 @@ with session.shell('#!/bin/bash') as console:
 ```
 
 
-### 🌎＄ Invoke an interactive console to run commands on remote host using the SSHScript dollar-syntax
+### 🌎＄ Invoke an interactive console on remote host using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
@@ -174,7 +174,7 @@ with $.connect('user@host','1234'):
             $ssh-keygen -t rsa -N ''
 ```
 
-### 🌎🐍 Invoke an interactive console to run commands on remote host using the SSHScript module
+### 🌎🐍 Invoke an interactive console on remote host using the SSHScript module
 
 ```
 import sshscript
@@ -187,7 +187,51 @@ with session.connect('user@host','1234') as remote_session:
             console("ssh-keygen -t rsa -N ''")
 ```
 
+## 🔵 Invoke an interactive root console (sudo)
 
+### ⏚＄ Invoke an interactive root console on localhost using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+with $.sudo('1234'):
+    $cd /root
+    $whoami
+    assert 'root' in $.stdout
+```
+
+### ⏚🐍 Invoke an interactive console on localhost using the SSHScript module
+
+```
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.sudo('1234') as console:
+    console('cd /root')
+    console('whoami')
+    assert 'root' in console.stdout
+```
+
+### 🌎＄ Invoke an interactive console on remote host using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+with $.connect('user@host','1234'):
+    with $.sudo('1234'):
+        $cd /root
+        $whoami
+        assert 'root' in $.stdout
+```
+
+### 🌎🐍 Invoke an interactive console on remote host using the SSHScript module
+
+```
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.connect('user@host','1234') as remote_session:
+    with remote_session.sudo('1234') as console:
+        console('cd /root')
+        console('whoami')
+        assert 'root' in console.stdout
+```
 
 ### Symbols
 
