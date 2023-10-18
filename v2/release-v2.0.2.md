@@ -31,3 +31,6 @@ SSHScript v2.0.2 reimplements its dollar-syntax functionality using the Python.a
 
 - If you find any bugs or have any suggestions, please report them on the SSHScript GitHub repository.
 
+
+Last updated on 2023-10-18
+
