@@ -84,14 +84,12 @@ Releases
 
 The new experimental release is 2.0.2 (2023/10/17). There are lots of changes, but documentation is on working.
 
-The last stable version is 1.1.17. (2022/9/22). Relase Notes_
-
 More
 ====
 
 * `SSHScript V1.0 Reference Guide`_
 
-* Examples_
+* `SSHScript V1.0 Examples`_
 
 
 .. bottom of content
@@ -100,7 +98,4 @@ More
 
 .. _`SSHScript V1.0 Reference Guide` : https://iapyeh.github.io/sshscript/v1/index
 
-.. _Examples : https://iapyeh.github.io/sshscript/examples/index
-
-
-.. _Notes : https://iapyeh.github.io/sshscript/release-v1.1.17
+.. _`SSHScript V1.0 Examples` : https://iapyeh.github.io/sshscript/v1/examples/index
