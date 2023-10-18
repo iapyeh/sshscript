@@ -79,13 +79,15 @@ SSHScript can be used to automate a wide variety of system tasks, such as:
 
 SSHScript is a powerful tool for system automation, and it is easy to use, even for those with limited programming experience.
 
-Releases
-========
+New Releases
+============
 
 The new experimental release is 2.0.2 (2023/10/17). There are lots of changes, but documentation is on working.
 
-More
-====
+* `SSHScript V2.0 Reference Guide`_
+
+SSHScript v1.0
+==============
 
 * `SSHScript V1.0 Reference Guide`_
 
@@ -95,6 +97,8 @@ More
 .. bottom of content
 
 .. _paramiko : https://www.paramiko.org/
+
+.. _`SSHScript V2.0 Reference Guide` : https://iapyeh.github.io/sshscript/v2/index
 
 .. _`SSHScript V1.0 Reference Guide` : https://iapyeh.github.io/sshscript/v1/index
 
