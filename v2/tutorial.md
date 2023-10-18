@@ -21,6 +21,8 @@ print(f'I am {$.stdout.strip()}')
 ### ⏚🐍 Execute commands on localhost using the SSHScript module
 
 ```
+## filename: example.py
+## run: python3 example.py
 import sshscript
 session = sshscript.SSHScriptSession()
 session('hostname')
@@ -28,6 +30,18 @@ print(f'hostname is {session.stdout.strip()}')
 session('whoami')
 print(f'I am {session.stdout.strip()}')
 ```
+
+For execution details, insert the following content at the beginning of the example:
+```
+import os
+os.environ['VERBOSE'] = 'yes'
+os.environ['DEBUG'] = 'yes'
+## more details
+#os.environ['DEBUG'] = '8'
+
+sshscript.setupLogger()
+```
+
 
 ### 🌎＄ Execute commands on remote host using the SSHScript dollar-syntax
 ```
