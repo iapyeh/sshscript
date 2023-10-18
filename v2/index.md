@@ -1,5 +1,6 @@
 # SSHScript v2.0 Reference Guide
 
+## [SSHScript v2.0 Tutorial: Automating Shell Tasks in Python](https://iapyeh.github.io/sshscript/v2/tutorial)
 
 ## Install
 
@@ -50,3 +51,4 @@ SSHScript can be used for a variety of tasks, including:
 
 
 [![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
+
