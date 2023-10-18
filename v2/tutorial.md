@@ -30,7 +30,8 @@ print(f'I am {session.stdout.strip()}')
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
-## '1234' is the password to user@host. If no password is provided, "~/.ssh/id_rsa" will be used (paramiko's feature).
+## '1234' is the password. If no password is provided,
+## "~/.ssh/id_rsa" would be used (Paramiko's feature).
 with $.connect('user@host','1234'):
     $hostname
     print(f'hostname is {$.stdout.strip()}')
@@ -92,7 +93,7 @@ with session.connect('user@host','1234') as remote_session:
         print('Folder:' + line)
 ```
 
-### Symbol
+### Symbols
 
 - ⏚ : local
 
