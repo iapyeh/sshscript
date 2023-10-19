@@ -4,7 +4,7 @@
 
 # Automating Shell Tasks in Python
 
-## 🔵 Execute commands
+## 🔵 Execute commands: one-dollar ($)
 
 ### ⏚＄ Execute commands on localhost using the SSHScript dollar-syntax
 ```
@@ -70,6 +70,8 @@ with $.connect('user@host','1234'):
 ### 🌎🐍 Execute commands on remote host using the SSHScript module
 
 ```
+## filename: example.py
+## run: python3 example.py
 import sshscript
 session = sshscript.SSHScriptSession()
 with session.connect('user@host','1234') as remote_session:
@@ -82,6 +84,8 @@ with session.connect('user@host','1234') as remote_session:
 Example of connecting to a nested remote host:
 
 ```
+## filename: example.py
+## run: python3 example.py
 with session.connect('user@host','1234') as remote_session:
     ## instead of using password, you can provide a paramiko pkey.
     ## (should give a absolute path to the key file)
@@ -93,7 +97,7 @@ with session.connect('user@host','1234') as remote_session:
         print(f'I am {nested_remote.stdout.strip()}')
 ```
 
-## 🔵 Execute shell commands
+## 🔵 Execute shell commands: two-dollars($$)
 
 Shell commands are commands that must be executed by a shell. They can be used to perform a variety of tasks, such as:
 
@@ -135,6 +139,8 @@ with $.connect('user@host','1234'):
 ### 🌎🐍 Execute shell commands on remote host using the SSHScript module
 
 ```
+## filename: example.py
+## run: python3 example.py
 import sshscript
 session = sshscript.SSHScriptSession()
 with session.connect('user@host','1234') as remote_session:
@@ -144,7 +150,7 @@ with session.connect('user@host','1234') as remote_session:
 ```
 
 
-## 🔵 Invoke an interactive console
+## 🔵 Invoke an interactive console: with-dollar(with $)
 
 ### ⏚＄ Invoke an interactive console on localhost using the SSHScript dollar-syntax
 ```
@@ -212,7 +218,7 @@ with session.connect('user@host','1234') as remote_session:
             console("ssh-keygen -t rsa -N ''")
 ```
 
-## 🔵 Invoke an interactive root console (sudo)
+## 🔵 Invoke an interactive root console: $.sudo()
 
 ### ⏚＄ Invoke an interactive root console on localhost using the SSHScript dollar-syntax
 ```
@@ -234,6 +240,8 @@ with $.sudo('1234') as console:
 ### ⏚🐍 Invoke an interactive root console on localhost using the SSHScript module
 
 ```
+## filename: example.py
+## run: python3 example.py
 import sshscript
 session = sshscript.SSHScriptSession()
 with session.sudo('1234') as console:
@@ -258,6 +266,8 @@ with $.connect('user@host','1234'):
 ### 🌎🐍 Invoke an interactive root console on remote host using the SSHScript module
 
 ```
+## filename: example.py
+## run: python3 example.py
 import sshscript
 session = sshscript.SSHScriptSession()
 with session.connect('user@host','1234') as remote_session:
@@ -266,6 +276,66 @@ with session.connect('user@host','1234') as remote_session:
         assert console.exitcode == 0
         console('whoami')
         assert 'root' in console.stdout
+```
+
+## 🔵 Invoke another user interactive console: $.su()
+
+### ⏚＄ Invoke another user interactive console on localhost using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+## suppose that your have to su to "sudoer" before getting the root console
+with $.su('sudoer','1234'):
+    $whoami
+    assert 'sudoer' in $.stdout
+    with $.sudo('1234'):
+        $whoami
+        assert 'root' in $.stdout
+## Equivalent
+with $.su('sudoer','1234') as console:
+    with console.sudo('1234') as sudoconsole:
+        sudoconsole('whoami')
+        assert 'root' in sudoconsole.stdout
+```
+
+### ⏚🐍 Invoke another user interactive console on localhost using the SSHScript module
+
+```
+## filename: example.py
+## run: python3 example.py
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.su('sudoer','1234') as console:
+    with console.sudo('1234') as sudoconsole:
+        sudoconsole('whoami')
+        assert 'root' in sudoconsole.stdout
+```
+
+### 🌎＄ Invoke another user interactive console on remote host using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+with $.connect('user@host','1234'):
+    with $.su('sudoer','1234'):
+        $whoami
+        assert 'sudoer' in $.stdout
+        with $.sudo('1234'):
+            $whoami
+            assert 'root' in $.stdout
+```
+
+### 🌎🐍 Invoke another user interactive console on remote host using the SSHScript module
+
+```
+## filename: example.py
+## run: python3 example.py
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.connect('user@host','1234') as remote_session:
+    with remote_session.su('sudoer','1234') as console:
+        with console.sudo('1234') as sudoconsole:
+            sudoconsole('whoami')
+            assert 'root' in sudoconsole.stdout
 ```
 
 ### Symbols
