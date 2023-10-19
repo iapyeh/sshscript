@@ -9,6 +9,8 @@
 * [Invoke an interactive console: with-dollar(with $)](#with-dollar)
 * [Invoke an interactive root console: $.sudo()](#dollar-sudo)
 * [Invoke another user interactive console: $.su()](#dollar-su)
+* [Execute interactive commands : $.enter()](#dollar-enter)
+* [Execute foreground commands : $.iterate()](#dollar-iterate)
 
 ## 🔵 <a name="one-dollar"></a>Execute commands: one-dollar ($)
 
@@ -343,7 +345,65 @@ with session.connect('user@host','1234') as remote_session:
             sudoconsole('whoami')
             assert 'root' in sudoconsole.stdout
 ```
+## 🔵 <a name="dollar-enter"></a>Execute interactive commands: $.enter()
 
+### ⏚＄ Execute interactive commands on localhost using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+## This example executes "mysql", waiting for "password" to be prompted,
+## and then input "1234". When all statements are executed, send "quit\n" to stop this process.
+with $.enter('mysql -uroot -p dbname','password','1234',exit='quit') as mysql:
+    mysql("ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyN3wP4ssw0rd';")
+    mysql('show slave status\G;');
+    for line in mysql.stdout.splitlines():
+        if ':' in line:
+            key,value = [x.strip() for x in line.split(':')]
+```
+
+### ⏚🐍 Execute interactive commands on localhost using the SSHScript module
+
+```
+## filename: example.py
+## run: python3 example.py
+import sshscript
+session = sshscript.SSHScriptSession()
+## The example would upload new version to the Pipy.
+## Since this command would be terminated automatically, so we set exit=False,
+## Which means that there is nothing to input when exiting the "with closure".
+with session.enter(f'python3 -m twine upload version.2.tgz',exit=False) as console:
+    console.expect('username')
+    console('tony')
+    console.expect('password')
+    console('password-of-tony')
+```
+
+### 🌎＄ Execute interactive commands on remote host using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+with $.connect('user@host','1234'):
+    with $.enter('mysql -uroot -p dbname','password','1234',exit='quit') as mysql:
+        mysql("ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyN3wP4ssw0rd';")
+        mysql('show slave status\G;');
+        for line in mysql.stdout.splitlines():
+            if ':' in line:
+                key,value = [x.strip() for x in line.split(':')]
+```
+
+### 🌎🐍 Execute interactive commands on remote host using the SSHScript module
+
+```
+## filename: example.py
+## run: python3 example.py
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.connect('user@host','1234') as remote_session:
+    with remote_session.enter('python3') as python3:
+        python3('import helloworld')
+        if 'ModuleNotFoundError' in python3.stdout:
+            print('helloworld module is not installed on host')
+```
 ### Symbols
 
 - ⏚ : local
