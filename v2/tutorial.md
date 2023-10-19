@@ -474,6 +474,11 @@ with $.connect('user@host','1234') as host:
     host.upload('image.jpg','imageuploaded.jpg')
     host('[ -e "$PWD"/imageuploaded.jpg ]')
     assert host.exitcode == 0
+    ## move the uploaded file to /root
+    with $.sudo('1234') as sudo:
+        sudo('cp imageuploaded.jpg /root')
+        sudo('[ -e /root/imageuploaded.jpg ]')
+        assert sudo.exitcode == 0
 ```
 
 ### 🌎🐍 Upload files to remote host using the SSHScript module
@@ -489,6 +494,11 @@ with session.connect('user@host','1234') as host:
     host.upload('image.jpg','imageuploaded.jpg')
     host('[ -e "$PWD"/imageuploaded.jpg ]')
     assert host.exitcode == 0
+    ## move the uploaded file to /root
+    with host.sudo('1234') as sudo:
+        sudo('cp imageuploaded.jpg /root')
+        sudo('[ -e /root/imageuploaded.jpg ]')
+        assert sudo.exitcode == 0
 ```
 ## 🔵 <a name="dollar-download"></a>Download: $.download()
 
