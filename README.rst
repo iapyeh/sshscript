@@ -5,7 +5,7 @@ System automation is the process of repeating network and execution operations t
 
 SSHScript is technically an integration of the subprocess and Paramiko modules, but it presents an unified interface that is more convenient and expressive for system automation tasks. It is also pure Python, which means that SSHScript scripts can be easily integrated with other Python libraries and tools.
 
-Here is an example of a simple script in SSHScript syntax(v2):
+An example of SSHScript dollar-syntax (v2.0):
 
 .. code-block:: python
 
@@ -21,7 +21,7 @@ Here is an example of a simple script in SSHScript syntax(v2):
         sudoconsole('ls -l $HOME')
 
     ## connect to remote by ssh
-    with $.connect('user1@host', 'password):
+    with $.connect('user1@host', 'password'):
         $hostname
         ## get output by $.stdout, $.stderr and $.exitcode
         print('remote name is ', $.stdout.strip())
@@ -41,7 +41,7 @@ Here is an example of a simple script in SSHScript syntax(v2):
                 sudoconsole('ls -l $HOME')
 
 
-Here is an example of a simple script with SSHScript module(v2):
+An example of SSHScript module(v2):
 
 .. code-block:: python
 
@@ -56,7 +56,7 @@ Here is an example of a simple script with SSHScript module(v2):
         cols = line.split()
         if len(cols)>5: print(f'ussage of {cols[0]} is {cols[4]}')
     ## connect to remote by ssh
-    with session.connect('user1@host', 'password) as remote_session:
+    with session.connect('user1@host', 'password') as remote_session:
         # Execute a command on the remote host
         remote_session('df')
         for line in remote_session.stdout.split('\n'):
