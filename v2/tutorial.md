@@ -10,7 +10,7 @@
 * [Invoke an interactive root console: $.sudo()](#dollar-sudo)
 * [Invoke another user interactive console: $.su()](#dollar-su)
 * [Execute interactive commands : $.enter()](#dollar-enter)
-* [Execute foreground commands : $.iterate()](#dollar-iterate)
+* [Execute foreground programs : $.iterate()](#dollar-iterate)
 
 ## 🔵 <a name="one-dollar"></a>Execute commands: one-dollar ($)
 
@@ -393,6 +393,70 @@ with session.connect('user@host','1234') as remote_session:
         if 'ModuleNotFoundError' in python3.stdout:
             print('helloworld module is not installed on host')
 ```
+
+## 🔵 <a name="dollar-iterate"></a>Execute foreground programs: $.iterate()
+
+"Foreground programs" is a name to describe programs like "tcpdump" that run in the foreground and require user interaction to stop. These programs run in the active terminal session and hold it until the user takes action to terminate them. 
+
+
+### ⏚＄ Execute foreground programs on localhost using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+## This example executes "mysql", waiting for "password" to be prompted,
+## and then input "1234". When all statements are executed, send "quit\n" to stop this process.
+with $.sudo('1234') as sudo:
+    with sudo.iterate('tcpdump -vv') as loopable:
+        for line in loopable:
+            print(line)
+            ## should break by some reason
+            if line.find('192.168.131.79'): break
+```
+
+### ⏚🐍 Execute foreground programs on localhost using the SSHScript module
+
+```
+## filename: example.py
+## run: python3 example.py
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.sudo('1234') as sudo:
+    with sudo.iterate('tcpdump -vv') as loopable:
+        for line in loopable:
+            print(line)
+            ## should break by some reason
+            if line.find('192.168.131.79'): break
+```
+
+### 🌎＄ Execute foreground programs on remote host using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+with $.connect('user@host','1234') as host:
+    with host.sudo('1234') as sudo:
+        with sudo.iterate('tcpdump -vv') as loopable:
+            for line in loopable:
+                print(line)
+                ## should break by some reason
+                if line.find('192.168.131.79'): break
+```
+
+### 🌎🐍 Execute foreground programs on remote host using the SSHScript module
+
+```
+## filename: example.py
+## run: python3 example.py
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.connect('user@host','1234') as remote_session:
+    with remote_session.sudo('1234') as sudo:
+        with sudo.iterate('tcpdump -vv') as loopable:
+            for line in loopable:
+                print(line)
+                ## should break by some reason
+                if line.find('192.168.131.79'): break
+```
+
 ### Symbols
 
 - ⏚ : local
