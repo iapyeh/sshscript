@@ -14,7 +14,7 @@ Last update: 2023/10/19
 * [Invoke another user interactive console: $.su()](#dollar-su)
 * [Execute interactive commands : $.enter()](#dollar-enter)
 * [Execute foreground programs : $.iterate()](#dollar-iterate)
-* [Upload : $.upload())](#dollar-upload)
+* [Upload : $.upload()](#dollar-upload)
 * [Download : $.download()](#dollar-download)
 
 ## 🔵 <a name="one-dollar"></a>Execute commands: one-dollar ($)
@@ -475,7 +475,7 @@ with $.connect('user@host','1234') as host:
     host('[ -e "$PWD"/imageuploaded.jpg ]')
     assert host.exitcode == 0
     ## move the uploaded file to /root
-    with $.sudo('1234') as sudo:
+    with host.sudo('1234') as sudo:
         sudo('cp imageuploaded.jpg /root')
         sudo('[ -e /root/imageuploaded.jpg ]')
         assert sudo.exitcode == 0
