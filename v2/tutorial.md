@@ -232,12 +232,6 @@ with session.connect('user@host','1234') as remote_session:
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
-with $.sudo('1234'):
-    $cd /root
-    assert $.exitcode == 0 ## success
-    $whoami
-    assert 'root' in $.stdout
-## Equivalent
 with $.sudo('1234') as console:
     console('cd /root')
     assert console.exitcode == 0
@@ -263,12 +257,12 @@ with session.sudo('1234') as console:
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
-with $.connect('user@host','1234'):
-    with $.sudo('1234'):
-        $cd /root
-        assert $.exitcode == 0 ## success
-        $whoami
-        assert 'root' in $.stdout
+with $.connect('user@host','1234') as host:
+    with host.sudo('1234') as sudo:
+        sudo('cd /root')
+        assert sudo.exitcode == 0 ## success
+        sudo('whoami')
+        assert 'root' in sudo.stdout
 ```
 
 ### 🌎🐍 Invoke an interactive root console on remote host using the SSHScript module
@@ -293,17 +287,12 @@ with session.connect('user@host','1234') as remote_session:
 ## filename: example.spy
 ## run: sshscript example.spy
 ## suppose that your have to su to "sudoer" before getting the root console
-with $.su('sudoer','1234'):
-    $whoami
-    assert 'sudoer' in $.stdout
-    with $.sudo('1234'):
-        $whoami
-        assert 'root' in $.stdout
-## Equivalent
-with $.su('sudoer','1234') as console:
-    with console.sudo('1234') as sudoconsole:
-        sudoconsole('whoami')
-        assert 'root' in sudoconsole.stdout
+with $.su('sudoer','1234') console:
+    console('whoami')
+    assert 'sudoer' in console.stdout
+    with console.sudo('1234') as sudo_console:
+        sudo_console('whoami')
+        assert 'root' in sudo_console.stdout
 ```
 
 ### ⏚🐍 Invoke another user interactive console on localhost using the SSHScript module
@@ -314,22 +303,22 @@ with $.su('sudoer','1234') as console:
 import sshscript
 session = sshscript.SSHScriptSession()
 with session.su('sudoer','1234') as console:
-    with console.sudo('1234') as sudoconsole:
-        sudoconsole('whoami')
-        assert 'root' in sudoconsole.stdout
+    with console.sudo('1234') as sudo_console:
+        sudo_console('whoami')
+        assert 'root' in sudo_console.stdout
 ```
 
 ### 🌎＄ Invoke another user interactive console on remote host using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
-with $.connect('user@host','1234'):
-    with $.su('sudoer','1234'):
-        $whoami
-        assert 'sudoer' in $.stdout
-        with $.sudo('1234'):
-            $whoami
-            assert 'root' in $.stdout
+with $.connect('user@host','1234') as host:
+    with host.su('sudoer','1234') as console:
+        console('whoami')
+        assert 'sudoer' in console.stdout
+        with console.sudo('1234') as sudo_console:
+            sudo_console('whoami')
+            assert 'root' in sudo_console.stdout
 ```
 
 ### 🌎🐍 Invoke another user interactive console on remote host using the SSHScript module
@@ -371,19 +360,19 @@ session = sshscript.SSHScriptSession()
 ## The example would upload new version to the Pipy.
 ## Since this command would be terminated automatically, so we set exit=False,
 ## Which means that there is nothing to input when exiting the "with closure".
-with session.enter(f'python3 -m twine upload version.2.tgz',exit=False) as console:
-    console.expect('username')
-    console('tony')
-    console.expect('password')
-    console('password-of-tony')
+with session.enter(f'python3 -m twine upload version.2.tgz',exit=False) as pipyupdate:
+    pipyupdate.expect('username')
+    pipyupdate('tony')
+    pipyupdate.expect('password')
+    pipyupdate('password-of-tony')
 ```
 
 ### 🌎＄ Execute interactive commands on remote host using the SSHScript dollar-syntax
 ```
 ## filename: example.spy
 ## run: sshscript example.spy
-with $.connect('user@host','1234'):
-    with $.enter('mysql -uroot -p dbname','password','1234',exit='quit') as mysql:
+with $.connect('user@host','1234') as host:
+    with host.enter('mysql -uroot -p dbname','password','1234',exit='quit') as mysql:
         mysql("ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyN3wP4ssw0rd';")
         mysql('show slave status\G;');
         for line in mysql.stdout.splitlines():
