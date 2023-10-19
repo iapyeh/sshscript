@@ -11,6 +11,8 @@
 * [Invoke another user interactive console: $.su()](#dollar-su)
 * [Execute interactive commands : $.enter()](#dollar-enter)
 * [Execute foreground programs : $.iterate()](#dollar-iterate)
+* [Upload : $.upload())](#dollar-upload)
+* [Download : $.download()](#dollar-download)
 
 ## 🔵 <a name="one-dollar"></a>Execute commands: one-dollar ($)
 
@@ -455,6 +457,35 @@ with session.connect('user@host','1234') as remote_session:
                 print(line)
                 ## should break by some reason
                 if line.find('192.168.131.79'): break
+```
+
+## 🔵 <a name="dollar-upload"></a>Upload: $.upload()
+
+### 🌎＄ Upload files to remote host using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+import os
+assert os.path.exists('image.jpg')
+with $.connect('user@host','1234') as host:
+    host.upload('image.jpg','image.jpg')
+    host('[ -e "$PWD"/image.jpg ]')
+    assert host.exitcode == 0
+```
+
+### 🌎🐍 Upload files to remote host using the SSHScript module
+
+```
+## filename: example.py
+## run: python3 example.py
+import sshscript
+session = sshscript.SSHScriptSession()
+import os
+assert os.path.exists('image.jpg')
+with session.connect('user@host','1234') as host:
+    host.upload('image.jpg','image.jpg')
+    host('[ -e "$PWD"/image.jpg ]')
+    assert host.exitcode == 0
 ```
 
 ### Symbols
