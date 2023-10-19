@@ -4,7 +4,13 @@
 
 # Automating Shell Tasks in Python
 
-## 🔵 Execute commands: one-dollar ($)
+* [Execute commands: one-dollar ($)](#one-dolar)
+* [Execute shell commands: two-dollars($$)](#two-dolars)
+* [Invoke an interactive console: with-dollar(with $)](#with-dollar)
+* [Invoke an interactive root console: $.sudo()](#dollar-sudo)
+* [Invoke another user interactive console: $.su()](#dollar-su)
+
+## 🔵 <a name="one-dollar"></a>Execute commands: one-dollar ($)
 
 ### ⏚＄ Execute commands on localhost using the SSHScript dollar-syntax
 ```
@@ -97,7 +103,7 @@ with session.connect('user@host','1234') as remote_session:
         print(f'I am {nested_remote.stdout.strip()}')
 ```
 
-## 🔵 Execute shell commands: two-dollars($$)
+## 🔵 <a name="two-dollars"></a> Execute shell commands: two-dollars($$)
 
 Shell commands are commands that must be executed by a shell. They can be used to perform a variety of tasks, such as:
 
@@ -150,7 +156,7 @@ with session.connect('user@host','1234') as remote_session:
 ```
 
 
-## 🔵 Invoke an interactive console: with-dollar(with $)
+## 🔵 <a name="with-dollar"></a>Invoke an interactive console: with-dollar(with $)
 
 ### ⏚＄ Invoke an interactive console on localhost using the SSHScript dollar-syntax
 ```
@@ -218,7 +224,7 @@ with session.connect('user@host','1234') as remote_session:
             console("ssh-keygen -t rsa -N ''")
 ```
 
-## 🔵 Invoke an interactive root console: $.sudo()
+## 🔵 <a name="dollar-sudo"></a>Invoke an interactive root console: $.sudo()
 
 ### ⏚＄ Invoke an interactive root console on localhost using the SSHScript dollar-syntax
 ```
@@ -278,7 +284,7 @@ with session.connect('user@host','1234') as remote_session:
         assert 'root' in console.stdout
 ```
 
-## 🔵 Invoke another user interactive console: $.su()
+## 🔵 <a name="dollar-su"></a>Invoke another user interactive console: $.su()
 
 ### ⏚＄ Invoke another user interactive console on localhost using the SSHScript dollar-syntax
 ```
