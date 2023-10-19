@@ -23,7 +23,7 @@ SSHScript v2.0.2 reimplements its dollar-syntax functionality using the Python.a
 
 - The usage case of with-dollar is now limited to invoking shell only.
 
-- The syntax @{var} is removed from one-dollar commands (e.g., $hostname) since $f-string is now supported.
+- The syntax @{var} would removed from dollar-syntax, using $f-string is recommanded.
 
 ## Additional Notes
 
