@@ -16,9 +16,9 @@ Here is an example of a simple script in SSHScript syntax(v2):
     print('localhost name is ', $.stdout.strip())
     ## get an interactive sudo console of locahost
     with $.sudo('password') as sudoconsole:
-        sudoconsole.exec_command('whoami')
+        sudoconsole('whoami')
         assert 'root' in sudoconsole.stdout
-        sudoconsole.exec_command('ls -l $HOME')
+        sudoconsole('ls -l $HOME')
 
     ## connect to remote by ssh
     with $.connect('user1@host', 'password):
@@ -27,18 +27,18 @@ Here is an example of a simple script in SSHScript syntax(v2):
         print('remote name is ', $.stdout.strip())
         ## get an interactive sudo console of remote host
         with $.sudo('password') as sudoconsole:
-            sudoconsole.exec_command('whoami')
+            sudoconsole('whoami')
             assert 'root' in sudoconsole.stdout
-            sudoconsole.exec_command('ls -l $HOME')
+            sudoconsole('ls -l $HOME')
         with $.connect('user2@nestedhost', pkey=$.pkey('/home/user1/.ssh/id_rsa')):
             $hostname
             ## get output by $.stdout, $.stderr and $.exitcode
             print('nested remote name is ', $.stdout.strip())
             ## get an interactive sudo console of remote host
             with $.sudo('password') as sudoconsole:
-                sudoconsole.exec_command('whoami')
+                sudoconsole('whoami')
                 assert 'root' in sudoconsole.stdout
-                sudoconsole.exec_command('ls -l $HOME')
+                sudoconsole('ls -l $HOME')
 
 
 Here is an example of a simple script with SSHScript module(v2):
@@ -51,20 +51,20 @@ Here is an example of a simple script with SSHScript module(v2):
     from sshscript import SSHScriptSession
     session = SSHScriptSession()
     # Execute a command on the local host
-    session.exec_command('df')
+    session('df')
     for line in session.stdout.split('\n'):
         cols = line.split()
         if len(cols)>5: print(f'ussage of {cols[0]} is {cols[4]}')
     ## connect to remote by ssh
     with session.connect('user1@host', 'password) as remote_session:
         # Execute a command on the remote host
-        remote_session.exec_command('df')
+        remote_session('df')
         for line in remote_session.stdout.split('\n'):
             cols = line.split()
             if len(cols)>5: print(f'ussage of {cols[0]} is {cols[4]}')
         with remote_session.connect('user2@nestedhost', pkey=remote_session.pkey('/home/user1/.ssh/id_rsa') as nested_remote_session:
             # Execute a command on the remote host
-            nested_remote_session.exec_command('df')
+            nested_remote_session('df')
             for line in nested_remote_session.stdout.split('\n'):
                 cols = line.split()
                 if len(cols)>5: print(f'ussage of {cols[0]} is {cols[4]}')
@@ -82,7 +82,7 @@ SSHScript is a powerful tool for system automation, and it is easy to use, even 
 New Releases
 ============
 
-The new experimental release is 2.0.2 (2023/10/17). There are lots of changes, but documentation is on working.
+The new experimental release is 2.0.2 (2023/10/17). There are lots of changes.
 
 * `SSHScript V2.0 Reference Guide`_
 
