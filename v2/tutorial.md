@@ -468,8 +468,8 @@ with session.connect('user@host','1234') as remote_session:
 import os
 assert os.path.exists('image.jpg')
 with $.connect('user@host','1234') as host:
-    host.upload('image.jpg','image.jpg')
-    host('[ -e "$PWD"/image.jpg ]')
+    host.upload('image.jpg','imageuploaded.jpg')
+    host('[ -e "$PWD"/imageuploaded.jpg ]')
     assert host.exitcode == 0
 ```
 
@@ -483,9 +483,42 @@ session = sshscript.SSHScriptSession()
 import os
 assert os.path.exists('image.jpg')
 with session.connect('user@host','1234') as host:
-    host.upload('image.jpg','image.jpg')
+    host.upload('image.jpg','imageuploaded.jpg')
+    host('[ -e "$PWD"/imageuploaded.jpg ]')
+    assert host.exitcode == 0
+```
+## 🔵 <a name="dollar-download"></a>Download: $.download()
+
+### 🌎＄ Download files from remote host using the SSHScript dollar-syntax
+```
+## filename: example.spy
+## run: sshscript example.spy
+import os
+with $.connect('user@host','1234') as host:
+    $[ -e "$PWD"/image.jpg ]
+    assert $.exitcode == 0
+    host.download('image.jpg','imagedownloaded.jpg')
+## check downloaded file on localhost
+$[ -e imagedownloaded.jpg ]
+assert $.exitcode == 0
+```
+
+### 🌎🐍 Download files from remote host using the SSHScript module
+
+```
+## filename: example.py
+## run: python3 example.py
+import sshscript
+session = sshscript.SSHScriptSession()
+import os
+with session.connect('user@host','1234') as host:
+    ## check source file on remote host
     host('[ -e "$PWD"/image.jpg ]')
     assert host.exitcode == 0
+    host.download('image.jpg','imagedownloaded.jpg')
+## check downloaded file on localhost
+session('[ -e imagedownloaded.jpg ]')
+assert session.exitcode == 0
 ```
 
 ### Symbols
