@@ -41,7 +41,7 @@ An example of SSHScript dollar-syntax (v2.0):
                 sudoconsole('ls -l $HOME')
 
 
-An example of SSHScript module(v2):
+An example of SSHScript module(v2.0):
 
 .. code-block:: python
 
@@ -50,20 +50,20 @@ An example of SSHScript module(v2):
     import sshscript
     from sshscript import SSHScriptSession
     session = SSHScriptSession()
-    # Execute a command on the local host
+    # Execute commands on localhost
     session('df')
     for line in session.stdout.split('\n'):
         cols = line.split()
         if len(cols)>5: print(f'ussage of {cols[0]} is {cols[4]}')
     ## connect to remote by ssh
     with session.connect('user1@host', 'password') as remote_session:
-        # Execute a command on the remote host
+        # Execute commands on remote host
         remote_session('df')
         for line in remote_session.stdout.split('\n'):
             cols = line.split()
             if len(cols)>5: print(f'ussage of {cols[0]} is {cols[4]}')
         with remote_session.connect('user2@nestedhost', pkey=remote_session.pkey('/home/user1/.ssh/id_rsa') as nested_remote_session:
-            # Execute a command on the remote host
+            # Execute commands on remote host
             nested_remote_session('df')
             for line in nested_remote_session.stdout.split('\n'):
                 cols = line.split()
