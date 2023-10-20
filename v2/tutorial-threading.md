@@ -14,6 +14,8 @@ Last Updated on 2023/10/20
 
 ##  🔵 <a name="effective_session"></a> Every thread has an effective SSHScript session
 
+![image](sessionstack.jpeg)
+
 The initial session (an instance of SSHScriptSession) is created for the main thread. All commands executed by the initial session are executed on the localhost using the subprocess module. This includes one-dollar, two-dollar, with-dollar commands as well as dollar properties, such as $.stdout, $.stderr and $.exitcode.
 
 For example, the following command would be executed by the subprocess module:
