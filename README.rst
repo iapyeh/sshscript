@@ -95,7 +95,9 @@ Benefits of using SSHScript
 
 ![image](https://iapyeh.github.io/sshscript/v2/methodology.png)
 .. image:: https://iapyeh.github.io/sshscript/v2/methodology.png
-
+   :scale: 50%
+   :alt: alternate text
+   :align: middle
 Use cases
 ==========
 
