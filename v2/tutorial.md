@@ -1,7 +1,7 @@
 # SSHScript 2.0 Tutorial
-# Automating Shell Tasks in Python
+# Core Features
 
-Last update: 2023/10/19
+Last Updated on 2023/10/20
 
 <div style="text-align:right;position:relative;top:-200px"><a href="./index">Back to Index</a></div>
 
