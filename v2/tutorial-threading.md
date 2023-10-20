@@ -7,54 +7,54 @@ Last Updated on 2023/10/20
 
 ## Topics
 
-- [Every Thread has an Effective Session](#effective_session)
+- [Every thread has an effective SSHScript session](#effective_session)
 - [Let functions come into play](#functions)
 - [Let Threads come into play](#threads)
 - [session.bind(),session.thread(): Binding a session to threads or functions](#bind)
 
-##  🔵 <a name="effective_session"></a> Every Thread has an Effective Session.
+##  🔵 <a name="effective_session"></a> Every thread has an effective SSHScript session
 
-The "session" here means an instance of SSHScriptSession. Initially, SSHScript creates a session for the main thread.
-All commands executed by the initial session are executed by the subprocess module on localhost.
-"All commands" includes one-dollar, two-dollars and with-dollar commands.
+The initial session is created for the main thread. All commands executed by the initial session are executed on the localhost using the subprocess module. This includes one-dollar, two-dollar, and with-dollar commands.
+
+For example, the following command would be executed by the subprocess module:
 
 ```
-## This command "hostname" would be executed by the subprocess module. 
-## Because the effective session is the initial sesssion of the main thread.
 $hostname
 ```
+This is because the effective session is the initial session of the main thread.
 
-If the initial session was connecting to a remote server. A new instance of SSHScriptSession would be returned by the $.connect() method.
-The new instance of SSHScriptSession would become the "effective session" of the main thread.
+If the initial session is connected to a remote server, a new SSHScript session is returned by the $.connect() method. This new session becomes the effective session of the main thread.
 
+For example, the "hostname" command would be executed by the Paramiko module:
 ```
 with $.connect('user@remotehost'):
-    ## This command "hostname" would be executed by the paramiko module
-    ## Because the effective session is the new instance of SSHScriptSession returned by $.connect()
     $hostname
 ```
+This is because the effective session is the new SSHScript session returned by $.connect().
 
-SSHScript attaches every dollar-commands to a session to execute it.
-For doing that, SSHScript binds a session to every thread, that session is the effective session of the thread.
+SSHScript attaches every dollar-command to a session to execute it. To do this, SSHScript binds a session to every thread. This session is the effective session of the thread.
 
-Every thread carries a stack to hold sessions. Initially, the stack of main thread has one element -- the initial session.
-A new connection creates a new session and that session would be put on the stack top to be the effective session.
-And it would be pull out of the stack when it was closed.
+Every thread carries a stack to hold sessions. Initially, the stack of the main thread has one element: the initial session.
+
+When a new connection is created, a new session is created and placed on top of the stack to become the effective session. This session is removed from the stack when it is closed.
 
 ```
-## Initial session would execute the following commands on localhost by subprocess module.
+## For example, the following code would execute the commands on localhost using the subprocess module:
 $hostname
 $whoami
-## The new session would become the effective session of main thread
+
+## Then, the new session becomes the effective session of the main thread:
 with $.connect('user@remotehost'):
-    ## the effective session which is connected to remotehost would execute the following commands
     $hostname
     $whoami
-## Initial session would execute the following commands on localhost by subprocess module.
-## Since connection to remotehost is closed.
+
+## Finally, the initial session would execute the commands on localhost using the subprocess module again:
 $hostname
 $whoami
+
+## This is because the connection to the remote host is closed.
 ```
+
 ## 🔵 <a name="lastsession"></a>The last connection made is the effective session
 
 SSHScript 2.0 supports a session connects to multiple hosts at the same time.
