@@ -14,7 +14,7 @@ Last Updated on 2023/10/20
 
 ##  🔵 <a name="effective_session"></a> Every thread has an effective SSHScript session
 
-The initial session is created for the main thread. All commands executed by the initial session are executed on the localhost using the subprocess module. This includes one-dollar, two-dollar, and with-dollar commands.
+The initial session (an instance of SSHScriptSession) is created for the main thread. All commands executed by the initial session are executed on the localhost using the subprocess module. This includes one-dollar, two-dollar, with-dollar commands as well as dollar properties, such as $.stdout, $.stderr and $.exitcode.
 
 For example, the following command would be executed by the subprocess module:
 
@@ -23,14 +23,14 @@ $hostname
 ```
 This is because the effective session is the initial session of the main thread.
 
-If the initial session is connected to a remote server, a new SSHScript session is returned by the $.connect() method. This new session becomes the effective session of the main thread.
+If the initial session is connected to a remote server, a new SSHScriptSession instance is returned by the $.connect() method. This new session becomes the effective session of the main thread.
 
 For example, the "hostname" command would be executed by the Paramiko module:
 ```
 with $.connect('user@remotehost'):
     $hostname
 ```
-This is because the effective session is the new SSHScript session returned by $.connect().
+This is because the effective session is the new SSHScriptSession instance returned by $.connect().
 
 SSHScript attaches every dollar-command to a session to execute it. To do this, SSHScript binds a session to every thread. This session is the effective session of the thread.
 
