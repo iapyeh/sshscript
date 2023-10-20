@@ -1,8 +1,9 @@
 # SSHScript v2.0 Reference Guide
+# Automating Shell Tasks in Python
+Last Updated on 2023/10/20
 
-2023/10/18
-
-## [Tutorial: Automating Shell Tasks in Python](tutorial)
+## [Tutorial: SSHScript Core Features](tutorial)
+## [Tutorial: SSHScript and Threading](tutorial-threading)
 
 ## Install
 
