@@ -1,5 +1,4 @@
 # SSHScript v2.0 Reference Guide
-# Automating Shell Tasks in Python
 Last Updated on 2023/10/20
 
 ## Install
@@ -8,7 +7,8 @@ Last Updated on 2023/10/20
 pip install sshscript
 ```
 
-## [Tutorial: SSHScript Core Features](tutorial)
-## [Tutorial: SSHScript and Threading](tutorial-threading)
+## Tutorial
+* [SSHScript Core Features](tutorial)
+* [SSHScript and Threading](tutorial-threading)
 
 
