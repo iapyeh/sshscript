@@ -5,7 +5,7 @@ Last Updated on 2023/10/20
 
 <div style="text-align:right;position:relative;top:-200px"><a href="./index">Back to Index</a></div>
 
-## Every Thread has an Effective Session.
+##  🔵 <a name="one"></a> Every Thread has an Effective Session.
 
 The "session" here means an instance of SSHScriptSession. Initially, SSHScript creates a session for the main thread.
 All commands executed by the initial session are executed by the subprocess module on localhost.
@@ -49,26 +49,59 @@ $hostname
 $whoami
 ```
 
-### When a function comes into play
+###  🔵 <a name="functions"></a>Let functions come into play
 
-Let's check the example code below:
+Usually we got so many runtines to execute on many hosts.
+We could use functions to do the same thing on every host.
+By updating the function, it applies to all hosts.
+
+Here is an example:
 ```
-def get_profile():
-    profile = {}
-    $hostname
-    profile['hostname'] = $.stdout.strip()
-    $whoami
-    profile['whoami'] = $.stdout.strip()
+def get_date():
+    $date
+    profile = {'dat':$.stdout.strip()}
     return profile
 
-profile = {'localhost':get_profile()}
-hosts = ['user@hostA','user@hostB']
-for account in hosts:
+profile = {'localhost':get_date()}
+accounts = ['user@hostA','user@hostB']
+for account in accounts:
     with $.connect(account):
-        profile[account] = get_profile()
+        profile[account] = get_date()
+```
+
+###  🔵 <a name="threads"></a>Let Threads come into play
+
+For some reason that we would use thread.
+
+Here is an example:
+```
+def get_date(profile):
+    $date
+    profile['date'] = $.stdout.strip()
+
+def get_diskspace(profile):
+    $df
+    profile['df'] = $.stdout.strip()
+
+def connect(account,profile):
+    with $.connect(account) as remote:
+        $hostname
+        hostname = $.stdout.strip()
+        profile[hostname] = {}
+        get_date(profile[hostname])
+        get_diskspace(profile[hostname])
+
+profile = {}
+accounts = ['user@hostA','user@hostB']
+threads = []
+for account in accounts:
+    thread = $.thread(target=get_profile,args=[account,profile])
+    thread.start()
+    threads.append(thread)
+for thread in threads:
+    thread.join()
+print(profile)
 ```
 
 
-
-## 🔵 <a name="one"></a>
 
