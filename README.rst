@@ -149,7 +149,7 @@ SSHScript v1.0
 
 [![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
 
-|ImageLink|
+|ImageLink|_
 
 .. |ImageLink| image:: https://pepy.tech/badge/sshscript
 .. _ImageLink: https://pepy.tech/project/sshscript
