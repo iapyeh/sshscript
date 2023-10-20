@@ -125,7 +125,11 @@ Using functions to execute routines on multiple hosts is a powerful way to autom
 
 ##  🔵 <a name="threads"></a>Let Threads come into play
 
-For some reason that we would use thread.
+There are a few reasons why we might use threads:
+
+- To improve performance: Threads can be used to execute multiple tasks simultaneously, which can improve the overall performance of a program.
+- To simplify code: Threads can be used to make code more modular and easier to understand.
+- To handle multiple network connections simultaneously
 
 Here is an example:
 ```
@@ -157,15 +161,13 @@ for thread in threads:
 print(profile)
 ```
 
-In the above example, the "get_date()" and "get_disksapce()" functions were called by different threads.
-It is fine because the effective session of threads are different.
+In the above example, the get_date() and get_diskspace() functions were called by different threads. This is okay because the effective sessions of the threads are different.
 
 ##  🔵 <a name="bind"></a>session.bind(),session.thread(): Binding a session to threads or functions
 
-When a session is connecting to multiple hosts, the effective session is the last connection made.
-What if you want to execute commands on previous connecting sessions?
-That is why "session.bind()" comes into play.
-The effective session of a thread or a function could be arbitrary assigned by "session.bind()".
+When a session is connected to multiple hosts, the effective session is the last connection made.
+
+If you want to execute commands on a previous connection, you can use the session.bind() method. This method allows you to arbitrarily assign the effective session of a thread or function.
 
 Here is an example.
 ```
@@ -234,3 +236,5 @@ This image shows the relationship between hosts
 
 This image shows the relationship between threads and sessions.
 ![image](sessionthread.jpeg)
+
+The session.bind() method is a powerful tool that can be used to control the effective session of a thread or function. This can be useful for a variety of tasks, such as executing commands on specific hosts or debugging multithreaded code.
