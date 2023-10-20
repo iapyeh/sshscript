@@ -5,7 +5,14 @@ Last Updated on 2023/10/20
 
 <div style="text-align:right;position:relative;top:-200px"><a href="./index">Back to Index</a></div>
 
-##  🔵 <a name="one"></a> Every Thread has an Effective Session.
+## Topics
+
+- [Every Thread has an Effective Session](#effective_session)
+- [Let functions come into play](#functions)
+- [Let Threads come into play](#threads)
+- [session.bind(),session.thread(): Binding a session to threads or functions](#bind)
+
+##  🔵 <a name="effective_session"></a> Every Thread has an Effective Session.
 
 The "session" here means an instance of SSHScriptSession. Initially, SSHScript creates a session for the main thread.
 All commands executed by the initial session are executed by the subprocess module on localhost.
@@ -106,7 +113,7 @@ print(profile)
 In the above example, the "get_date()" and "get_disksapce()" functions were called by different threads.
 It is fine because the effective session of threads are different.
 
-##  🔵 <a name="bridge"></a>session.bind(),session.thread(): Binding a session to threads or functions.
+##  🔵 <a name="bind"></a>session.bind(),session.thread(): Binding a session to threads or functions
 
 SSHScript 2.0 supports a session connects to multiple hosts at the same time.
 When connecting to multiple hosts, the effective session is the last connection made.
