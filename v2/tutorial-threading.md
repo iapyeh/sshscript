@@ -49,7 +49,7 @@ $hostname
 $whoami
 ```
 
-###  🔵 <a name="functions"></a>Let functions come into play
+##  🔵 <a name="functions"></a>Let functions come into play
 
 Usually we got so many runtines to execute on many hosts.
 We could use functions to do the same thing on every host.
@@ -69,7 +69,7 @@ for account in accounts:
         profile[account] = get_date()
 ```
 
-###  🔵 <a name="threads"></a>Let Threads come into play
+##  🔵 <a name="threads"></a>Let Threads come into play
 
 For some reason that we would use thread.
 
@@ -106,7 +106,7 @@ print(profile)
 In the above example, the "get_date()" and "get_disksapce()" functions were called by different threads.
 It is fine because the effective session of threads are different.
 
-###  🔵 <a name="bridge"></a>session.bind(),session.thread(): Binding a session to threads or functions.
+##  🔵 <a name="bridge"></a>session.bind(),session.thread(): Binding a session to threads or functions.
 
 SSHScript 2.0 supports a session connects to multiple hosts at the same time.
 When connecting to multiple hosts, the effective session is the last connection made.
