@@ -229,8 +229,8 @@ bridgeSession2.close()
 bridgeSession3.close()
 print(profile)
 ```
-This images shows the relationship between hosts
+This image shows the relationship between hosts
 ![image](hostdiagram1.jpeg)
 
-This images shows the relationship between threads and sessions.
+This image shows the relationship between threads and sessions.
 ![image](sessionthread.jpeg)
