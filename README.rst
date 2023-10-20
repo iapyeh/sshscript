@@ -94,6 +94,7 @@ Benefits of using SSHScript
 * Leverage the Python ecosystem: SSHScript scripts are pure Python, which means that they can leverage the vast ecosystem of Python packages. This gives you access to a wide range of tools and libraries for tasks such as data processing, machine learning, and web development.
 
 ![image](https://iapyeh.github.io/sshscript/v2/methodology.png)
+.. image:: https://iapyeh.github.io/sshscript/v2/methodology.png
 
 Use cases
 ==========
@@ -146,3 +147,6 @@ SSHScript v1.0
 
 
 [![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
+
+.. |ImageLink| image:: https://pepy.tech/badge/sshscript
+.. _ImageLink: https://pepy.tech/project/sshscript
