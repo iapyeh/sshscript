@@ -1,13 +1,46 @@
     
 SSHScript
 #########
+
 System automation is the process of automating repetitive tasks by executing commands on local and remote hosts. SSHScript is a Python library that makes system automation easy. It provides a simple and intuitive interface for executing commands, without requiring any knowledge of the subprocess module or Paramiko (SSH).
 
-Benefits of SSHScript
-=====================
-* Unified interface: SSHScript integrates the subprocess and Paramiko modules into a single, unified interface that is more convenient and expressive for system automation tasks.
-* Pure Python: SSHScript scripts are pure Python, which means that they can be easily integrated with other Python libraries and tools.
-* Easy to use: SSHScript is easy to use, even for those with limited programming experience.
+
+SSHScript: A Simple and Intuitive Way to Automate Common SSH Tasks
+==================================================================
+
+SSHScript is a Python library that provides a simple and intuitive way to automate common tasks that involve running commands and dealing with outputs on local and remote hosts. SSHScript makes it easy to write scripts that can connect to remote hosts via SSH and execute commands, and it allows you to process the resulting data directly in Python. This enables you to build complex data structures and processing flows using an object-oriented approach. Parallel execution support: SSHScript supports parallel execution of commands using threads.
+
+
+Benefits of using SSHScript
+============================
+
+* Easy to use: SSHScript is easy to use, even for those with limited programming experience. It abstracts away the complexity of the subprocess and Paramiko modules, so you can focus on writing your scripts.
+
+* Intuitive and self-explanatory: SSHScript uses a simple and intuitive syntax, making it easy to read and write your scripts. You can embed shell commands directly in your Python scripts, which makes your scripts more readable and self-explanatory.
+
+Unified interface: SSHScript provides an unified interface for interacting with both local and remote hosts. This makes it easy to write scripts that can be used to automate tasks on any type of host.
+
+Easier handling of outputs and exceptions: SSHScript makes it easy to handle the output and exceptions of your scripts. You can use Python's built-in data structures and exception handling mechanisms to write more robust and maintainable scripts.
+
+Pure Python: SSHScript is written in pure Python, which means that it can be easily integrated with other Python libraries and tools. This makes it easy to extend SSHScript with new features and functionality.
+
+Leverage the Python ecosystem: SSHScript scripts are pure Python, which means that they can leverage the vast ecosystem of Python packages. This gives you access to a wide range of tools and libraries for tasks such as data processing, machine learning, and web development.
+
+Use cases
+==========
+
+SSHScript can be used for a variety of tasks, including:
+
+- Provisioning and configuration: SSHScript can be used to automate the provisioning and configuration of servers, networks, and other devices.
+
+- Data collection and processing: SSHScript can be used to collect data from remote hosts and process it in Python. This can be useful for tasks such as monitoring, logging, and reporting.
+
+- Deployment and testing: SSHScript can be used to deploy and test software on remote hosts.
+
+- Troubleshooting and maintenance: SSHScript can be used to troubleshoot and maintain remote systems.
+
+- Overall, SSHScript is a powerful and flexible tool that can be used to automate a wide range of common SSH tasks. It is easy to use and learn, and it provides a number of benefits over traditional shell scripting.
+
 
 Examples
 ========
