@@ -83,18 +83,19 @@ assert  hostname == 'bridge3'
 ## close the seession to bridge3
 $.close()
 
-## the effective session is now the bridge2
+## the effective session is the bridge2
 hostname = get_hostname()
 assert  hostname == 'bridge2'
 
 ## close the seession to bridge2
 $.close()
 
-## the effective session is now the bridge1
+## the effective session is the bridge1
 hostname = get_hostname()
 assert  hostname == 'bridge1'
 
 $.close()
+
 ## this would be localhost's hostname
 assert localhostname == get_hostname()
 
@@ -102,9 +103,7 @@ assert localhostname == get_hostname()
 
 ##  🔵 <a name="functions"></a>Let functions come into play
 
-Usually we got so many runtines to execute on many hosts.
-We could use functions to do the same thing on every host.
-By updating the function, it applies to all hosts.
+We often need to execute the same routines on multiple hosts. We can use functions to do this, which makes it easy to update the routine and apply it to all hosts.
 
 Here is an example:
 ```
@@ -119,6 +118,10 @@ for account in accounts:
     with $.connect(account):
         profile[account] = get_date()
 ```
+
+We can easily update the get_date() function to perform a different task on all of the remote hosts. For example, we could update the function to install a new software package or to start a new service.
+
+Using functions to execute routines on multiple hosts is a powerful way to automate system administration tasks.
 
 ##  🔵 <a name="threads"></a>Let Threads come into play
 
@@ -226,3 +229,8 @@ bridgeSession2.close()
 bridgeSession3.close()
 print(profile)
 ```
+This images shows the relationship between hosts
+![image](hostdiagram1.jpeg)
+
+This images shows the relationship between threads and sessions.
+![image](sessionthread.jpeg)
