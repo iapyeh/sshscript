@@ -57,12 +57,13 @@ $whoami
 ## This is because the connection to the remote host is closed.
 ```
 
-## 🔵 <a name="lastsession"></a>The last connection made is the effective session
+## 🔵 <a name="lastsession"></a>The last connection is the effective session
 
-SSHScript 2.0 supports a session connects to multiple hosts at the same time.
-When connecting to multiple hosts, the effective session is the last connection made.
+The effective session is the last connection made to a remote host.
 
-Here is an example.
+SSHScript 2.0 supports connecting to multiple remote hosts at the same time. When you connect to multiple hosts, the effective session is the session that was last connection to a remote host.
+
+Here is an example:
 ```
 def get_hostname():
     $hostname
@@ -75,7 +76,7 @@ $.connect('user@bridge1')
 $.connect('user@bridge2')
 $.connect('user@bridge3')
 
-## the effective session is the last connection made.
+## the effective session is the last connection.
 hostname = get_hostname()
 assert  hostname == 'bridge3'
 
