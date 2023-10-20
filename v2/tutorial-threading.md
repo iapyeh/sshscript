@@ -1,5 +1,5 @@
 # SSHScript 2.0 Tutorial
-# SSHScript and Threading (Draft)
+# SSHScript and Threading
 
 Last Updated on 2023/10/20
 
@@ -238,3 +238,5 @@ This image shows the relationship between threads and sessions.
 ![image](sessionthread.jpeg)
 
 The session.bind() method is a powerful tool that can be used to control the effective session of a thread or function. This can be useful for a variety of tasks, such as executing commands on specific hosts or debugging multithreaded code.
+
+( This article was written with the help of [Google Bard](https://bar.google.com/), which is awesome! )
