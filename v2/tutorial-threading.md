@@ -55,6 +55,47 @@ with $.connect('user@remotehost'):
 $hostname
 $whoami
 ```
+## 🔵 <a name="lastsession"></a>The last connection made is the effective session
+
+SSHScript 2.0 supports a session connects to multiple hosts at the same time.
+When connecting to multiple hosts, the effective session is the last connection made.
+
+Here is an example.
+```
+def get_hostname():
+    $hostname
+    return $.stdout.strip()
+
+localhostname = get_hostname()
+ 
+## connect to the bridge host 
+$.connect('user@bridge1')
+$.connect('user@bridge2')
+$.connect('user@bridge3')
+
+## the effective session is the last connection made.
+hostname = get_hostname()
+assert  hostname == 'bridge3'
+
+## close the seession to bridge3
+$.close()
+
+## the effective session is now the bridge2
+hostname = get_hostname()
+assert  hostname == 'bridge2'
+
+## close the seession to bridge2
+$.close()
+
+## the effective session is now the bridge1
+hostname = get_hostname()
+assert  hostname == 'bridge1'
+
+$.close()
+## this would be localhost's hostname
+assert localhostname == get_hostname()
+
+```
 
 ##  🔵 <a name="functions"></a>Let functions come into play
 
@@ -115,9 +156,8 @@ It is fine because the effective session of threads are different.
 
 ##  🔵 <a name="bind"></a>session.bind(),session.thread(): Binding a session to threads or functions
 
-SSHScript 2.0 supports a session connects to multiple hosts at the same time.
-When connecting to multiple hosts, the effective session is the last connection made.
-What if you want to execute commands on previous sessions?
+When a session is connecting to multiple hosts, the effective session is the last connection made.
+What if you want to execute commands on previous connecting sessions?
 That is why "session.bind()" comes into play.
 The effective session of a thread or a function could be arbitrary assigned by "session.bind()".
 
