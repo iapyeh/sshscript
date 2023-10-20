@@ -95,12 +95,10 @@ Benefits of using SSHScript
 
 ![image](https://iapyeh.github.io/sshscript/v2/methodology.png)
 
-.. image:: https://iapyeh.github.io/sshscript/v2/methodology.png
-   :width: 400px
-   :height: 500px
-   :alt: alternate text
-   :align: middle
+|pic2|
 
+.. |pic2| image:: https://iapyeh.github.io/sshscript/v2/methodology.png
+          :alt: my-picture2
 Use cases
 ==========
 
