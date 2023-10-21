@@ -1,4 +1,4 @@
-# SSHScript v2.0 Core Features
+# SSHScript v2.0 Commands Execution and Console
 
 Last Updated on 2023/10/20
 
