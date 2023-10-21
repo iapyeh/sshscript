@@ -13,6 +13,13 @@ SSHScript makes it easy to write scripts that can connect to remote hosts via SS
 .. |pic2| image:: https://iapyeh.github.io/sshscript/v2/methodology.png
           :alt: my-picture2
 
+Install
+=======
+
+.. code-block:: python
+
+    pip install sshscript
+
 Example Codes
 =============
 
