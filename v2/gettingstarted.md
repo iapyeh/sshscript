@@ -6,23 +6,21 @@ Last Updated on 2023/10/21
 
 ## Topics
 
-## Installation
+## 🔵 Installation
     ```
         pip3 install sshscript
         ## or
         python3 -m pip install sshscript
     ```
 
-## Upgrading
+## 🔵 Upgrading
     ```
         pip3 install sshscript --upgrade
         ## or
         python3 -m pip install sshscript --upgrade
     ```
     
-## 🔵 <a name="one-dollar"></a>Check Installation
-
-## Check Installation
+## 🔵 <a name="check-installation"></a> Check Installation
 
 After you have installed the SSHScript. let us check if it works. The SSHScript would install a cli named "sshscript". You can open a console and typing "sshscript" to check if it works.
 
