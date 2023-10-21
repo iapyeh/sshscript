@@ -134,25 +134,25 @@ New Releases
 
 The new experimental release is 2.0.2 (2023/10/17). There are lots of changes.
 
-* `SSHScript V2.0 Reference Guide`_
+* `SSHScript v2.0 Reference Guide`_
 
 SSHScript v1.0
 ==============
 
-* `SSHScript V1.0 Reference Guide`_
+* `SSHScript v1.0 Reference Guide`_
 
-* `SSHScript V1.0 Examples`_
+* `SSHScript v1.0 Examples`_
 
 
 .. bottom of content
 
 .. _paramiko : https://www.paramiko.org/
 
-.. _`SSHScript V2.0 Reference Guide` : https://iapyeh.github.io/sshscript/v2/index
+.. _`SSHScript v2.0 Reference Guide` : https://iapyeh.github.io/sshscript/v2/index
 
-.. _`SSHScript V1.0 Reference Guide` : https://iapyeh.github.io/sshscript/v1/index
+.. _`SSHScript v1.0 Reference Guide` : https://iapyeh.github.io/sshscript/v1/index
 
-.. _`SSHScript V1.0 Examples` : https://iapyeh.github.io/sshscript/v1/examples/index
+.. _`SSHScript v1.0 Examples` : https://iapyeh.github.io/sshscript/v1/examples/index
 
 
 |ImageLink|_
