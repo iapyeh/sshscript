@@ -2,6 +2,19 @@
 Last Updated on 2023/10/21
 
 
+## Installation
+    ```
+        pip3 install sshscript
+        ## or
+        python3 -m pip install sshscript
+    ```
+## Upgrading
+    ```
+        pip3 install sshscript --upgrade
+        ## or
+        python3 -m pip install sshscript --upgrade
+    ```
+
 ## Releases 
 
 * 2023/10/17: [v2.0.2 Release Notes](release-v2.0.2) 
