@@ -1,6 +1,6 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
 
-# SSHScript v2.0.2 Release Notes (Drafe)
+# SSHScript v2.0.2 Release Notes (Draft)
 
 
 ## Summary
@@ -9,7 +9,7 @@ Threading support has also been reimplemented, and SSHScript v2.0.2 now supports
 
 You can also now use all SSHScript functions in a regular Python script without needing to use dollar-syntax. 
 
-## Improvements in SSHScript v2.0.2
+## Improvements 
 
 - More flexible and consistent dollar-syntax functionality: You can now use all SSHScript functions in a regular Python script without needing to use dollar-syntax. This makes your scripts more readable and maintainable.
 - Reimplemented threading support: SSHScript v2.0.2 now supports connecting to multiple hosts at the same time. This can improve the performance of your scripts, especially when you need to execute commands on multiple hosts simultaneously.
@@ -19,32 +19,20 @@ You can also now use all SSHScript functions in a regular Python script without 
 
 Overall, SSHScript v2.0.2 is a significant improvement over previous versions. It is more flexible, consistent, robust, and stable. It is also easier to use, thanks to the new handy functions and improved foreground process handling.
 
-### New Features in SSHScript v2.0.2
+### New Features 
 
-- $.sudo(password), get a root console: The $.sudo function returns a console as the root user. This can be useful for executing commands that require root privileges.
+- `$.sudo(password)`, get a root console: The $.sudo function returns a console as the root user. This can be useful for executing commands that require root privileges.
 
-- $.su(username,password), get a different user console: The $.su() function returns a console as the specified user. This can be useful for executing commands as a different user, such as sudoer account.
+- `$.su(username,password)`, get a different user console: The $.su() function returns a console as the specified user. This can be useful for executing commands as a different user, such as sudoer account.
 
-- $.enter(command), get an interactive console: The $.enter() function returns a console of an interactive process. This can be useful for executing interactive tools, such as `mysql-client`.
+- `$.enter(command)`, get an interactive console: The $.enter() function returns a console of an interactive process. This can be useful for executing interactive tools, such as `mysql-client`.
 
-- $.iterate(command), iterate over foreground command outputs: The $.iterate() function returns a loopable console for iterating over the output of a foreground command, such astcpdump`. This can be useful for processing the output of foreground commands in real time.
+- `$.iterate(command)`, iterate over foreground command outputs: The $.iterate() function returns a loopable console for iterating over the output of a foreground command, such astcpdump`. This can be useful for processing the output of foreground commands in real time.
 
-- $.thread(target), create a new SSHScript-aware thread: The $.thread() function creates a new thread that takes the session as its effective sessions. This can be useful for executing commands in a multithreaded environment.
+- `$.thread(target)`, create a new SSHScript-aware thread: The $.thread() function creates a new thread that takes the session as its effective sessions. This can be useful for executing commands in a multithreaded environment.
 
 
 ## Additional Notes
-
-Simplifications in the Roadmap of SSHScript v2.0:
-SSHScript v2.0 would improve its simplicity, the following items are on the schedule.
-They would be implemented in next releases.
-
-- The usage case of with-dollar is now limited to invoking shell only.
-
-- The syntax @{var} would removed from dollar-syntax, using $f-string is recommanded.
-
-
-Development of SSHScript v2.0 is in early stage, If you find any bugs or have any suggestions, you are welcome to post them on the SSHScript GitHub repository.
-
 
 ### Simplifications in the Roadmap of SSHScript v2.0
 
@@ -69,7 +57,7 @@ with $#!/bin/bash as console:
 
 - The syntax @{var} will be removed from dollar-syntax, using $f-string is recommanded. This means that you should use Python f-strings instead of @{var} to insert variables into dollar-syntax commands. This is a simplification because f-strings are more concise and easier to use.
 
-### Development of SSHScript v2.0 is in an early stage. If you find any bugs or have any suggestions, please post them on the SSHScript GitHub repository.
+### Development of SSHScript v2.0 is in an early stage. If you find any bugs or have any suggestions, please post them on the `issues`.
 
 Last updated on 2023-10-21
 
