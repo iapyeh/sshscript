@@ -22,7 +22,7 @@ Install
     ## or
     python3 -m pip install sshscript
 
-Example Codes
+Examples
 =============
 
 An example of SSHScript dollar-syntax (v2.0):
