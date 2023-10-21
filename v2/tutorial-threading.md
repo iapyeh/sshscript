@@ -1,5 +1,4 @@
-# SSHScript 2.0 Tutorial
-# SSHScript and Threading
+# SSHScript v2.0 and Threading
 
 Last Updated on 2023/10/20
 
