@@ -1,11 +1,6 @@
 # SSHScript v2.0 Reference Guide
 Last Updated on 2023/10/21
 
-
-## Releases 
-
-* 2023/10/17: [v2.0.2 Release Notes](release-v2.0.2) 
-
 ## Tutorials
 * [Getting Started](gettingstarted)
 * [Commands Execution and Console](tutorial) 
@@ -13,6 +8,11 @@ Last Updated on 2023/10/21
 * [Console of sudo and su](tutorial-sudo) 
 * [Upload and Download Files](tutorial-download) 
 * [Threading Support](tutorial-threading) 
+
+
+## Releases 
+
+* 2023/10/17: [v2.0.2 Release Notes](release-v2.0.2) 
 
 ### SSHScript v2.0 is still under development. If you find any bugs or have any suggestions, you are welcome to post them on the `issues` page.
 
