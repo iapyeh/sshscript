@@ -1,7 +1,6 @@
-<div style="text-align:right"><a href="./index">Index</a></div>
-
 # SSHScript v2.0.2 Release Notes (Draft)
 
+<div style="text-align:right;position:relative;top:-200px"><a href="./index">Back to Index</a></div>
 
 ## Summary
 SSHScript v2.0.2 reimplements its dollar-syntax functionality using the Python.ast module, making it more flexible and consistent. 
