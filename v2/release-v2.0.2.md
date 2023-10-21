@@ -8,10 +8,11 @@ SSHScript v2.0.2 reimplements its dollar-syntax functionality using the Python.a
 Threading support has also been reimplemented, and SSHScript v2.0.2 now supports connecting to multiple hosts at the same time.
 
 You can also now use all SSHScript functions in a regular Python script without needing to use dollar-syntax. 
+This makes your scripts easier to integrate with existing scripts.
 
 ## Improvements 
 
-- More flexible and consistent dollar-syntax functionality: You can now use all SSHScript functions in a regular Python script without needing to use dollar-syntax. This makes your scripts more readable and maintainable.
+- Reimplemented syntax parsing: More flexible and consistent dollar-syntax functionality.
 - Reimplemented threading support: SSHScript v2.0.2 now supports connecting to multiple hosts at the same time. This can improve the performance of your scripts, especially when you need to execute commands on multiple hosts simultaneously.
 - Improved robustness and stability: SSHScript v2.0.2 has greatly refined the way it interacts with the shell console to improve its robustness and stability. This makes your scripts less likely to fail or crash.
 - Handy functions for regular tasks: SSHScript v2.0.2 provides handy functions for regular tasks, such as sudo and su. This makes it easier to write scripts that perform these tasks.
@@ -40,20 +41,20 @@ SSHScript v2.0 will focus on improving its simplicity. The following items are o
 
 - The usage case of with-dollar is now limited to invoking shell only. This means that with-dollar can no longer be used to execute commands. This is a simplification because it makes the with-dollar syntax more consistent and easier to understand.
 
-For example:
-```
-## would be invalid in the future
-with $"""
-    #!/bin/bash
-    cd $HOME
-    """ as console:
-           console('ls -l | grep ^d')
+    For example:
+    ```
+    ## would be invalid in the future
+    with $"""
+        #!/bin/bash
+        cd $HOME
+        """ as console:
+            console('ls -l | grep ^d')
 
-## valid in the future (this style is easier to understand)
-with $#!/bin/bash as console:
-    console('cd $HOME')
-    console('ls -l | grep ^d')
-```
+    ## valid in the future (this style is easier to understand)
+    with $#!/bin/bash as console:
+        console('cd $HOME')
+        console('ls -l | grep ^d')
+    ```
 
 - The syntax @{var} will be removed from dollar-syntax, using $f-string is recommanded. This means that you should use Python f-strings instead of @{var} to insert variables into dollar-syntax commands. This is a simplification because f-strings are more concise and easier to use.
 
