@@ -155,8 +155,6 @@ SSHScript v1.0
 .. _`SSHScript V1.0 Examples` : https://iapyeh.github.io/sshscript/v1/examples/index
 
 
-[![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
-
 |ImageLink|_
 
 .. |ImageLink| image:: https://pepy.tech/badge/sshscript
