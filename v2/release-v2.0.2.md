@@ -1,4 +1,4 @@
-# SSHScript v2.0.2 Release Notes (Draft)
+# SSHScript v2.0.2 Release Notes
 
 <div style="text-align:right;position:relative;top:-200px"><a href="./index">Back to Index</a></div>
 
@@ -61,13 +61,13 @@ SSHScript v2.0 will focus on improving its simplicity. The following items are o
     ```
     greeting = 'hello world'
     ## would be invalid in the future
-    $ echo @{greeting}
+    $echo @{greeting}
     ## using f-string is encouraged
     $f'echo {greeting}`
     ```
 
 
-### Development of SSHScript v2.0 is in an early stage. If you find any bugs or have any suggestions, please post them on the `issues`.
+### SSHScript v2.0 is still under development. If you find any bugs or have any suggestions, you are welcome to post them on the `issues` page.
 
 Last updated on 2023-10-21
 
