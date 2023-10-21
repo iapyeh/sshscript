@@ -58,6 +58,16 @@ SSHScript v2.0 will focus on improving its simplicity. The following items are o
 
 - The syntax @{var} will be removed from dollar-syntax, using $f-string is recommanded. This means that you should use Python f-strings instead of @{var} to insert variables into dollar-syntax commands. This is a simplification because f-strings are more concise and easier to use.
 
+    For example:
+    ```
+    greeting = 'hello world'
+    ## would be invalid in the future
+    $ echo @{greeting}
+    ## using f-string is encouraged
+    $f'echo {greeting}`
+    ```
+
+
 ### Development of SSHScript v2.0 is in an early stage. If you find any bugs or have any suggestions, please post them on the `issues`.
 
 Last updated on 2023-10-21
