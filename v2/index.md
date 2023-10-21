@@ -10,4 +10,6 @@ Last Updated on 2023/10/21
 * [Core Features](tutorial) 
 * [Threading Support](tutorial-threading) 
 
+### SSHScript v2.0 is still under development. If you find any bugs or have any suggestions, you are welcome to post them on the `issues` page.
+
 [![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
