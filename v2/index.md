@@ -7,7 +7,10 @@ Last Updated on 2023/10/21
 * 2023/10/17: [v2.0.2 Release Notes](release-v2.0.2) 
 
 ## Tutorial
-* [Core Features](tutorial) 
+* [Commands Execution and Console](tutorial) 
+* [Su and Sudo Console](tutorial-sudo) 
+* [Interactive Commands and Foreground Commands](tutorial-sudo) 
+* [Upload and Download Files](tutorial-download) 
 * [Threading Support](tutorial-threading) 
 
 ### SSHScript v2.0 is still under development. If you find any bugs or have any suggestions, you are welcome to post them on the `issues` page.
