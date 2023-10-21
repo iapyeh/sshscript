@@ -1,4 +1,4 @@
-# SSHScript v2.0 Core Features
+# SSHScript v2.0 Upload and Download Files
 
 Last Updated on 2023/10/20
 

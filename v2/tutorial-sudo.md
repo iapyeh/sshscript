@@ -1,4 +1,4 @@
-# SSHScript v2.0 Core Features
+# SSHScript v2.0 Console of sudo and su
 
 Last Updated on 2023/10/20
 

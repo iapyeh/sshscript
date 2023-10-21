@@ -9,7 +9,7 @@ Last Updated on 2023/10/21
 ## Tutorials
 * [Commands Execution and Console](tutorial) 
 * [Interactive Commands and Foreground Commands](tutorial-enter) 
-* [Su and Sudo Console](tutorial-sudo) 
+* [Console of sudo and su](tutorial-sudo) 
 * [Upload and Download Files](tutorial-download) 
 * [Threading Support](tutorial-threading) 
 
