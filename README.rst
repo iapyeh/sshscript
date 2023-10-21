@@ -2,13 +2,16 @@
 SSHScript
 #########
 
-System automation is the process of automating repetitive tasks by executing commands on local and remote hosts. SSHScript is a Python library that makes system automation easy. It provides a simple and intuitive interface for executing commands, without requiring any knowledge of the subprocess module or Paramiko (SSH).
+System automation is the process of automating repetitive tasks by executing commands on local and remote hosts.
 
+SSHScript is a Python library that provides a simple and intuitive way to automate common tasks that involve running commands and dealing with outputs on local and remote hosts, without requiring any knowledge of the subprocess module or Paramiko (SSH).
 
-SSHScript: A Simple and Intuitive Way to Automate Common SSH Tasks
-==================================================================
+SSHScript makes it easy to write scripts that can connect to remote hosts via SSH and execute commands, and it allows you to process the resulting data directly in Python. This enables you to build complex data structures and processing flows using an object-oriented approach. Parallel execution support: SSHScript supports parallel execution of commands using threads.
 
-SSHScript is a Python library that provides a simple and intuitive way to automate common tasks that involve running commands and dealing with outputs on local and remote hosts. SSHScript makes it easy to write scripts that can connect to remote hosts via SSH and execute commands, and it allows you to process the resulting data directly in Python. This enables you to build complex data structures and processing flows using an object-oriented approach. Parallel execution support: SSHScript supports parallel execution of commands using threads.
+|pic2|
+
+.. |pic2| image:: https://iapyeh.github.io/sshscript/v2/methodology.png
+          :alt: my-picture2
 
 Example Codes
 =============
@@ -93,10 +96,6 @@ Benefits of using SSHScript
 
 * Leverage the Python ecosystem: SSHScript scripts are pure Python, which means that they can leverage the vast ecosystem of Python packages. This gives you access to a wide range of tools and libraries for tasks such as data processing, machine learning, and web development.
 
-|pic2|
-
-.. |pic2| image:: https://iapyeh.github.io/sshscript/v2/methodology.png
-          :alt: my-picture2
 Use cases
 ==========
 
