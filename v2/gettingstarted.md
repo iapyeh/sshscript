@@ -7,18 +7,18 @@ Last Updated on 2023/10/21
 ## Topics
 
 ## 🔵 Installation
-    ```
-        pip3 install sshscript
-        ## or
-        python3 -m pip install sshscript
-    ```
+```
+    pip3 install sshscript
+    ## or
+    python3 -m pip install sshscript
+```
 
 ## 🔵 Upgrading
-    ```
-        pip3 install sshscript --upgrade
-        ## or
-        python3 -m pip install sshscript --upgrade
-    ```
+```
+    pip3 install sshscript --upgrade
+    ## or
+    python3 -m pip install sshscript --upgrade
+```
     
 ## 🔵 <a name="check-installation"></a> Check Installation
 
@@ -29,7 +29,7 @@ $ sshscript
 ```
 
 If it works, you would have screen like below:
-(image of "sshscript")
+![image](sshscriptcli.png)
 
 If you don't have that screen, you might have to modify the PATH environment variable
 of your shell. You can find the path of "sshscript" by running the following command:
