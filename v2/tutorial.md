@@ -1,5 +1,4 @@
-# SSHScript 2.0 Tutorial
-# Core Features
+# SSHScript v2.0 Core Features
 
 Last Updated on 2023/10/20
 
