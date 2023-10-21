@@ -18,7 +18,9 @@ Install
 
 .. code-block:: python
 
-    pip install sshscript
+    pip3 install sshscript
+    ## or
+    python3 -m pip install sshscript
 
 Example Codes
 =============
