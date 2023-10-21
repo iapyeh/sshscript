@@ -1,4 +1,4 @@
-# SSHScript v2.0 and Threading
+# SSHScript v2.0 Threading Support
 
 Last Updated on 2023/10/20
 

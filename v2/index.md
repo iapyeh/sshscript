@@ -8,6 +8,6 @@ Last Updated on 2023/10/21
 
 ## Tutorial
 * [Core Features](tutorial) 
-* [Threading](tutorial-threading) 
+* [Threading Support](tutorial-threading) 
 
 [![Downloads](https://pepy.tech/badge/sshscript)](https://pepy.tech/project/sshscript)
