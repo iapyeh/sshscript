@@ -1,5 +1,7 @@
 # SSHScript v2.0.2 Release Notes
 
+Last Updated on 2023/10/21
+
 <div style="text-align:right;position:relative;top:-200px"><a href="./index">Back to Index</a></div>
 
 ## Summary
