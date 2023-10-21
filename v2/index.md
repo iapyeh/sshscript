@@ -6,10 +6,10 @@ Last Updated on 2023/10/21
 
 * 2023/10/17: [v2.0.2 Release Notes](release-v2.0.2) 
 
-## Tutorial
+## Tutorials
 * [Commands Execution and Console](tutorial) 
-* [Su and Sudo Console](tutorial-sudo) 
 * [Interactive Commands and Foreground Commands](tutorial-enter) 
+* [Su and Sudo Console](tutorial-sudo) 
 * [Upload and Download Files](tutorial-download) 
 * [Threading Support](tutorial-threading) 
 
