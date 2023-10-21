@@ -25,11 +25,11 @@ Overall, SSHScript v2.0.2 is a significant improvement over previous versions. I
 
 - `$.sudo(password)`, get a root console: The $.sudo function returns a console as the root user. This can be useful for executing commands that require root privileges. [Details](tutorial#dollar-sudo)
 
-- `$.su(username,password)`, get a different user console: The $.su() function returns a console as the specified user. This can be useful for executing commands as a different user, such as sudoer account.[Details](tutorial#dollar-su)
+- `$.su(username,password)`, get a different user console: The $.su() function returns a console as the specified user. This can be useful for executing commands as a different user, such as sudoer account. [Details](tutorial#dollar-su)
 
-- `$.enter(command)`, get an interactive console: The $.enter() function returns a console of an interactive process. This can be useful for executing interactive tools, such as `mysql-client`.[Details](tutorial#dollar-enter)
+- `$.enter(command)`, get an interactive console: The $.enter() function returns a console of an interactive process. This can be useful for executing interactive tools, such as `mysql-client`. [Details](tutorial#dollar-enter)
 
-- `$.iterate(command)`, iterate over foreground command outputs: The $.iterate() function returns a loopable console for iterating over the output of a foreground command, such astcpdump`. This can be useful for processing the output of foreground commands in real time.[Details](tutorial#dollar-iterate)
+- `$.iterate(command)`, iterate over foreground command outputs: The $.iterate() function returns a loopable console for iterating over the output of a foreground command, such astcpdump`. This can be useful for processing the output of foreground commands in real time. [Details](tutorial#dollar-iterate)
 
 - `$.thread(target)`, create a new SSHScript-aware thread: The $.thread() function creates a new thread that takes the session as its effective sessions. This can be useful for executing commands in a multithreaded environment. [Details](tutorial-threading)
 
