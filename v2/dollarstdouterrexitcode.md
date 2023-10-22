@@ -1,6 +1,6 @@
-# SSHScript v2.0 Stdout, Stderr and Exitcode(Draft)
+# SSHScript v2.0 Stdout, Stderr and Exitcode
 
-Last Updated on 2023/10/20
+Last Updated on 2023/10/22
 
 <div style="text-align:right;position:relative;top:-140px"><a href="./index">Back to Index</a></div>
 
