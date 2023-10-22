@@ -46,17 +46,18 @@ else:
     print('error: ' + $.stderr)
 ```
 
-The values of $.stdout, $.stderr and $.exitcode are changed after each dollar command execution. This means that if you execute two dollar commands in a row, the values of these variables will be set to the results of the second command.
+**The values of $.stdout, $.stderr and $.exitcode are changed after each dollar command execution. This means that if you execute two dollar commands in a row, the values of these variables will be set to the results of the second command.**
 
 
-## 🔵 <a name="one-dollar"></a> Outputs of Two-Dollars Commands
+## 🔵 <a name="two-dollars"></a> Outputs of Two-Dollars Commands
 
+A two-dollar command can span multiple lines. Each line is executed as a separate command.
 
 When a two-dollars command is executed, the following variables are also available:
 
-* $.stdout: The standard output of the command.
-* $.stderr: The standard error of the command.
-* $.exitcode: The exit code of the command.
+* $.stdout: The standard output of all commands.
+* $.stderr: The standard error of all commands.
+* $.exitcode: The exit code of the last command.
 
 One-dollar and two-dollar commands in SSHScript are similar in many ways, but there are a few key differences.
 
@@ -70,3 +71,39 @@ If you are using two-dollars commands in a macOS terminal, consider deleting os.
 One-dollar commands are generally recommended for most cases. They are simpler to use and produce more predictable results.
 
 Two-dollar commands should be used when you need to execute a command that requires a shell environment, such as a command that uses shell variables or a command that needs to be executed in a specific shell.
+
+## 🔵 <a name="with-dollar"></a> Outputs of With-Dollar Commands
+
+With-dollar commands in SSHScript invoke a shell process. When a with-dollar command is executed, the following variables are available:
+
+* $.stdout: The standard output of the shell process.
+* $.stderr: The standard error of the shell process.
+* $.exitcode: The exit code of the shell process.
+
+Inside the block of a with-dollar command, you can get the stdout, stderr, and exit code of the last command executed by the console object.
+
+$.stdout is mixed with the standard output of the shell process.
+
+This means that all output from the shell process is captured by $.stdout.
+
+When a command is executed inside the with-block, you can read the output of the shell process as it is being produced by using the console.stdout and console.stderr properties.
+
+For example
+```
+with $#!/bin/bash as console:
+    console('hostname')
+    print('hostname=',console.stdout.strip())
+    print('exitcode of hostname=',console.exitcode)
+    console('whoami')
+    print('whoami=',console.stdout.strip())
+    print('exitcode of whoami=',console.exitcode)
+print('output of shell process=',$.stdout.strip())
+print('exitcode of shell process=',$.exitcode)
+```
+
+Tips for Using With-Dollar Commands
+
+* With-dollar commands can be useful for executing commands that require a shell environment, such as commands that use shell variables or commands that need to be executed in a specific shell.
+* However, it is important to be aware that with-dollar commands can produce unexpected results, especially if the output of the shell process is not properly handled.
+For example, if the shell process produces a lot of output, it can cause the SSHScript interpreter to run out of memory.
+* To avoid problems, it is important to handle the output of with-dollar commands carefully. You might redirect the output to a file or consider using $.iterate().
