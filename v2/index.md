@@ -4,6 +4,7 @@ Last Updated on 2023/10/21
 ## Tutorials
 * [Getting Started](gettingstarted)
 * [Commands Execution and Console](tutorial) 
+* [Stdout, Stderr and Exitcode](dollarstdouterrexitcode) 
 * [Interactive Commands and Foreground Commands](tutorial-enter) 
 * [Console of sudo and su](tutorial-sudo) 
 * [Upload and Download Files](tutorial-download) 
