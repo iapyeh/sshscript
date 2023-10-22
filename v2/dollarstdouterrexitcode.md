@@ -9,6 +9,7 @@ Last Updated on 2023/10/20
 * [Outputs of One-Dollar Commands](#one-dollar)
 * [Outputs of Two-Dollars Commands](#two-dollars)
 * [Outputs of With-Dollar Commands](#with-dollar)
+* [SSHScript Module](#sshscript-module)
 
 ## 🔵 <a name="one-dollar"></a> Outputs of One-Dollar Commands
 
@@ -107,3 +108,37 @@ Tips for Using With-Dollar Commands
 * However, it is important to be aware that with-dollar commands can produce unexpected results, especially if the output of the shell process is not properly handled.
 For example, if the shell process produces a lot of output, it can cause the SSHScript interpreter to run out of memory.
 * To avoid problems, it is important to handle the output of with-dollar commands carefully. You might redirect the output to a file or consider using $.iterate().
+
+## 🔵 <a name="sshscript-module"></a>SSHScript Module
+
+When working with SSHScript modules,
+the $.stdout, $.stderr and $.exitcode can be accessed by the 
+session instance. 
+
+For example
+```
+import sshscript
+session = sshscript.SSHScriptSession()
+
+## session() is equivalent to one-dollar commands
+session('hostname')
+print('hostname=', session.stdout.strip())
+print('exitcode=', session.exitcode)
+
+## session(command,shell=True) is equivalent to two-dollars commands
+session('echo $HOME', shell=True)
+print('output=', session.stdout.strip())
+print('exitcode=', session.exitcode)
+
+## "with session.shell()" is equivalent to with-dollar commands
+with session.shell('#!/bin/bash') as console:
+    console('hostname')
+    print('hostname=',console.stdout.strip())
+    print('exitcode of hostname=',console.exitcode)
+    console('whoami')
+    print('whoami=',console.stdout.strip())
+    print('exitcode of whoami=',console.exitcode)
+print('output of shell process=',$.stdout.strip())
+print('exitcode of shell process=',$.exitcode)
+
+```
