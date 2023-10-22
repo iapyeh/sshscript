@@ -111,9 +111,9 @@ For example, if the shell process produces a lot of output, it can cause the SSH
 
 ## 🔵 <a name="sshscript-module"></a>SSHScript Module
 
-When working with SSHScript modules,
-the $.stdout, $.stderr and $.exitcode can be accessed by the 
-session instance. 
+The $.stdout, $.stderr, and $.exitcode can be accessed by the SSHScript session instance when working with SSHScript modules.
+
+The SSHScript session instance is the object that you use to execute commands on the localhost or a remote host. To access the $.stdout, $.stderr, and $.exitcode properties, you can use the following code:
 
 For example
 ```
@@ -138,7 +138,7 @@ with session.shell('#!/bin/bash') as console:
     console('whoami')
     print('whoami=',console.stdout.strip())
     print('exitcode of whoami=',console.exitcode)
-print('output of shell process=',$.stdout.strip())
-print('exitcode of shell process=',$.exitcode)
+print('output of shell process=',session.stdout.strip())
+print('exitcode of shell process=',session.exitcode)
 
 ```
