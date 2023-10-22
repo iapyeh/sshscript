@@ -40,7 +40,7 @@ $ python3 -c 'import sysconfig; print(sysconfig.get_path("scripts"))'
 Once you have the path to the SSHScript CLI, you can add it to your PATH environment variable. For example, to add the path to your PATH environment variable in Bash, you would run the following command:
 
 ```
-export PATH=$PATH:/path/to/sshscript/cli
+export PATH=$PATH:/path/to/sshscript
 ```
 
 Once you have added the path to your PATH environment variable, you should be able to run the sshscript command from anywhere in your terminal.
