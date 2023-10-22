@@ -10,33 +10,35 @@ Last Updated on 2023/10/20
 * [$.stderr](#dollar-stderr)
 * [$.exitcode](#dollar-exitcode)
 
-## 🔵 <a name="dollar-stdout"></a>$.stdout, $.stderr and $.exitcode
+## 🔵 <a name="one-dollar"></a> Outputs of One-Dollar Commands
 
-When a dollar command is executed, $.stdout has its output of stdout,
-$.stderr has its output of stderr and $.exitcode has its exit code.
 
-In the following example, $.stdout has the stdout output of "ls -l" command.
+When a one-dollar command is executed, the following variables are available:
+
+* `$.stdout`: The standard output of the command.
+* `$.stderr`: The standard error of the command.
+* `$.exitcode`: The exit code of the command.
+
+The following example prints the standard output of the `ls -l` command:
+
 ```
 $ls -l 
 for line in $.stdout.splitlines():
     print(line)
 ```
 
-In the following example, $.stderr has the stderr output of "ls -l /non-existing" command.
+The following example prints the standard error of the `ls -l /non-existing` command:
+
 ```
 $ls -l /non-existing
 print('error: ' + $.stderr)
 ```
 
-You can use $.exitcode to tell execution status
+You can use `$.exitcode` to check the execution status of a command. For example, the following code prints the standard output of the command, or prints an error message if the command fails:
 
 ```
-import random
-if random.random() > 0.5:
-    command = 'ls -l /non-existing'
-else:
-    command = 'ls -l '
-$f'{command}'
+path = 'somepath'
+$f'ls -l {path}'
 if $.exitcode == 0:
     for line in $.stdout.splitlines():
         print(line)
