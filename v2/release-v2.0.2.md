@@ -36,10 +36,10 @@ Overall, SSHScript v2.0.2 is a significant improvement over previous versions. I
 ### Changes
 - `$.log()` is removed, please use `$.logger` instead. The reason for this is that $.logger is more easier. For example
 ```
-## in SSHScript v1.0, do logging like this
+## In SSHScript v1.0
 import logging
 $.log(logging.DEBUG, 'message')
-## in SSHScript v2.0, do logging like this (no need to import logging)
+## In SSHScript v2.0, use the built-in logging functionality (no need to import the logging module or type as much).
 $.logger.debug('message')
 ```
 
