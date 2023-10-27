@@ -1,7 +1,7 @@
 # SSHScript v2.0 Reference Guide
 Last Updated on 2023/10/21
 
-## Tutorials
+## Learning
 * [Getting Started](gettingstarted)
 * [Commands Execution and Console](tutorial) 
 * [Stdout, Stderr and Exitcode](dollarstdouterrexitcode) 
@@ -10,6 +10,8 @@ Last Updated on 2023/10/21
 * [Upload and Download Files](tutorial-download) 
 * [Threading Support](tutorial-threading) 
 
+## References
+* [Recipes](recipes)
 
 ## Releases 
 

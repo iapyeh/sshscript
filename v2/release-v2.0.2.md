@@ -33,9 +33,18 @@ Overall, SSHScript v2.0.2 is a significant improvement over previous versions. I
 
 - `$.thread(target)`, create a new SSHScript-aware thread: The $.thread() function creates a new thread that takes the session as its effective sessions. This can be useful for executing commands in a multithreaded environment. [Details](tutorial-threading)
 
-
+### Changes
+- `$.log()` is removed, please use `$.logger` instead. The reason for this is that $.logger is more easier. For example
+```
+## in SSHScript v1.0, do logging like this
+import logging
+$.log(logging.DEBUG, 'message')
+## in SSHScript v2.0, do logging like this (no need to import logging)
+$.logger.debug('message')
+```
 
 ## Additional Notes
+
 
 ### Simplifications in the Roadmap of SSHScript v2.0
 
