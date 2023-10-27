@@ -6,11 +6,9 @@ Last Updated on 2023/10/20
 
 ## Topics
 
-* [Execute commands: one-dollar ($)](#one-dolar)
-* [Execute shell commands: two-dollars($$)](#two-dolars)
-* [Invoke an interactive console: with-dollar(with $)](#with-dollar)
+* [Setup Logger](#setuplogger)
 
-## 🔵 <a name="one-dollar"></a>Setup Logger
+## 🔵 <a name="setuplogger"></a>Setup Logger
 ```
 import logging
 logger = logging.getLogger('mylogger')
