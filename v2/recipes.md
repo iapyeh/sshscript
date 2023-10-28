@@ -8,6 +8,7 @@ Last Updated on 2023/10/20
 
 * [Setup Logger](#setuplogger)
 * [Using argparser in .spy](#argparser)
+* [Working with the systemctl](#systemctl)
 
 ## 🔵 <a name="setuplogger"></a>Setup Logger
 ```
@@ -26,4 +27,30 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--file', dest='file')
 args = parser.parse_args(__main__.unknown_args)
 print(args.file)
+```
+## 🔵 <a name="systemctl"></a>Working with the systemctl
+This command "systemctl --type=service --state=active" is displayed page by page, you can run it like this:
+```
+import time    
+with $.sudo(sudoPassword) as console:
+    content = []
+    ## press "q" to exit, otherwise this command will block at the bottom page
+    with console.enter('systemctl --type=service --state=active',exit='q') as systemctlscreen:
+        content.append(systemctlscreen.stdout)
+        while 'END' not in systemctlscreen.stdout:
+            systemctlscreen.input(' ') ## move to next page
+            time.sleep(1) ## wait 1 second for screen to refresh
+            content.append(systemctlscreen.stdout)
+    print(content) 
+```
+But you will find there are many terminal control codes in the "content".
+The following example would be more practical
+```
+with $.sudo(sudoPassword) as console:
+    ## redirect the output of systemctl to a file
+    console('systemctl --type=service --state=active > /tmp/crontab-root.txt')
+    console('cat /tmp/crontab-root.txt')
+    content = console.stdout
+    console('rm -f /tmp/crontab-root.txt')
+    print(content) 
 ```
