@@ -19,6 +19,7 @@ import sshscript
 sshscript.setupLogger(logger)
 ```
 ## 🔵 <a name="argparser"></a>Using argparser in .spy
+If you need to have your own cli-arguments, you can get them from __main__.unknown_args
 ```
 ## filename: example.spy
 ## run: sshscript example.spy --file myfile1.jpg
@@ -29,7 +30,8 @@ args = parser.parse_args(__main__.unknown_args)
 print(args.file)
 ```
 ## 🔵 <a name="systemctl"></a>Working with the systemctl
-This command "systemctl --type=service --state=active" is displayed page by page, you can run it like this:
+This command "systemctl --type=service --state=active" displays content page by page, you can run it with $.enter.
+Example:
 ```
 import time    
 with $.sudo(sudoPassword) as console:
@@ -43,8 +45,8 @@ with $.sudo(sudoPassword) as console:
             content.append(systemctlscreen.stdout)
     print(content) 
 ```
-But you will find there are many terminal control codes in the "content".
-The following example would be more practical
+But this way, the content would be mixed with terminal control codes.
+The following example is more practical:
 ```
 with $.sudo(sudoPassword) as console:
     ## redirect the output of systemctl to a file
