@@ -7,6 +7,7 @@ Last Updated on 2023/10/20
 ## Topics
 
 * [Setup Logger](#setuplogger)
+* [Using argparser in .spy](#argparser)
 
 ## 🔵 <a name="setuplogger"></a>Setup Logger
 ```
@@ -16,5 +17,13 @@ logger = logging.getLogger('mylogger')
 import sshscript
 sshscript.setupLogger(logger)
 ```
-
-
+## 🔵 <a name="argparser"></a>Using argparser in .spy
+```
+## filename: example.spy
+## run: sshscript example.spy --file myfile1.jpg
+import argparse, __main__
+parser = argparse.ArgumentParser()
+parser.add_argument('--file', dest='file')
+args = parser.parse_args(__main__.unknown_args)
+print(args.file)
+```
