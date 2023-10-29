@@ -1,6 +1,6 @@
 # SSHScript v2.0 Recipes
 
-Last Updated on 2023/10/20
+Last Updated on 2023/10/28
 
 <div style="text-align:right;position:relative;top:-140px"><a href="./index">Back to Index</a></div>
 
@@ -45,14 +45,12 @@ with $.sudo(sudoPassword) as console:
             content.append(systemctlscreen.stdout)
     print(content) 
 ```
-But this way, the content would be mixed with terminal control codes.
+But this way, the content might be mixed with terminal control codes.
 The following example is more practical:
 ```
 with $.sudo(sudoPassword) as console:
     ## redirect the output of systemctl to a file
-    console('systemctl --type=service --state=active > /tmp/crontab-root.txt')
-    console('cat /tmp/crontab-root.txt')
+    console('systemctl --type=service --state=active | cat')
     content = console.stdout
-    console('rm -f /tmp/crontab-root.txt')
     print(content) 
 ```
