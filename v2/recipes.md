@@ -1,6 +1,6 @@
 # SSHScript v2.0 Recipes
 
-Last Updated on 2023/10/28
+Last Updated on 2023/10/30
 
 <div style="text-align:right;position:relative;top:-140px"><a href="./index">Back to Index</a></div>
 
@@ -82,3 +82,13 @@ with $.sudo(sudoPassword) as console:
 ```
 
 This will prevent the program from adding any terminal control codes to the output.
+
+
+## 🔵 <a name="mysqldump"></a>Working with mysqldump
+`mysqldump` would require password, so we should use $.enter to handle it. For example:
+Please note that you should set "exit=False" for $.enter, since `mysqldump` would be stopped by itself, exiting command is not necessary.
+```
+with $.enter(f'mysqldump -u root -p mydb > dbdump.sql',exit=False) as mysqldump:
+    mysqldump.expect('password')
+    mysqldump.input('my-db-password')
+```
