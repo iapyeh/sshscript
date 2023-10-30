@@ -45,6 +45,15 @@ $.logger.debug('message')
 
 ## Additional Notes
 
+- `$@{var}` is going to be deprecated in next release of v2.0. Please use f-string instead. For example:
+```
+cmd="hello world"
+## @{cmd} is replaced with "hello world" before execution.
+## the following format is going to be deprecated
+$echo @{cmd}
+## please use f-string instead
+$f'echo {cmd}'
+```
 
 ### Simplifications in the Roadmap of SSHScript v2.0
 
