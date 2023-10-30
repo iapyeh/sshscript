@@ -54,3 +54,24 @@ with $.sudo(sudoPassword) as console:
     content = console.stdout
     print(content) 
 ```
+
+## 🔵 <a name="systemctl"></a>Get rid of terminal control codes
+
+Terminal control codes can be distracting when mixed with output. You can avoid this by modifying your command. 
+```
+## For example, instead of running:
+$ systemctl --type=service --state=active
+## You can run:
+$ systemctl --type=service --state=active | cat
+```
+Some programs automatically add terminal control codes, such as `grep --color=auto`.
+You can disable this by running the command with the `--color=never` option. 
+
+```
+## For example, instead of running:
+$ lsof -n -Pi | grep LISTEN
+## You can run:
+$ lsof -n -Pi | grep --color=never LISTEN
+```
+
+This will prevent the program from adding any terminal control codes to the output.
