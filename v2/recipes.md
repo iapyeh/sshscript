@@ -10,6 +10,7 @@ Last Updated on 2023/10/30
 * [Using argparser in .spy](#argparser)
 * [Working with the systemctl](#systemctl)
 * [Get rid of terminal control codes](#getridterminalcodes)
+* [Inputing password for mysqldump](#mysqldump)
 
 ## 🔵 <a name="setuplogger"></a>Setup Logger
 ```
@@ -84,7 +85,7 @@ with $.sudo(sudoPassword) as console:
 This will prevent the program from adding any terminal control codes to the output.
 
 
-## 🔵 <a name="mysqldump"></a>Working with mysqldump
+## 🔵 <a name="mysqldump"></a>Inputing password for mysqldump
 `mysqldump` would require password, so we should use $.enter to handle it. For example:
 Please note that you should set "exit=False" for $.enter, since `mysqldump` would be stopped by itself, exiting command is not necessary.
 ```
