@@ -9,6 +9,7 @@ Last Updated on 2023/10/28
 * [Setup Logger](#setuplogger)
 * [Using argparser in .spy](#argparser)
 * [Working with the systemctl](#systemctl)
+* [Get rid of terminal control codes](#getridterminalcodes)
 
 ## 🔵 <a name="setuplogger"></a>Setup Logger
 ```
@@ -55,23 +56,29 @@ with $.sudo(sudoPassword) as console:
     print(content) 
 ```
 
-## 🔵 <a name="systemctl"></a>Get rid of terminal control codes
+## 🔵 <a name="getridterminalcodes"></a>Get rid of terminal control codes
 
 Terminal control codes can be distracting when mixed with output. You can avoid this by modifying your command. 
 ```
 ## For example, instead of running:
-$ systemctl --type=service --state=active
+with $.sudo(sudoPassword) as console:
+    console('systemctl --type=service --state=active')
+
 ## You can run:
-$ systemctl --type=service --state=active | cat
+with $.sudo(sudoPassword) as console:
+    console('systemctl --type=service --state=active | cat')
 ```
 Some programs automatically add terminal control codes, such as `grep --color=auto`.
 You can disable this by running the command with the `--color=never` option. 
 
 ```
 ## For example, instead of running:
-$ lsof -n -Pi | grep LISTEN
+with $.sudo(sudoPassword) as console:
+    console('lsof -n -Pi | grep LISTEN')
+
 ## You can run:
-$ lsof -n -Pi | grep --color=never LISTEN
+with $.sudo(sudoPassword) as console:
+    console('lsof -n -Pi | grep --color=never LISTEN')
 ```
 
 This will prevent the program from adding any terminal control codes to the output.
