@@ -14,12 +14,14 @@ This example performs the following tasks to check the syncing status of two MyS
 ## dbIsSynced is what we want to know, supposed to be False initially
 dbIsSynced = False
 
-def getMasterStatus(password):
+def getMasterStatus(passwordForDb,passwordForSu):
     ## connect to master server
-    with $.connect('user@masterdb',pkey=$.pkey('/home/user/.ssh/id_rsa')) as rms1:
-        with $.enter('mysql -uroot -p db','password',password,exit='quit') as console:
-            console.sendline('SHOW MASTER STATUS \G')
-            data = console.stdout
+    with $.connect('user@masterdb',pkey=$.pkey('/home/user/.ssh/id_rsa')) as master:
+        ## let's su to "dbmaster" to call mysql client.
+        with master.su('dbmaster',passwordForSu) as suconsole:
+            with suconsole.enter('mysql -uroot -p db','password',passwordForDb,exit='quit') as mysql:
+                mysql('SHOW MASTER STATUS \G')
+                data = mysql.stdout
 
     ## parse output of "SHOW MASTER STATUS"
     masterFile = None
@@ -32,11 +34,13 @@ def getMasterStatus(password):
             masterPosition = line.split()[1].strip()
     return {'file':masterFile , 'position': masterPosition}
 
-def getSlaveStatus(password):
-    ## this is localhost and it the slave server
-    with $.enter('mysql -uroot -p db','password',password,exit='quit') as console:
-        console.sendline('SHOW SLAVE STATUS \G')
-        data = console.stdout
+def getSlaveStatus(passwordForDb,passwordForSudo):
+    ## on the bridge host
+    ## let's su to "root" to call mysql client.
+    with $.sudo(passwordForSudo) as sudoconsole:
+        with sudoconsole.enter('mysql -uroot -p db','password',passwordForDb,exit='quit') as mysql:
+            mysql('SHOW SLAVE STATUS \G')
+            data = mysql.stdout
 
     ## parse output of "SHOW SLAVE STATUS"
     slaveFile = None
@@ -64,10 +68,10 @@ def getSlaveStatus(password):
 with $.connect('user@bridge') as bridge:
 
     ## call the MySQL client on the bridge host to collect information about the slave database.
-    slaveInfo = getSlaveStatus(dbpass)
+    slaveInfo = getSlaveStatus(passwordForDb,passwordForSudo)
 
     ## From the bridge host, connect to the master database to collect information about the master database.
-    masterInfo = getMasterStatus(dbpass)
+    masterInfo = getMasterStatus(passwordForDb,passwordForSu)
 
 ## Compare the information of the master database and the slave database.
 if not(masterInfo['file'] and masterInfo['position']):
