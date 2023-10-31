@@ -6,32 +6,32 @@
 ## Making ssh connection and run commands
 - [ssh to a host, su as root, then download root's file](ex-ssh-sudo-download) 
 - [work with pytermgui by providing output data of remote executions](ex-pytermgui) 
-- [exchange file between hosts](https://iapyeh.github.io/sshscript/examples/ex-filetransfer) 
-- [check disk space utilization](https://iapyeh.github.io/sshscript/examples/ex-disk.space.checking) 
-- [generate list of ip addresses for blocking](https://iapyeh.github.io/sshscript/examples/ex-blackip) 
-- [some notes about sudo](https://iapyeh.github.io/sshscript/examples/sudo-notes) 
-- [ssh via proxyCommand, nested ssh with password and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh) 
-- [ssh via proxyCommand, nested ssh with ssh key and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh3) 
-- [ssh via proxyCommand, nested ssh with interactive ssh and interactive sudo su](https://iapyeh.github.io/sshscript/examples/proxycommand-ssh2) 
-- [Install or upgrade python packages](https://iapyeh.github.io/sshscript/examples/install-python-package) 
-- [$.careful() usage](https://iapyeh.github.io/sshscript/examples/careful) 
-- [talk to smtp server to send mails](https://iapyeh.github.io/sshscript/examples/ex-smtptest) 
+- [exchange file between hosts](ex-filetransfer) 
+- [check disk space utilization](ex-disk.space.checking) 
+- [generate list of ip addresses for blocking](ex-blackip) 
+- [some notes about sudo](sudo-notes) 
+- [ssh via proxyCommand, nested ssh with password and interactive sudo su](proxycommand-ssh) 
+- [ssh via proxyCommand, nested ssh with ssh key and interactive sudo su](proxycommand-ssh3) 
+- [ssh via proxyCommand, nested ssh with interactive ssh and interactive sudo su](proxycommand-ssh2) 
+- [Install or upgrade python packages](install-python-package) 
+- [$.careful() usage](careful) 
+- [talk to smtp server to send mails](ex-smtptest) 
 
 ## Long Running Processes
 - [ping many hosts](ex-ping) 
-- [get bad ip addresses by tcpdump](https://iapyeh.github.io/sshscript/examples/ex-tcpdump) 
+- [get bad ip addresses by tcpdump](ex-tcpdump) 
 
 ## Tunnel and Reverse Tunnel
-- [ssh tunnel, nested ssh tunnel](https://iapyeh.github.io/sshscript/examples/ex-tunnel) 
-- [ssh reverse tunnel](https://iapyeh.github.io/sshscript/examples/ex-rtunnel-1) 
-- [socks5 server over nested reverse ssh tunnel](https://iapyeh.github.io/sshscript/examples/ex-rtunnel-2) 
+- [ssh tunnel, nested ssh tunnel](ex-tunnel) 
+- [ssh reverse tunnel](ex-rtunnel-1) 
+- [socks5 server over nested reverse ssh tunnel](ex-rtunnel-2) 
 
 ## Working with Threads
-- [py_cui with threads](https://iapyeh.github.io/sshscript/examples/ex-py_cui_threading) 
-- [connecting to hosts in threads,usage scenario 1](https://iapyeh.github.io/sshscript/examples/ex-threads-2) 
-- [connecting to hosts in threads,usage scenario 2](https://iapyeh.github.io/sshscript/examples/ex-threads-3) 
-- [connecting to hosts in threads,usage scenario 3](https://iapyeh.github.io/sshscript/examples/ex-threads-userlist) 
-- [connecting to hosts in threads,usage scenario 4](https://iapyeh.github.io/sshscript/examples/ex-threads-userlist2) 
+- [py_cui with threads](ex-py_cui_threading) 
+- [connecting to hosts in threads,usage scenario 1](ex-threads-2) 
+- [connecting to hosts in threads,usage scenario 2](ex-threads-3) 
+- [connecting to hosts in threads,usage scenario 3](ex-threads-userlist) 
+- [connecting to hosts in threads,usage scenario 4](ex-threads-userlist2) 
 
 
 ## Need an Example?
