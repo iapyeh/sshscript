@@ -87,15 +87,16 @@ This will prevent the program from adding any terminal control codes to the outp
 
 ## 🔵 <a name="mysqldump"></a>Inputing password for mysqldump
 `mysqldump` requires password, so we could use $.enter to handle it. For example:
+
 ```
-with $.enter(f'mysqldump -u root -p mydb > dbdump.sql',exit=False) as mysqldump:
-    mysqldump.expect('password')
-    mysqldump.input('my-db-password')
+with $.enter(f'mysqldump -u root -p mydb > db.sql','password','1234',exit=False) as mysqldump:
+    pass
 ```
 or
 ```
-with $.enter(f'mysqldump -u root -p mydb > dbdump.sql','password','my-db-password',exit=False) as mysqldump:
-    pass
+with $.enter(f'mysqldump -u root -p mydb > db.sql',exit=False) as mysqldump:
+    mysqldump.expect('password')
+    mysqldump.input('1234')
 ```
 
 Please note that you should set "exit=False" for $.enter, since `mysqldump` would be stopped by itself, exiting command is not necessary.
