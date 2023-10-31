@@ -1,4 +1,4 @@
-# SSHScript v2.0 Checking the syncing status of two MySQL servers
+# Checking the syncing status of two MySQL servers
 
 Last Updated on 2023/10/31
 
