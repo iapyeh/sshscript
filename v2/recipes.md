@@ -1,6 +1,6 @@
 # SSHScript v2.0 Recipes
 
-Last Updated on 2023/10/30
+Last Updated on 2023/10/31
 
 <div style="text-align:right;position:relative;top:-140px"><a href="./index">Back to Index</a></div>
 
@@ -92,4 +92,10 @@ with $.enter(f'mysqldump -u root -p mydb > dbdump.sql',exit=False) as mysqldump:
     mysqldump.expect('password')
     mysqldump.input('my-db-password')
 ```
+or
+```
+with $.enter(f'mysqldump -u root -p mydb > dbdump.sql','password','my-db-password',exit=False) as mysqldump:
+    pass
+```
+
 Please note that you should set "exit=False" for $.enter, since `mysqldump` would be stopped by itself, exiting command is not necessary.
