@@ -99,4 +99,4 @@ with $.enter(f'mysqldump -u root -p mydb > db.sql',exit=False) as mysqldump:
     mysqldump.input('1234')
 ```
 
-Please note that you should set "exit=False" for $.enter, since `mysqldump` would be stopped by itself, exiting command is not necessary.
+Please note that you should set "exit=False" for $.enter, since `mysqldump` would stop by itself, exiting command is not necessary.

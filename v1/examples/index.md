@@ -4,8 +4,8 @@
 # Examples
 
 ## Making ssh connection and run commands
-- [ssh to a host, su as root, then download root's file](https://iapyeh.github.io/sshscript/examples/ex-ssh-sudo-download) 
-- [work with pytermgui by providing output data of remote executions](https://iapyeh.github.io/sshscript/examples/ex-pytermgui) 
+- [ssh to a host, su as root, then download root's file](ex-ssh-sudo-download) 
+- [work with pytermgui by providing output data of remote executions](ex-pytermgui) 
 - [exchange file between hosts](https://iapyeh.github.io/sshscript/examples/ex-filetransfer) 
 - [check disk space utilization](https://iapyeh.github.io/sshscript/examples/ex-disk.space.checking) 
 - [generate list of ip addresses for blocking](https://iapyeh.github.io/sshscript/examples/ex-blackip) 
@@ -18,7 +18,7 @@
 - [talk to smtp server to send mails](https://iapyeh.github.io/sshscript/examples/ex-smtptest) 
 
 ## Long Running Processes
-- [ping many hosts](https://iapyeh.github.io/sshscript/examples/ex-ping) 
+- [ping many hosts](ex-ping) 
 - [get bad ip addresses by tcpdump](https://iapyeh.github.io/sshscript/examples/ex-tcpdump) 
 
 ## Tunnel and Reverse Tunnel
