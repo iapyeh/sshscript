@@ -5,9 +5,12 @@ Last Updated on 2023/10/31
 <div style="text-align:right;position:relative;top:-140px"><a href="./index">Back to Index</a></div>
 This example performs the following tasks to check the syncing status of two MySQL servers:
 
-- Connect to a bridge host.
-- Because the bridge host is the slave database host, call the MySQL client on itself to collect information about the slave database.
-- From the bridge host, connect to the master database to collect information about the master database.
+- Connect to a bridge host. 
+
+- Because the bridge host is the slave database host, switch to the root account and call the MySQL client on itself to collect information about the slave database.
+
+- From the bridge host, connect to the master database, switch to the dbmaster account and call the MySQL client to collect information about the master database.
+
 - Compare the information of the master database and the slave database.
 
 ```
