@@ -122,17 +122,21 @@ def runFile(givenPaths,
             if scriptFolderInsertedToSysPath:
                 sys.path.remove(scriptFolder)
 
-            exported = newglobals.get('__export__')        
-            if exported:
-                ## __export__ = '*' will export all
-                if '*' == exported:
-                    _globals.update(newglobals)
-                else:
-                    basename = os.path.basename(file)
-                    for key in exported:
-                        logDebug8(f'{basename} export {key}')
-                        _globals[key] = newglobals[key]
-            _globals['_sshscriptstacks_'] = newglobals['_sshscriptstacks_']
+            if newglobals is None:
+                ## user calls sys.exit() in .spy
+                break
+            else:
+                exported = newglobals.get('__export__')        
+                if exported:
+                    ## __export__ = '*' will export all
+                    if '*' == exported:
+                        _globals.update(newglobals)
+                    else:
+                        basename = os.path.basename(file)
+                        for key in exported:
+                            logDebug8(f'{basename} export {key}')
+                            _globals[key] = newglobals[key]
+                _globals['_sshscriptstacks_'] = newglobals['_sshscriptstacks_']
         finally:
             if not unisession:    
                 session.close()

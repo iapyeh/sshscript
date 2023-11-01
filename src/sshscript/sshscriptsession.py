@@ -776,7 +776,10 @@ class SSHScriptSession(object):
                     return _globals
                 except SSHScriptBreak:
                     return _globals
-                except SSHScriptExit:
+                except SSHScriptExit as e:
+                    ## v2.0.3, same as SSHScriptExit
+                    raise SystemExit(e.code)
+                except SystemExit:
                     raise
                 except SSHScriptError:
                     raise
@@ -831,6 +834,9 @@ class SSHScriptSession(object):
         def runner(*args):
             try:
                 ret['value'] = _run(*args)
+            except SystemExit as e:
+                ret['exitcode'] = e.code
+                logDebug(f"{runSession}: sshscript.run() exits, code={e.code}")
             except Exception as e:
                 traceback.print_exc()
                 ret['error'] = e
@@ -862,6 +868,8 @@ class SSHScriptSession(object):
             #logDebug(f"{runSession}: script={script})")
             logDebug(f'{self} run() complete with error')
             raise error or ret.get('error')
+        elif 'exitcode' in ret:
+            sys.exit(ret['exitcode'])
         else:
             logDebug(f'{self} run() complete')
             ret['value']['_sshscriptstacks_'] = thread.sshscriptstack
@@ -984,5 +992,3 @@ class SSHScriptSession(object):
         dollar = self.withdollar(None,locals,globals)
         wrapper = ConsoleWrapper(dollar,'enter',*args,**kwargs)
         return wrapper
-
-       
