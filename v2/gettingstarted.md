@@ -4,8 +4,6 @@ Last Updated on 2023/10/21
 
 <div style="text-align:right;position:relative;top:-140px"><a href="./index">Back to Index</a></div>
 
-## Topics
-
 ## 🔵 Installation
 ```
     pip3 install sshscript
@@ -22,7 +20,7 @@ Last Updated on 2023/10/21
     
 ## 🔵 <a name="check-installation"></a> Checking if SSHScript is Installed
 
-Once you have installed SSHScript, you can check if it is working by running the sshscript command in a terminal.
+Once you have installed SSHScript, you can check if it is installed correctly by running the sshscript command in a terminal. 
 
 ```
 $ sshscript
@@ -49,6 +47,21 @@ $ python3 -c 'import sysconfig; print(sysconfig.get_path("scripts"))'
 /opt/homebrew/Cellar/python@3.8/3.8.18/Frameworks/Python.framework/Versions/3.8/bin
 export PATH=$PATH:/opt/homebrew/Cellar/python@3.8/3.8.18/Frameworks/Python.framework/Versions/3.8/bin
 ```
+
+## 🔵 <a name="check-version"></a> Checking version
+SSHScript depends on the Paramiko library. In some cases, it has been reported that an older version (1.1.17) of SSHScript was incorrectly installed. If you encounter this problem, the workaround is to manually install Paramiko and then reinstall SSHScript.
+
+```
+## check version
+$ sshscript --version
+```
+It should be 2.0 or higher. If it is older version, eg. 1.*. You can try to do the following steps:
+```
+$ pip3 uninstall sshscript
+$ pip3 install paramiko
+$ pip3 install sshscript
+```
+
 ## 🔵 <a name="check-works"></a>  Dollar-Syntax and Python Module
 
 SSHScript can be used in two ways: dollar-syntax and Python module.
