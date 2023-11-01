@@ -16,11 +16,25 @@ SSHScript makes it easy to write scripts that can connect to remote hosts via SS
 Install
 =======
 
-.. code-block:: python
+.. code-block:: shell script
 
-    pip3 install sshscript
+    $▏ pip3 install sshscript
     ## or
-    python3 -m pip install sshscript
+    $ python3 -m pip install sshscript
+
+SSHScript depends on the Paramiko library. In some cases, it has been reported that an older version (1.1.17) of SSHScript was incorrectly installed. If you encounter this problem, the workaround is to manually install Paramiko and then reinstall SSHScript.
+
+.. code-block:: shell script
+
+    ## check version
+    $ sshscript --version
+
+    ## It should be 2.0 or higher. If it is older version, eg. 1.*. You can try to do the following steps:
+    
+    $ pip3 uninstall sshscript
+    $ pip3 install paramiko
+    $ pip3 install sshscript
+    
 
 Examples
 =============
