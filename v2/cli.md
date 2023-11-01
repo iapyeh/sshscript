@@ -6,7 +6,8 @@ Last Updated on 2023/11/1
 
 The SSHScript package includes a CLI named `sshscript`. It is installed with the SSHScript package. To check if it is available, open a terminal and type `sshscript`. If it is not available, check the `$PATH` environment variable. ([details](gettingstarted))
 
-## sshscript [filepath …]
+## sshscript [paths [paths ...]]
+### Executing dollar-syntax scripts (.spy)
 
 This is for executing python scripts written in dollar-syntax of the SSHScript.
 For example:
@@ -31,6 +32,7 @@ $ sshscript hello.spy world.spy
 ```
 
 ## sshscript --folder FOLDER
+### Executing dollar-syntax scripts in a folder
 
 You can put .spy files into a folder and use --folder to address them.
 The next example runs test/hello.spy and test/world.spy. 
@@ -50,6 +52,7 @@ $sshscript --folder unittest base.spy "b*.spy"
 This would run unittest/base.spy, unittest/b1.spy, unittest/b2.spy. But uittest/a1.spy is excluded.
 
 ## sshscript \-\-run-order
+### Ensuring the sequence of execution
 
 Suppose you want to run .spy files in a folder, like this:
 
@@ -67,6 +70,7 @@ $sshscript --run-order --folder unittest base.spy "b*.spy"
 With this option, sshscript will not execute them, it just shows them in order of execution.
 
 ## sshscript --folder FOLDER --ext SSHSCRIPTEXT 
+### Changing default .spy to your own extension
 
 If .spy is what you want, you can specify your own extension.
 The next example runs all .myspy files in the test folder.
@@ -75,6 +79,7 @@ $sshscript --unittest --ext .myspy
 ```
 
 ## sshscript  \-\-debug
+### Finding problems
 
 This would set the debuging level to logging.DEBUG (10).
 ```
@@ -91,6 +96,7 @@ Some credential information, such as passwords, could be included in logging mes
 
 
 ## sshscript  \-\-script
+### Knowning what is exactly executed by Python
 
 With this option, the sshscript would not execute script files.
 It would output the parsed and converted python script from those .spy files.
@@ -112,6 +118,7 @@ $ sshscript --script hello-parsed.spy
 When the sshcript runs the hello-parsed.spy, it would not parse it again.
 
 ## sshscript \-\-verbose
+### Checking the outputs on stdout and stderr
 
 With this option, the sshscript would  dump stdout and stderr to console. 
 
