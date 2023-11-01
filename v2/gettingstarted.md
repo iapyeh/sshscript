@@ -1,4 +1,4 @@
-# SSHScript v2.0 Getting Started (Draft)
+# SSHScript v2.0 Getting Started
 
 Last Updated on 2023/10/21
 
