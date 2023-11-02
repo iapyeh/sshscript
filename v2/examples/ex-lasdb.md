@@ -1,4 +1,4 @@
-<div style="text-align:right"><a href="./index">Index</a></div>
+<div style="text-align:right"><a href="./index">Back to Index</a></div>
 
 ## Who is attacking your server?
 The lastb command in Linux displays a list of failed login attempts by users. It retrieves the information from the /var/log/btmp file, which records unsuccessful login attempts. We can use lastb to generate a list of crackers' IP addresses, and then generate a configuration file for iptables to block them.
