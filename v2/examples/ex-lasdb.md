@@ -1,8 +1,8 @@
 <div style="text-align:right"><a href="./index">Index</a></div>
 
+## Who is attacking your server?
 The lastb command in Linux displays a list of failed login attempts by users. It retrieves the information from the /var/log/btmp file, which records unsuccessful login attempts. We can use lastb to generate a list of crackers' IP addresses, and then generate a configuration file for iptables to block them.
 
-#### file: lastb.spy
 ```
 def getBadIPAddresses(stdout):
     # dealing with the output of "lastb"
@@ -40,11 +40,5 @@ $.connect('user@host',password):
         print('\n'.join(rules))    
 ```
 
-## Execute this example:
-```
-$sshscript lastb.spy
-$sshscript lastb.spy --verbose --debug
-
-```
 ![image](https://user-images.githubusercontent.com/4695577/182344161-e8753829-9be5-4176-8ba4-e660d732c9be.png)
 
