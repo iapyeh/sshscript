@@ -4,6 +4,7 @@
 The Linux command df is used to display information about the file system usage on a Linux system. It shows the amount of disk space used and available on different file systems, such as hard drives, network file systems, and virtual file systems.
 
 ```
+## filename: check.disk.space.spy
 '''
 Output sample of "df" on ubuntu:
 Filesystem     1K-blocks     Used Available Use% Mounted on
