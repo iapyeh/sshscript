@@ -1,3 +1,5 @@
+<div style="text-align:right"><a href="../index">Reference Guide</a></div>
+
 # SSHScript v2.0 Examples
 Last Updated on 2023/10/31
 
