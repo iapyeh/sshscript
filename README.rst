@@ -1,16 +1,21 @@
     
 SSHScript
 #########
+Many backend, DevOps, and SRE engineers have daily tasks that involve repetitive manual operations between the Linux console and SSH. When automation is needed, shell scripts are often used. Have you ever thought about solving this with Python scripts?
 
-System automation is the process of automating repetitive tasks by executing commands on local and remote hosts.
+SSHScript is a solution for those who have such an idea.
 
-SSHScript is a Python library that provides a simple and intuitive way to automate common tasks that involve running commands and dealing with outputs on local and remote hosts, without requiring any knowledge of the subprocess module or Paramiko (SSH).
+The goal of SSHScript is to simply automate manual operations. Achieve the same functionality as shell scripts with Python.
 
-SSHScript makes it easy to write scripts that can connect to remote hosts via SSH and execute commands, and it allows you to process the resulting data directly in Python. This enables you to build complex data structures and processing flows using an object-oriented approach. Parallel execution support: SSHScript supports parallel execution of commands using threads.
+It can also use all Python packages and threading features.
+
+To achieve the goal, it is necessary to simplify the functions of Python for SSH connections, executing CLI programs and shell commands, and changing the execution identity (sudo).
+
+SSHScript has achieved these things.
 
 |pic2|
 
-.. |pic2| image:: https://iapyeh.github.io/sshscript/v2/methodology.png
+.. |pic2| image:: https://iapyeh.github.io/sshscript/v2/shellandsshscript.png
           :alt: my-picture2
 
 Install
