@@ -23,9 +23,10 @@ Install
 
 .. code-block:: shell script
 
-    $▏ pip3 install sshscript
+    $ pip3 install sshscript
     ## or
     $ python3 -m pip install sshscript
+
 
 SSHScript depends on the Paramiko library. In some cases, it has been reported that an older version (1.1.17) of SSHScript was incorrectly installed. If you encounter this problem, the workaround is to manually install Paramiko and then reinstall SSHScript.
 
