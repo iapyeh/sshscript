@@ -30,7 +30,7 @@ For example, here is a Python script with dollar-syntax that runs the hostname c
 
 Flexible and Robustness
 =======================
-SSHScript v2.0 makes a great improvement by providing all the features of dollar-syntax in the sshscript module. This allows you to use all of SSHScript's features in pure Python without writing dollar-syntax. This makes SSHScript work exactly like any other counterpart package when integrating with existing projects.
+SSHScript v2.0 makes a great improvement by providing all the features of dollar-syntax in the sshscript module. This makes SSHScript work exactly like any other counterpart package when integrating with existing projects. This allows users to use all of SSHScript's features in pure Python without writing dollar-syntax. 
 
 Here is an example of the same script as above, but using only the sshscript module:
 
