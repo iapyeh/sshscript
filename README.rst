@@ -21,7 +21,7 @@ SSHScript has achieved these things.
 Install
 =======
 
-.. code-block:: shell script
+.. code-block:: 
 
     $ pip3 install sshscript
     ## or
@@ -30,7 +30,7 @@ Install
 
 SSHScript depends on the Paramiko library. In some cases, it has been reported that an older version (1.1.17) of SSHScript was incorrectly installed. If you encounter this problem, the workaround is to manually install Paramiko and then reinstall SSHScript.
 
-.. code-block:: shell script
+.. code-block::
 
     ## check version
     $ sshscript --version
