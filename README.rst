@@ -28,6 +28,25 @@ For example, here is a Python script with dollar-syntax that runs the hostname c
                 ## run "hostname" on host2, with is behind the host1
                 $hostname
 
+Flexible and Robustness
+=======================
+SSHScript v2.0 makes a great improvement by providing all the features of dollar-syntax in the sshscript module. This allows you to use all of SSHScript's features in pure Python without writing dollar-syntax. This makes SSHScript work exactly like any other counterpart package when integrating with existing projects.
+
+Here is an example of the same script as above, but using only the sshscript module:
+
+.. code-block:: python
+
+    from sshscript import SSHScriptSession
+    session = SSHScriptSession()
+    ## run "hostname" on localhost
+    session('hostname')
+    with session.connect('user@host1') as host1_session:
+        ## run "hostname" on host1
+        host1_session('hostname')
+        with host1_session.connect('user@host2') as host2_session:
+                ## run "hostname" on host2, with is behind the host1
+                host2_session('hostname')
+
 Install
 =======
 
