@@ -18,6 +18,22 @@ SSHScript has achieved these things.
 .. |pic2| image:: https://iapyeh.github.io/sshscript/v2/shellandsshscript.png
           :alt: my-picture2
 
+Simple and Intuitive
+====================
+SSHScript adds dollar-syntax syntax sugar to Python, which allows you to write scripts that closely resemble the process of manually performing operations.
+For example, here is a Python script with dollar-syntax that runs the hostname command on localhost, a remote server, and the server behind the remote server:
+
+.. code-block:: python
+
+    ## run "hostname" on localhost
+    $hostname
+    with $.connect('user@host1'):
+        ## run "hostname" on host1
+        $hostname 
+        with $.connect('user@host2'):
+                ## run "hostname" on host2, with is behind the host1
+                $hostname
+
 Install
 =======
 
