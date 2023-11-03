@@ -1,7 +1,7 @@
     
 SSHScript
 #########
-Many backend, DevOps, and SRE engineers have daily tasks that involve repetitive manual operations between the Linux console and SSH. When automation is needed, shell scripts are often used. Have you ever thought about solving this with Python scripts?
+Many backend, DevOps and SRE engineers have daily tasks that involve repetitive manual operations between the Linux console and SSH. When automation is needed, shell scripts are often used. Have you ever thought about solving this with Python scripts?
 
 SSHScript is a solution for those who have such an idea.The goal of SSHScript is to simply automate manual operations. Achieve the same functionality as shell scripts with Python.It can also use all Python packages and threading features.
 
