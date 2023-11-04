@@ -7,6 +7,7 @@ You want to regularly check the connection states from group A to B.
 This example shows how to connect to all servers in group A and execute the "ping" command to database server B.
 
 ```
+## filename: example-ping.spy
 databaseServer = '192.168.1.100'
 ## suppose they share the same credentials
 username = 'user'
@@ -25,4 +26,9 @@ for account,password in group:
             received, time = int(cols[3]),int(cols[9][:-2])
             avg = sum(times)/len(times) if len(times) else 0
             states[account] = time / received if received else 0
+```
+
+#### Executing 
+```
+$sshscript example-ping.spy
 ```

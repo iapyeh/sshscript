@@ -77,7 +77,7 @@ import tabulate
 print(tabulate.tabulate(rows,['Status','Partition','Use Percent']))
 ```
 
-#### execution examples
+#### Executing 
 ```
 # localhost
 $sshscript check.disk.space.spy
