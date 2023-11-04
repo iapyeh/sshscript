@@ -6,4 +6,4 @@ Last Updated on 2023/10/31
 * [Checking the syncing status of two MySQL servers](mysqlsyncstate)
 * [Who is attacking your server?](ex-lasdb)
 * [Check Disk Usage](ex-df)
-* [Using ping to check network quality](ex-ping
+* [Using ping to check network quality](ex-ping)
