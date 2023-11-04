@@ -6,6 +6,8 @@ Server group A has members A1, A2, ..., A10, which share the same database serve
 You want to regularly check the connection states from group A to B. 
 This example shows how to connect to all servers in group A and execute the "ping" command to database server B.
 
+![image](ex-ping.png)
+
 ```
 ## filename: example-ping.spy
 databaseServer = '192.168.1.100'
@@ -28,8 +30,6 @@ for account,password in group:
             avg = sum(times)/len(times) if len(times) else 0
             states[account] = time / received if received else 0
 ```
-
-![image](ex-ping.png)
 
 #### Executing 
 ```
