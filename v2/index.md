@@ -14,7 +14,7 @@ Last Updated on 2023/10/21
 * [CLI "sshscript"](cli)
 * [Recipes](recipes)
 * [Examples](examples/index)
-
+* [SSHScript vs. Ansible](ansiblediff)
 
 ## Releases 
 
