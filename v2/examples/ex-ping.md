@@ -23,10 +23,12 @@ for account,password in group:
         if 'transmitted' in line:
             ## eg. 3 packets transmitted, 3 received, 0% packet loss, time 2003ms
             words = line.split()
-            received, time = int(cols[3]),int(cols[9][:-2])
+            received, time = int(words[3]),words(cols[9][:-2])
             avg = sum(times)/len(times) if len(times) else 0
             states[account] = time / received if received else 0
 ```
+
+![image](ex-ping.png)
 
 #### Executing 
 ```
