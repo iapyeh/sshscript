@@ -14,7 +14,7 @@ username = 'user'
 password = '1234'
 groupsA = []
 for i in range(10):
-    groupsA.append([f'{username}@host{i}',password)
+    groupsA.append([f'{username}@hostA{i+1}',password)
 ## This keeps average speeds of "ping"
 states = {}
 for account,password in group:
