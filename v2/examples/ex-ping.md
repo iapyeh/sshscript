@@ -19,9 +19,10 @@ for i in range(10):
 states = {}
 for account,password in group:
     with $.connect(account,password) as host:
-        $f'ping -c 3 -w 3 {databaseServer}'
+        $f'ping -c 3 -W 3 {databaseServer}'
+        ## find the bottom line of output
+        ## eg. 3 packets transmitted, 3 received, 0% packet loss, time 2003ms
         if 'transmitted' in line:
-            ## eg. 3 packets transmitted, 3 received, 0% packet loss, time 2003ms
             words = line.split()
             received, time = int(words[3]),words(cols[9][:-2])
             avg = sum(times)/len(times) if len(times) else 0
