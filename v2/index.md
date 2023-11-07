@@ -18,7 +18,7 @@ Last Updated on 2023/11/07
 
 ## Releases 
 
-* 2023/10/17: [v2.0.2 Release Notes](release-v2.0.2) 
+* [v2.0.2 Release Notes](release-v2.0.2) (2023/10/17)
 
 ## Essay
 * [SSHScript vs. Ansible](ansiblediff)
