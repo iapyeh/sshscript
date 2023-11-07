@@ -9,11 +9,13 @@ Last Updated on 2023/10/21
 * [Console of sudo and su](tutorial-sudo) 
 * [Upload and Download Files](tutorial-download) 
 * [Threading Support](tutorial-threading) 
-
+* [Connect](connect)
 ## References
 * [CLI "sshscript"](cli)
 * [Recipes](recipes)
 * [Examples](examples/index)
+
+## Essay
 * [SSHScript vs. Ansible](ansiblediff)
 
 ## Releases 
