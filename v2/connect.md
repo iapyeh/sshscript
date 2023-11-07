@@ -75,8 +75,7 @@ Important note: When making a nested connection, the hostname must be resolvable
 with $.connect('user@bridge','1234') as host_session:
     with $.connect('user@database','1234') as inner_host_session:
         with $.connect('user@accounts','1234') as inner_inner_host_session:
-            inner_inner_host_session('hostname')
-            assert inner_inner_host_session.stdout.strip() == 'accounts'
+            pass
 ```
 - The hostname "bridge" is resolvable by localhost.
 - The hostname "database" should be resolvable by the "bridge" host.
@@ -89,8 +88,9 @@ By default, Paramiko searches for SSH keys on localhost. In the following exampl
 with $.connect('user@bridge') as host_session:
     ## still using the ssh key on localhost
     with $.connect('user@database') as inner_host_session:
-        inner_host_session('hostname')
-        assert inner_host_session.stdout.strip() == 'database'
+        ## still using the ssh key on localhost
+        with $.connect('user@accounts') as inner_inner_host_session:
+            pass
 ```
 To use the SSH key on the "bridge" host, you need to explicitly specify it using the $.pkey() function. For example:
 
@@ -99,7 +99,24 @@ with $.connect('user@bridge') as host_session:
     ## "/home/user/.ssh/id_rsa" is on the "bridge" host
     pkey = $.pkey('/home/user/.ssh/id_rsa')
     with $.connect('user@database',pkey=pkey) as inner_host_session:
-        inner_host_session('hostname')
-        assert inner_host_session.stdout.strip() == 'database'
+        ## "/home/user/.ssh/id_rsa" is on the "database" host
+        pkey = $.pkey('/home/user/.ssh/id_rsa')
+        with $.connect('user@accounts',pkey=pkey) as inner_inner_host_session:
+            pass
+```
+
+The following code accomplishes the same task but utilizes the sshscript module:
+
+```
+import sshscript
+session = sshscript.SSHScriptSession()
+with session.connect('user@bridge') as bridge_session:
+    ## "/home/user/.ssh/id_rsa" is on the "bridge" host
+    pkey = bridge_session.pkey('/home/user/.ssh/id_rsa')
+    with bridge_session.connect('user@database',pkey=pkey) as database_host_session:
+        ## "/home/user/.ssh/id_rsa" is on the "database" host
+        pkey = database_host_session.pkey('/home/user/.ssh/id_rsa')
+        with database_host_session.connect('user@accounts',pkey=pkey) as accounts_host_session:
+            pass
 ```
 
