@@ -1,5 +1,5 @@
 # SSHScript v2.0 Reference Guide
-Last Updated on 2023/10/21
+Last Updated on 2023/11/07
 
 ## Learning
 * [Getting Started](gettingstarted)
@@ -7,21 +7,21 @@ Last Updated on 2023/10/21
 * [Stdout, Stderr and Exitcode](dollarstdouterrexitcode) 
 * [Interactive Commands and Foreground Commands](tutorial-enter) 
 * [Console of sudo and su](tutorial-sudo) 
+* [Make Connections](connect)
 * [Upload and Download Files](tutorial-download) 
 * [Threading Support](tutorial-threading) 
-* [Connect](connect)
 
 ## References
 * [CLI "sshscript"](cli)
 * [Recipes](recipes)
 * [Examples](examples/index)
 
-## Essay
-* [SSHScript vs. Ansible](ansiblediff)
-
 ## Releases 
 
 * 2023/10/17: [v2.0.2 Release Notes](release-v2.0.2) 
+
+## Essay
+* [SSHScript vs. Ansible](ansiblediff)
 
 ### SSHScript v2.0 is still under development. If you find any bugs or have any suggestions, you are welcome to post them on the `issues` page.
 
