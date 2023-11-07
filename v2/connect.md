@@ -49,7 +49,9 @@ with $.connect('user@host') as host_session:
 ```
 
 ## 🔵 <a name="bykey"></a>Connect by ProxyCommand
-Keyword arguments passed to connect(), except for "policy", are passed through to paramiko.SSHClient().connect().
+Keyword arguments passed to connect(), except for "policy", are passed through to [paramiko.SSHClient().connect()](https://docs.paramiko.org/en/latest/api/client.html). This means you can use any keyword arguments that are supported by paramiko.SSHClient().connect(), such as "proxyCommand".
+
+Here is an example of how to use the proxyCommand keyword argument to connect to a remote server through a proxy:
 ```
 with $.connect('user@host',proxyCommand='openssl s_client -ign_eof -connect 1.2.3.4:5555 -quiet') :
     $hostname
