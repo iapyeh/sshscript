@@ -1,6 +1,6 @@
-# SSHScript v2.0 Connect
+# SSHScript v2.0 Make Connections
 
-Last Updated on 2023/10/20
+Last Updated on 2023/11/07
 
 <div style="text-align:right;position:relative;top:-140px"><a href="./index">Back to Index</a></div>
 
