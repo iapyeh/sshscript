@@ -185,14 +185,14 @@ New Releases
 
 The new experimental release is 2.0.2 (2023/10/17). There are lots of changes.
 
-* `SSHScript v2.0 Reference Guide`_
+* `SSHScript v2.0 Reference Guide`_ https://iapyeh.github.io/sshscript/v2/index
 
 SSHScript v1.0
 ==============
 
-* `SSHScript v1.0 Reference Guide`_
+* `SSHScript v1.0 Reference Guide`_ https://iapyeh.github.io/sshscript/v1/index
 
-* `SSHScript v1.0 Examples`_
+* `SSHScript v1.0 Examples`_ https://iapyeh.github.io/sshscript/v1/examples/index
 
 
 .. bottom of content
@@ -206,7 +206,7 @@ SSHScript v1.0
 .. _`SSHScript v1.0 Examples` : https://iapyeh.github.io/sshscript/v1/examples/index
 
 
-|ImageLink|_
+|ImageLink|
 
 .. |ImageLink| image:: https://pepy.tech/badge/sshscript
 .. _ImageLink: https://pepy.tech/project/sshscript
