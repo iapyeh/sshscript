@@ -6,8 +6,8 @@ Last Updated on 2023/10/20
 
 ## Topics
 
-* [Execute interactive commands : $.enter()](#dollar-enter)
-* [Execute foreground programs : $.iterate()](#dollar-iterate)
+* [Execute interactive commands : $.enter()](#dollar-enter) (eg. python, mysql)
+* [Execute foreground programs : $.iterate()](#dollar-iterate) (eg. "tcpdump","strace")
 
 ## 🔵 <a name="dollar-enter"></a>Execute interactive commands: $.enter()
 
@@ -130,6 +130,34 @@ with session.connect('user@host','1234') as remote_session:
                 print(line)
                 ## should break by some reason
                 if line.find('192.168.131.79'): break
+```
+
+### 🌎＄ Example of monitoring pty console on localhost
+
+If you want to monitor the input and output of the pts/1 console, first obtain the PID of pts/1 by running:
+```
+# ps --sort start_time -t pts/1 |head -2
+```
+Then, you can use the following script to start monitoring:
+```
+import sys
+pid = 135251 ## pid of pts/1
+cmd=f'strace -e trace=write -s999999 -fp {pid} 2>&1'
+import re
+## only stdout and stderr are instereseted
+pat = re.compile('write\(([12]), "(.+)",',re.I)
+with $ as console:
+    with console.iterate(cmd) as strace:
+        for line in strace:
+            m = pat.search(line)
+            if not m:
+                print(line)
+                continue
+            type,content = m.groups()
+            if type == '1':
+                sys.stdout.write(content + '\n')
+            else:
+                sys.stderr.write(content+ '\n')
 ```
 
 
