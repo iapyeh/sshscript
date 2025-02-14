@@ -7,3 +7,4 @@ Last Updated on 2023/10/31
 * [Who is attacking your server?](ex-lasdb)
 * [Check Disk Usage](ex-df)
 * [Using ping to check network quality](ex-ping)
+* [Backup VMGuest](ex-voftool)
