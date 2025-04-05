@@ -592,7 +592,7 @@ with __ret as topconsole:
             
             self.containsSSHScriptStack[-1] = True
             ## rewrite _sshscript_in_context_.connect() to
-            ## _new_sshcript = _sshscriptstack_.connectAndAppend('timwang@rms1', password='tech168')
+            ## _new_sshcript = _sshscriptstack_.connectAndAppend()
             nodeToInsert = copy.deepcopy(self.tmplLineForConnect)
             nodeToInsert.value.args = node.args
             nodeToInsert.value.keywords = node.keywords
