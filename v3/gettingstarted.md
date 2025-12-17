@@ -10,7 +10,34 @@ First, you need to install SSHScript. You can do this using pip:
 pip install sshscript
 ```
 
-## Basic Usage
+## Basic Usage - Local Session
+Let's start with a simple example. We'll execute a command, and print the output on localhost.
+
+```python
+from sshscript import Session
+# Create a new SSH session
+session = Session()
+# Execute a command on the remote server
+session('ls -l /')
+
+# Print the standard output and standard error
+print("STDOUT:")
+print(session.stdout)
+print("STDERR:")
+print(session.stderr)
+
+# You can also access the exit code
+print(f"Exit Code: {session.exitcode}")
+
+
+# Execute next command
+stdout,stderr = session('hostname')
+print('hostname={stdout.strip()}')
+
+```
+
+
+## Basic Usage - Remote Session
 
 Let's start with a simple example. We'll connect to a remote server, execute a command, and print the output.
 
@@ -19,35 +46,22 @@ from sshscript import Session
 
 # Create a new SSH session
 # Replace 'user', 'password', and 'your_server_ip' with your actual credentials and server IP
-with Session('user@your_server_ip', password='your_password') as session:
+account = 'user@192.168.0.100'
+password = '12345678'
+with Session().connect(account, password=password) as session:
     # Execute a command on the remote server
-    result = session.run('ls -l /')
+    session('ls -l /')
 
     # Print the standard output and standard error
     print("STDOUT:")
-    print(result.stdout)
+    print(session.stdout)
     print("STDERR:")
-    print(result.stderr)
+    print(session.stderr)
 
     # You can also access the exit code
-    print(f"Exit Code: {result.exit_code}")
+    print(f"Exit Code: {session.exitcode}")
+
+    # Execute next command
+    stdout,stderr = session('hostname')
+    print('remote hostname={stdout.strip()}')
 ```
-
-### Running Multiple Commands
-
-You can run multiple commands sequentially within the same session:
-
-```python
-from sshscript import Session
-
-with Session('user@your_server_ip', password='your_password') as session:
-    session.run('mkdir my_test_directory')
-    session.run('echo "Hello from SSHScript!" > my_test_directory/hello.txt')
-    result = session.run('cat my_test_directory/hello.txt')
-    print(result.stdout)
-    session.run('rm -rf my_test_directory')
-```
-
-### Handling Errors
-
-SSHScript allows you to easily check for command execution errors. By default, if a command returns a non-zero exit code, an `SSHScriptError` will be raised.
