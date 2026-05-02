@@ -17,7 +17,8 @@ import os
 import sys
 import glob
 import __main__
-from logging import DEBUG
+import traceback
+
 # set here used in sshscriptdollar
 import warnings
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
@@ -25,23 +26,30 @@ def warning_on_one_line(message, category, filename, lineno, file=None, line=Non
 warnings.formatwarning = warning_on_one_line
 
 try:
-    from .sshscriptsession import SSHScriptSession
-    from .sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptError, setupLogger, logDebug, logDebug8
+    from .session import Session
+    from .errorutils import SSHScriptExit, SSHScriptBreak,  set_logger, log_debug, log_debug_8,SSHScriptException
+    ## 2025/3/3 v2.0.3 feature: import *.spy file directly
+    from . import spyimporter
 except ImportError:
-    from sshscriptsession import SSHScriptSession
-    from sshscripterror import SSHScriptExit, SSHScriptBreak, SSHScriptError, setupLogger, logDebug, logDebug8
+    ## 2024/8/16, should add mydir into sys.path for python 3.12
+    mydir = os.path.abspath(os.path.dirname(__file__))
+    if not mydir in sys.path: sys.path.insert(0,mydir)
+    from session import Session
+    from errorutils import SSHScriptExit, SSHScriptBreak, set_logger, log_debug, log_debug_8, SSHScriptException
+    import spyimporter
+    ## 2024/8/16, should remove mydir out of sys.path for python 3.11
+    if mydir == sys.path[0]: del sys.path[0]
 
-def runFile(givenPaths,
-        varGlobals=None,
-        varLocals=None,
+def run_file(givenPaths,
+        vars=None,
         showScript=False,
         showRunOrder=False,
         unisession=True)->int:
-    ## @unisession:bool, if true, use the same session(an instance of SSHScriptSession) for all files.
+    ## @unisession:bool, if true, use the same session(an instance of Session) for all files.
     if isinstance(givenPaths, str): givenPaths = [givenPaths]
-    ext = os.environ.get('SSHSCRIPT_EXT','.spy')
 
     paths = []
+    ext = '.spy'
     for path in givenPaths:
         abspath = os.path.abspath(path)
         ## if path is a directory, add all *.spy files in it
@@ -74,21 +82,22 @@ def runFile(givenPaths,
         for path in paths: print(path)
         return 0
     
-    _locals = locals().copy()
-    _globals = globals().copy()
+    ## starts the executions of every script
+    _vars = locals().copy()
+    if vars: _vars.update(vars)
+    #_globals = globals().copy()
+
     if unisession:
-        session = SSHScriptSession()
+        session = Session()
     else:
         session = None
-    if varGlobals: _globals.update(varGlobals)
-    if varLocals: _locals.update(varLocals)
     exitcode = 0
-    for file in paths:
+    for idx,file in enumerate(paths):
         ## when unisession is not True,
         ## generate a new session for every file
-        if not unisession: session = SSHScriptSession()
+        if not unisession: session = Session()
 
-        logDebug(f'running {file}')
+        log_debug(f'executing {file}')
 
         absfile = os.path.abspath(file)
         ## maybe strange, but probably also works on windows
@@ -96,48 +105,48 @@ def runFile(givenPaths,
             script = fd.read().decode('utf-8','replace')
 
         ## add folder to sys.path,so "import <module in the same folder of __file__>" works
-        scriptFolder = os.path.dirname(abspath)
+        scriptFolder = os.path.dirname(absfile)
         scriptFolderInsertedToSysPath = False
         if not scriptFolder in sys.path:
             scriptFolderInsertedToSysPath = True
             sys.path.insert(0,scriptFolder)
 
         try:
-            _locals['__file__'] = absfile
+            _vars['__name__'] = '__main__' if idx == 0 else os.path.basename(absfile)
+            _vars['__file__'] = absfile
             ## parse the file only if it is .spy
-            newglobals = session.run(script,_locals,_globals,showScript=showScript)
+            ## v2.0.3 changes the order from locals,globals to globals,locals
+            newvars = session.run(script,_vars,showScript=showScript)
+        except SSHScriptException as e:
+            exitcode = e.errno
+            raise
         except SSHScriptBreak as e:
-            logDebug8(f'break by {e}')
-            exitcode = e.code
+            log_debug_8(f'break by {e}')
+            exitcode = e.errno
             continue
         except SSHScriptExit as e:
-            logDebug8(f'exit by {e}')
-            exitcode = e.code
+            log_debug_8(f'exit by {e}')
+            exitcode = e.errno
             raise
         except Exception as e:
-            logDebug(f'exit by {e}')
+            log_debug_8(f'exit by {e}')
             raise
         else:
+            exported = newvars.get('__export__')        
+            if exported:
+                ## __export__ = '*' will export all
+                if '*' == exported:
+                    _vars.update(newvars)
+                else:
+                    basename = os.path.basename(file)
+                    for key in exported:
+                        log_debug_8(f'{basename} export {key}')
+                        _vars[key] = newvars[key]
+            _vars['_sshscriptstacks_'] = newvars['_sshscriptstacks_']
+        finally:
             ## restore sys.path
             if scriptFolderInsertedToSysPath:
                 sys.path.remove(scriptFolder)
-
-            if newglobals is None:
-                ## user calls sys.exit() in .spy
-                break
-            else:
-                exported = newglobals.get('__export__')        
-                if exported:
-                    ## __export__ = '*' will export all
-                    if '*' == exported:
-                        _globals.update(newglobals)
-                    else:
-                        basename = os.path.basename(file)
-                        for key in exported:
-                            logDebug8(f'{basename} export {key}')
-                            _globals[key] = newglobals[key]
-                _globals['_sshscriptstacks_'] = newglobals['_sshscriptstacks_']
-        finally:
             if not unisession:    
                 session.close()
                 del session
@@ -148,53 +157,67 @@ def runFile(givenPaths,
     
     return exitcode
 
-def runScript(script,varGlobals=None,varLocals=None,showScript=False):
-    session = SSHScriptSession()
-    session.run(script,varGlobals,varLocals,showScript=showScript)
+def run_script(script,varGlobals=None,showScript=False):
+    session = Session()
+    session.run(script,globals=varGlobals,showScript=showScript)
     session.close()  
 
 def main():
     import argparse
 
     # REF: https://stackoverflow.com/questions/15753701/how-can-i-pass-a-list-as-a-command-line-argument-with-argparse
-    parser = argparse.ArgumentParser(description='SSHScript')
+    parser = argparse.ArgumentParser(description='SSHScript: automation tools for Subprocess and SSH')
 
-    parser.add_argument('--run-order', dest='showRunOrder', action='store_true',
-                        default=False,
-                        help='show the files to run in order, no execution.')
+    ## v2.0.3, only one .spy file is allowed, this makes no sense
+    #parser.add_argument('--run-order', dest='showRunOrder', action='store_true',
+    #                    default=False,
+    #                    help='show the files to run in order, no execution.')
 
-    parser.add_argument('--script', dest='showScript', action='store_true',
+    parser.add_argument('--script','-s', dest='showScript', action='store_true',
                         default=False,
                         help='show the converted python script only, no execution.')
     
-    parser.add_argument('--verbose', dest='verbose', action='store_true',
+    parser.add_argument('--verbose','-v', dest='verbose', action='store_true',
                         default=False,
-                        help='dump stdout,stderr to console. "debug" implies "verbose".')   
+                        help='dump stdout,stderr to console.')   
 
-    parser.add_argument('--ext', dest='sshscriptExt', action='store',
-                        default='.spy',
-                        help='the extension of sshscript file. default is .spy')
+    parser.add_argument('--stderr', dest='verbose_stderr', action='store_true',
+                        default=False,
+                        help='dump stderr only to console.')   
 
-    parser.add_argument('--debug', dest='debug', nargs='*', help='set log level to debug(default 10, could be 9 for more details but insecure)')
+    ## v2.0.3, fixed to .spy
+    #parser.add_argument('--ext', dest='sshscriptExt', action='store',
+    #                    default='.spy',
+    #                    help='the extension of sshscript file. default is .spy')
 
-    parser.add_argument(dest='paths', action='store', nargs='*',
+    ## v2.0.3, only one .spy file is allowed
+    #parser.add_argument(dest='paths', action='store', nargs='*',
+    #                    help='path of .spy files or folders')
+
+    parser.add_argument('path', action='store', nargs='?',default='_',
                         help='path of .spy files or folders')
 
+    parser.add_argument('--debug','-d', dest='debug', nargs='*',
+                        help='debug level: 8 or 10, default is 10')
+
+
+    ## v2.0.3, only one .spy file is allowed, this makes no sense
     ## new on v1.1.13
-    parser.add_argument('--folder', dest='folder', help='base folder of paths')
+    #parser.add_argument('--folder', dest='folder', help='base folder of paths')
 
     ## new on v1.1.17
     parser.add_argument('--version', dest='version', action='store_true',default=False,
                         help='dump the version number')
 
     ## new on v2.0.2
-    parser.add_argument('--check-version', dest='checkversion', action='store_true',default=False,
+    parser.add_argument('--check', dest='checkversion', action='store_true',default=False,
                         help='check the last version of SSHScript (need internet)')
 
     args, unknown = parser.parse_known_args()
-    __main__.unknown_args = unknown
-
-    os.environ['SSHSCRIPT_EXT'] = args.sshscriptExt
+   
+    ## add unknown arguments to sys.argv
+    del sys.argv[1:] 
+    sys.argv.extend(unknown)
 
     def get_current_version():
         try:
@@ -207,24 +230,25 @@ def main():
         return __version__
 
     ## handle the contradiction between args.debug and args.paths
-    ## eg.  python3 sshscript.py --verbose --debug unittest/0.spy ==>  python3 sshscript.py --verbose --debug 10 unittest/0.spy
-
-    if args.debug is not None:
-        if len(args.debug) == 0:
-            ## case like: python3 sshscript.py --verbose --debug --folder unittest 0.spy
+    if args.path == '_':
+        if args.debug and len(args.debug) == 1:
+            ## sshscript.py  --debug unittest-v2.0.3/A01onedollar.spy 
+            args.path = args.debug[0]
             args.debug = 10
+        elif args.debug and len(args.debug) > 1:
+            ## sshscript.py  --debug 8  unittest-v2.0.3/A01onedollar.spy 
+            args.path = args.debug[1]
+            args.debug = int(args.debug[0])
         else:
-            try:
-                debugLevel = int(args.debug[0])
-            except ValueError:
-                ## case like: python3 sshscript.py --verbose --debug 0.spy
-                args.paths = args.debug[:] + args.paths
-                args.debug = 10
-            else:
-                ## case like: python3 sshscript.py --verbose --debug 8 unittest/0.spy
-                args.paths = args.debug[1:] + args.paths            
-                args.debug = debugLevel
-
+            args.path = None
+    elif args.debug is not None:
+        if len(args.debug) == 0:
+            ## sshscript.py unittest-v2.0.3/A01onedollar.spy --debug
+            args.debug = 10
+        elif len(args.debug) > 0:
+            ## sshscript.py unittest-v2.0.3/A01onedollar.spy --debug 8
+            args.debug = int(args.debug[0])
+    ## handling starts
     if (args.version):
         print(get_current_version())
     elif (args.checkversion):
@@ -249,34 +273,38 @@ def main():
                 print(f"  3.  {sys.executable} -m pip install sshscript --upgrade")
                 print(f"  4.  {sys.executable} -m pip install sshscript=={info['version']} --upgrade")
 
-    elif len(args.paths):
+    elif args.path:
         
+        sys.argv[0] = args.path
+
         if args.debug:
             os.environ['DEBUG'] = str(args.debug)
         
         if args.verbose:
             os.environ['VERBOSE'] = '1'
+        elif args.verbose_stderr:
+            os.environ['VERBOSE_STDERR'] = '1'
+        
+        set_logger()
 
-        setupLogger()
+        ## v3, only one .spy file is allowed, this makes no sense
+        #if args.folder:
+        #    paths = [os.path.join(args.folder,x) for x in args.paths]
+        #else:
+        #    paths = args.paths
 
-        if args.folder:
-            paths = [os.path.join(args.folder,x) for x in args.paths]
-        else:
-            paths = args.paths
         try:
-            runFile(paths,
-                varGlobals=None,
-                varLocals=None,
+            run_file([args.path],
                 showScript=args.showScript,
-                showRunOrder=args.showRunOrder,
+                showRunOrder=False,
                 unisession=True)
         except SSHScriptExit as e:
-            sys.exit(e.code)
+            sys.exit(e.errno)
+        except SSHScriptException as e:
+            sys.exit(e.errno)
         except Exception as e:
-            import traceback
             traceback.print_exc()
-            code = e.code if hasattr(e,'code') else 1
-            sys.exit(code)
+            sys.exit(1)
         else:
             sys.exit(0)
     elif sys.stdout.isatty():
@@ -287,11 +315,11 @@ def main():
             try:
                 from . import __version__
             except ImportError:
-                __version__ = 'unknown'
+                __version__ = None
         
-        print(f'SSHScript Version:{__version__}')
-        print()
-        parser.print_help()        
+        if __version__: print(f'Version:{__version__}')
+        
+        parser.print_help()
     
 if __name__ == '__main__':
     main()
