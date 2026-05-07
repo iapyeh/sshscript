@@ -164,13 +164,17 @@ class DequeString(str):
         self.closed = False
         self.is_bytes = bytes
         self.glue = b'' if self.is_bytes else ''
+        DequeString.sno += 1
         self.name = f'DS{DequeString.sno}'
-        
         self.iterTimeout = None
         self.iterTimeoutSilent = False
 
+        
         if initial is None:
             self._deque = deque(maxlen=maxlen)
+        ## isinstance(initial, DequeString) should be in front of isinstance(initial, str) 
+        elif isinstance(initial, DequeString):
+            self._deque = initial._deque.copy()
         elif isinstance(initial, str):
             self._deque = deque(maxlen=maxlen)
             self._deque.append(initial)
@@ -189,6 +193,10 @@ class DequeString(str):
         ## for non-popleft iteration(see SSHScriptStderr.iter())
         self.sessionId = time.time() + random.random()
         self._listeners = []
+
+        ## this is one shot only
+        self.callback_pattern = None
+        self.callback = None
     @property
     def _string(self)->str:
         try:
@@ -242,6 +250,12 @@ class DequeString(str):
         else:
             return object.__getattribute__(self, name)
 
+    def set_callback(self,callback,pattern):
+        """ watching content for pattern, call callback() when the pattern shows up"""
+        self.callback = callback
+        assert pattern is None or isinstance(pattern,str), '"str" pattern supported only'
+        self.callback_pattern = pattern
+
     def append(self, item,splitlines=False):
         """
         Add an item into deque. item could be multiple lines.
@@ -250,6 +264,12 @@ class DequeString(str):
         when the listeners does not change the content,
         there is no string-copy , it saves memory usage.
         """
+        assert isinstance(item,str),f'{[item]} is not str'
+        callback_triggered = self.callback and self.callback_pattern in item
+        if callback_triggered:
+            item = item.replace(self.callback_pattern,'')
+        print('ioooo>>',self.sessionId,[item,callback_triggered,self.callback_pattern])
+        
         items = [item]
         with self._condition:
             if self._listeners:
@@ -268,7 +288,15 @@ class DequeString(str):
                 pass # might be closed (Errno 9)
             else:
                 self._condition.notify()
+        ## test callback pattern
+        if callback_triggered:
+            self.callback() 
+            ## this is one shot only
+            self.callback = None
+            self.callback_pattern = None
+
     def push_listener(self,listener):
+        ## listener is callable, called by listener(items)
         self._listeners.append(listener)
     def pop_listener(self,listener):
         assert self._listeners.pop() == listener

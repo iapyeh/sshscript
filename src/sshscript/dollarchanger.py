@@ -392,7 +392,6 @@ class DollarChanger(ast.NodeTransformer):
         elif isinstance(node, ast.Attribute) and \
             isinstance(node.value, ast.Name) and \
             node.value.id in ('_sshscript_in_context_','_c'):
-            #print('@' * 200,self.currentConsole,node.attr)
             if node.attr in ('connect','open'):
                 node.value = copy.deepcopy(self.tmplLineOfSshscriptstack.value)
                 node.attr = 'connect' ## normalize to "connect"

@@ -13,6 +13,7 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
+
 import __main__
 import threading, os, sys, re
 import time, traceback, shlex
@@ -47,22 +48,22 @@ class GenericChannel(object):
         
         :owner: The owner of this channel (typically a Dollar instance)
         """
-        self._native_id = str(threading.get_native_id())
+        self._native_id = str(int(time.time()))
         ## initial exitcode can not be -1,
         ## because it would trigger a calling to get the exitcode
         self._exitcode = None
         self._enter_counter = 0
 
         ## Guarding self._stdout, self._stderr
-        self._lock = threading.Lock()
-        self._stdout = SSHScriptStdout()
-        self._stderr = SSHScriptStderr()
+        self._lock = asyncio.Lock()
+        #self._stdout = SSHScriptStdout()
+        #self._stderr = SSHScriptStderr()
         ##lastOutputTime :最後一次有輸出的時間
-        self.lastIOAtTime = [0,0] ## input(send), output(stderr,stdout)
+        self.lastIOAtTime = [time.time(),time.time()] ## input(send), output(stderr,stdout)
 
-        self._dumpCondition = threading.Condition()
-        self._dumpBuf = DequeString(maxlen=1000)
-        self._dumpThread = threading.Thread(target=self._dump_stdout_err_job,daemon=True,no_patch=True)
+        self._dumpCondition = asyncio.Condition()
+        #self._dumpBuf = DequeString(maxlen=1000)
+        self._dumpBuf = []
         self._stdoutDumpBuf = b''
         self._stderrDumpBuf = b''
         
@@ -109,11 +110,55 @@ class GenericChannel(object):
             pat = re.compile(f'(\\W?)(?:echo )?__exitcode{sno}\\-_\\-(\\d+)\\-_\\-\\r?\\n?',re.M)
             self.exitcodePatterns.append(pat)
 
-
-        self.executing_lock = threading.Lock()
+        ## layer's variable
+        self.executing_locks = []
+        self.prompts= []
+        self.stdio_store = []
 
         self.prefixOfLog = '[Channel]'
-        self.log(f'{self} created')
+
+        self.sending_queue = asyncio.Queue()
+
+        ## initailly set layer 1
+        self.increase_layer('')
+        ## this flag control $.shell to use existing layer or increase layer
+        self.on_generic_layer = True 
+
+    @property
+    def executing_lock(self):
+        return self.executing_locks[-1]
+    @property
+    def prompt(self):
+        return self.prompts[-1]
+    @prompt.setter
+    def prompt(self,text):
+        self.prompts[-1] = text
+    @property
+    def _stdout(self):
+        return self.stdio_store[-1][0]            
+    @property
+    def _stderr(self):
+        return self.stdio_store[-1][1]
+    @property
+    def layer_count(self):
+        return len(self.stdio_store)
+    def increase_layer(self,prompt):
+        ## clone the current _stdout, stderr
+        ## there are the message of shell, su or sudo, and important
+        ## there also having "password:" prompt, it would be the targets for expect()
+        if len(self.stdio_store):
+            self.stdio_store.append([SSHScriptStdout(self._stdout),SSHScriptStderr(self._stderr)])
+        else:
+            self.stdio_store.append([SSHScriptStdout(),SSHScriptStderr()])
+        self.prompts.append(prompt)
+        self.executing_locks.append(threading.Lock())
+    def decrease_layer(self):
+        ## keep at least one layer
+        assert self.layer_count > 1
+        self.prompts.pop()
+        self.executing_locks.pop()
+        self.stdio_store.pop()
+    
     def _increase_exitcode_sno(self):
         """Increment the exit code sequence number.
         
@@ -195,49 +240,24 @@ class GenericChannel(object):
         :seconds: (int)
             Wait this many seconds after the last output before returning
         """
+       
         while True:
-            time.sleep(0.2)
-            if time.time() - self.lastIOAtTime[0] >= seconds and\
-               time.time() - self.lastIOAtTime[1] >= seconds:
+            now = time.time()
+            if now - self.lastIOAtTime[0] >= seconds and\
+               now - self.lastIOAtTime[1] >= seconds:
                 break
-    ## original implementation before v2.0.3
-    def wait_for_silent_with_timeout(self,seconds,timeout=0,silent=False)->bool:
-        """Wait for output to be silent with an overall timeout.
+            time.sleep(0.1)
+
+    ## v3.0
+    def wait_for_prompt(self,prompt,timeout=None)->bool:
+        """Block execution until output is silent for the specified duration.
         
-        This method is used to determine when a command has finished executing
-        by waiting for its output to stop. It will wait at least the specified
-        seconds after the last output, but will timeout if output continues
-        for too long.
+        If output continues (e.g., from tcpdump), it will block until output stops.
         
         :seconds: (int)
             Wait this many seconds after the last output before returning
-        :timeout: (int)
-            Maximum time to wait for output to stop (0 = wait forever)
-        :silent: (bool)
-            If True, return False when timeout reached instead of raising exception
-        :return:
-            True if output became silent, False if timeout reached (silent=True)
-        :raise:
-            TimeoutError: if timeout reached and silent=False
         """
-        self.log8(f'wait, seconds={seconds}, timeout={timeout}')
-        #print(f'{id(threading.current_thread())}: wait, seconds={seconds}, timeout={timeout}')
-        timeoutTime = (time.time() + timeout) if (timeout > 0) else 0
-        ret = True
-        while True:
-            time.sleep(0.2)
-            now = time.time()            
-            if timeoutTime and now > timeoutTime:
-                if silent:
-                    ret = False
-                    break
-                else:
-                    raise TimeoutError(f'wait exceeded {timeout}')
-            elif now - self.lastOutputTime > seconds:
-                break
-        #print(f'{id(threading.current_thread())}: wait returns')
-        return ret
-    
+        self.expect(prompt,timeout=timeout)
 
     @property
     def stdout(self)->str:
@@ -248,11 +268,14 @@ class GenericChannel(object):
         :return: Contents of stdout buffer
         """
         if self.hijacked:
-            return self._stdout
+            with self.executing_lock:
+                return self._stdout
         else:    
             ## by getting exitcode, make sure we have got all the output of stdout and stderr
-            if self._exitcode == EXITCODE_DEFAULT: self.get_exit_code(1)
-            return self._stdout
+            #if self._exitcode == EXITCODE_DEFAULT: self.get_exit_code()
+            with self.executing_lock:
+                return self._stdout
+
 
     @property
     def stderr(self)->str:
@@ -263,17 +286,22 @@ class GenericChannel(object):
         :return: Contents of stderr buffer
         """
         if self.hijacked:
-            return self._stderr
+            with self.executing_lock:
+                return self._stderr
         else:
             ## by getting exitcode, make sure we have got all the output of stdout and stderr
-            if self._exitcode == EXITCODE_DEFAULT: self.get_exit_code(1)
-            return self._stderr
+            #if self._exitcode == EXITCODE_DEFAULT: self.get_exit_code(1)
+            with self.executing_lock:
+                return self._stderr
 
     def hijack(self,yes):
-        """Hijack or release the channel's send_line method.
+        """
+        Called by EnterConsole.       
+        Hijack or release the channel's send_line method.
         
-        When hijacked, send_line is replaced with input method.
-        Called by EnterConsole.
+        When hijacked
+        1. send_line is replaced with input method.
+        2. no exitcode 
         
         :yes: True to hijack, False to release
         """
@@ -281,15 +309,15 @@ class GenericChannel(object):
             assert not self.hijacked,'can not hijack twice'
             assert self._send_line is None, 'can not hijack twice'
             self._send_line = self.send_line
+            self.hijacked = True
             self.send_line = self.input
-            self.hijacked = yes
             return True
         else:
             assert self.hijacked,'can not release hijack twice'
             assert self._send_line is not None, 'should release before hijacking'
             self.send_line = self._send_line
             self._send_line = None
-            self.hijacked = yes
+            self.hijacked = False
             return True
         return False
 
@@ -301,10 +329,13 @@ class GenericChannel(object):
         
         :return: Exit code of the last command
         """
+        if self.hijacked:
+            raise ValueError('exitcode is not available in current state')
         ## v2.0.3 request by demamd
         if self._exitcode == EXITCODE_DEFAULT:
-            self.get_exit_code(1)
-        return self._exitcode
+            return self.get_exit_code()
+        else:
+            return self._exitcode
 
     def log(self,msg, *args):
         """Log a debug message.
@@ -349,7 +380,7 @@ class GenericChannel(object):
         :raise:
             TimeoutError: if timeout reached and silent=False
         """
-        #print(f'{id(threading.current_thread())}: expect, rawpat={rawpat}, timeout={timeout}')
+
         ## prepare matching objects
         regularPats = []
         if not (isinstance(rawpat,list) or isinstance(rawpat,tuple)):
@@ -370,7 +401,6 @@ class GenericChannel(object):
                 
         ## comparing starts
         endTime = (time.time() + timeout) if timeout else 0       
-        
         def searching(items):
             for callback in callablePats:
                 if callback(items):
@@ -393,6 +423,7 @@ class GenericChannel(object):
                 for line in self._stdout:
                     m = searching([line])
                     if m:
+                        print('got ',m)
                         return m
             if stderr:
                 ## searching existing data
@@ -403,13 +434,14 @@ class GenericChannel(object):
                 self._stdout.push_listener(listener)
             if stderr:
                 self._stderr.push_listener(listener)
-
+        
         def remove_listener():
             if stdout:
                 self._stdout.pop_listener(listener)
             if stderr:
                 self._stderr.pop_listener(listener)
-
+        
+        ## searching existing buffer
         ret[0] = set_listener()
         if ret[0] is None:
             while True:
@@ -425,6 +457,7 @@ class GenericChannel(object):
                     else:
                         raise TimeoutError(f'Not found: {rawpat}')
                 time.sleep(0.25)
+        print(f'->expect returns {ret[0]}')
         return ret[0]
 
     def __enter__(self):
@@ -439,14 +472,46 @@ class GenericChannel(object):
             self.close()
     
     def send(self,text):
-        raise   NotImplementedError('send() not implemented')
+        self.sending_queue.put_nowait(text)
 
+    def raw_send(self,text):
+        raise   NotImplementedError('raw_send() not implemented')
+
+    async def _start_interaction(self):
+        await asyncio.gather(self._start_reading(),self.consume_sending_queue(),self._dump_stdout_err_job())
+    async def consume_sending_queue(self):
+        empty = asyncio.queues.QueueEmpty
+        while not self.closed:
+            try:
+                text = self.sending_queue.get_nowait()
+            except empty:
+                await asyncio.sleep(0.1)
+            else:
+                try:
+                    self.raw_send(text)
+                except OSError:
+                    ## eg. socket closed
+                    self.log('failure to send')
+                    traceback.print_exc()
+                    raise
+        self.sending_queue.join()
     def input(self,text):
         """Send text as input to the channel.
         
         :text: Text to send as input
         """
         self.log8(f'inputing {[text]}')
+
+        if self.hijacked:
+            ## caution: if user's last command is "exit", this lock would not be release
+            ##      but it does not matter, becuase that layer would be removed as well as this lock
+            self.executing_lock.acquire()
+            self.reset_buffer()
+            print('input reset buffer to',self._stdout.sessionId)
+            def prompt_found_callback():
+                self.executing_lock.release()
+            self._stdout.set_callback(prompt_found_callback,self.prompt)
+            self._stderr.set_callback(prompt_found_callback,self.prompt)
         self.send(text+'\n')
 
     def get_exit_code(self,timeout=None):
@@ -454,12 +519,43 @@ class GenericChannel(object):
         
         :timeout: Maximum time to wait for exit code
         """
+        
         assert not self.closed
-        sno = self._increase_exitcode_sno()
-        pat = self.exitcodePatterns[sno]
        
-        self.wait_for_silent(0.2) ## important for stability
-        self.send(f'{self._exitcodeSymbol[0]} __exitcode{sno}-_-{self._exitcodeSymbol[1]}-_-\n')
+        ## important for stability
+        with self.executing_lock:
+            #self.wait_for_silent(1)
+            sno = self._increase_exitcode_sno()
+            pat = self.exitcodePatterns[sno]
+            #_stdout = self._stdout
+            #_stderr = self._stderr
+            _backup_stdio = self.stdio_store[-1][:]
+            self.reset_buffer()
+            
+            complete = False
+            def prompt_found_callback():
+                nonlocal complete
+                m = pat.search(str(self._stdout))
+                if m:
+                    self._exitcode = int(m.group(2))
+                    #self._stdout = _stdout
+                    #self._stderr = _stderr
+                else:
+                    m = pat.search(str(self._stderr))
+                    if m:
+                        self._exitcode = int(m.group(2))
+                        #self._stdout = _stdout
+                        #self._stderr = _stderr
+                self.stdio_store[-1] = _backup_stdio
+                complete = True
+                #self.executing_lock.release()
+            self._stdout.set_callback(prompt_found_callback,self.prompt)
+            self._stderr.set_callback(prompt_found_callback,self.prompt)
+            self.send(f'{self._exitcodeSymbol[0]} __exitcode{sno}-_-{self._exitcodeSymbol[1]}-_-\n')
+            while not complete:
+                time.sleep(0.1)
+            return self._exitcode
+        '''
         exitcode = None
         def callback(items):
             nonlocal exitcode
@@ -470,65 +566,37 @@ class GenericChannel(object):
                 return True
             ## note: self._exitcode_command_pat string might appear on stderr
             ## when not setting PS1=""
-        self.expect(callback,timeout=timeout)
+        await self.expect(callback,timeout=timeout)
         if exitcode is not None:
             self._exitcode = exitcode
-
+        '''
     ## run the commands
-    def send_line(self,line,ensure=True):
+    def send_line(self,line):
         """Send a line or multiple lines to the channel.
         
         :line: String or list of strings to send
         """
         assert not self.hijacked, 'can not sendline when hijacked'
 
-        return self.send_command(line,ensure=ensure)
+        return self.send_command(line)
 
-    def send_command(self,command,ensure=True):
-        """Send a command to the channel.
-        
+    def send_command(self,command):
+        """Send a command to the channel.       
         :command: Command to execute
-        :ensure: if True, request exitcode of previous execution to ensure two execution are separated
-                it is for internal commands to speed up
         :return: Tuple of (stdout, stderr)
         """
-        self.log8(f'executing {command}')
-        '''
-        :command:
-            command to run, single line
-        :outputTimeout: timeout of waiting io to stop,
-            if outputTimeout == 0, user hints this is command won't end
-            such as "tcpdump", 
-        '''
+        self.log8(f'send_command: {command},prompt={self.prompt},self._exitcode={self._exitcode}')
         
-        #command = shlex.quote(command)
-
         ## ensure that there is no more output, especially at the beginning when a new shell is started
         self.executing_lock.acquire()
-        ## 確保跟上一個命令之間有間隔
-        if ensure and self._exitcode == EXITCODE_DEFAULT:
-            self.get_exit_code(2)
-
-        ## cleanup and reset buffers of both console.stdout and console.stderr
-        ## Should not depends on updateStdoutStderr(), because soon after 1st line was send, data would be received.
-        ## But updateStdoutStderr() was called after the last line (so, it does not cleanup buffers)
-        self.reset_buffer()
         self._exitcode = EXITCODE_DEFAULT
+        self.reset_buffer()
+        def prompt_found_callback():
+            self.executing_lock.release()
+        self._stdout.set_callback(prompt_found_callback,self.prompt)
+        self._stderr.set_callback(prompt_found_callback,self.prompt)
         ## for powershell, send \n would get \n back; send \r\n would get \r\n back
         self.send(command+'\n')        
-        ## 不呼叫 self.wait()
-        ## 因為不一定會有output停止的時候(eg. tcpdump會一直輸出）
-        ## 但是，大部分的指令確實是有需要等一下才會有輸出。
-        ## 所以，在不是with的情況下，
-        #＃  如果user 讀取stdout, stderr時，如果還沒有取得exitcode，
-        ##   則強制先取得exitcode
-
-        self.executing_lock.release()
-        ## v2.0.3 exitcode is requested by demand
-        #return self.stdout, self.stderr, self.exitcode
-        
-        ## note: returned is self._stdout, not self.stdout
-        ## which means, self.get_exitcode() is not called yet
         return self._stdout, self._stderr
    
     def send_signal(self,sig):
@@ -548,54 +616,53 @@ class GenericChannel(object):
         else:
             self.cp.send_signal(sig)
 
-    def _add_stdout_data(self,newbytes): 
+    async def _add_stdout_data(self,newbytes): 
         """Add data to stdout buffer.
         
         :newbytes: Bytes to add to stdout
         """
+        self.touchIO(True)
         ## do output, even it is empty (eg. echo $HELLO)
         #if not newbytes: return
-        
+
         ## by checking self.closed, "exit" would not be put into stdout
         if self.closed: return
         ## when user set "encoding=utf8" for subprocess.run,newbytes is string. 
         #if isinstance(newbytes,str):
         #    newbytes = newbytes.encode()
-        with self._lock:
+        async with self._lock:
             try:
                 self._stdout.append(newbytes.decode('utf8'),True)
             except UnicodeDecodeError:
                 self._stdout.append(newbytes.decode('utf8','replace'),True)
-            self.touchIO(True)
             if self.dump2sys[0]:
-                with self._dumpCondition:
+                async with self._dumpCondition:
                     self._dumpBuf.append((0,newbytes))
                     self._dumpCondition.notify()
 
-    def _add_stderr_data(self,newbytes):
+    async def _add_stderr_data(self,newbytes):
         """Add data to stderr buffer.
         
         :newbytes: Bytes to add to stderr
         """
         ## do output, even it is empty (eg. echo $HELLO)
         #if not newbytes: return
-        
+        self.touchIO(True)
         ## by checking self.closed, "exit" would not be put into stdout
         if self.closed: return
 
-        with self._lock:         
+        async with self._lock:         
             try:
                 self._stderr.append(newbytes.decode('utf8'),True)
             except UnicodeDecodeError:
                 self._stderr.append(newbytes.decode('utf8','replace'),True)
-            self.touchIO(True)       
             if self.dump2sys[1]:
-                with self._dumpCondition:
+                async with self._dumpCondition:
                     self._dumpBuf.append((1,newbytes))
                     self._dumpCondition.notify()
 
     ## v2.0.3, adds an delegated thread to dump stdout,stderr to console
-    def _dump_stderr(self,newbytes):
+    async def _dump_stderr(self,newbytes):
         try:
             p = newbytes.rindex(b'\n')
         except ValueError:
@@ -607,7 +674,8 @@ class GenericChannel(object):
             self._stderrDumpBuf = newbytes[p+1:]
             sys.stderr.buffer.flush()        
 
-    def _dump_stdout(self,newbytes):
+    async def _dump_stdout(self,newbytes):
+        ''' print to console line by line, no print if no new line'''
         try:
             p = newbytes.rindex(b'\n')
         except ValueError:
@@ -619,32 +687,42 @@ class GenericChannel(object):
             self._stdoutDumpBuf = newbytes[p+1:]
             sys.stdout.buffer.flush()
 
-    def _dump_stdout_err_job(self):
+    async def _dump_stdout_err_job(self):
         """Background thread function to dump stdout/stderr to console.
         
         This method runs in a separate thread and handles writing
         stdout/stderr data to the console with appropriate prefixes.
         """
         handler = [self._dump_stdout,self._dump_stderr]
-        while not (self.closed or self._dumpBuf.closed):
+        #while not (self.closed or self._dumpBuf.closed):
+        while not self.closed:
             try:
-                with self._dumpCondition:
-                    while not self._dumpBuf:
-                        if self._dumpCondition.wait(1):
+                async with self._dumpCondition:
+                    if self.closed: break
+                    try:
+                        await asyncio.wait_for(self._dumpCondition.wait(),timeout=0.1)
+                    except (asyncio.exceptions.CancelledError,GeneratorExit):
+                        break
+                    except asyncio.exceptions.TimeoutError:
+                        if self.closed:# or self._dumpBuf.closed:
                             break
-                        elif self.closed or self._dumpBuf.closed:
-                            break
-                    for x,newbytes in self._dumpBuf:
-                        handler[x](newbytes)
-                    self._dumpBuf.clear()
+                        else:
+                            try:
+                                ## important for avoiding blocking the event loop
+                                await asyncio.sleep(0.01)
+                            except asyncio.exceptions.CancelledError:
+                                break                            
+                    else:
+                        for x,newbytes in self._dumpBuf:
+                            await handler[x](newbytes)
+                        self._dumpBuf.clear()
             except:
                 traceback.print_exc()
-                break                
-    
-    def _dump_stdout_err(self):
+                break
+    async def _dump_stdout_err(self):
         handler = [self._dump_stdout,self._dump_stderr]
         for x,newbytes in self._dumpBuf:
-            handler[x](newbytes)
+            await handler[x](newbytes)
         self._dumpBuf.clear()
     
     def reset_buffer(self):
@@ -654,13 +732,10 @@ class GenericChannel(object):
         """
         ## clean up console.stdout, console.stderr
         ## dump to screen for verbose mode, then clean up its buffers
-        with self._lock:
-            #self._stdout.clear()
-            #self._stderr.clear()
-            self._stdout = SSHScriptStdout()
-            self._stderr = SSHScriptStderr()
-            self.touchIO(0)
-            self.touchIO(1)
+        self.stdio_store[-1][0] = SSHScriptStdout()
+        self.stdio_store[-1][1] = SSHScriptStderr()
+        self.touchIO(0)
+        self.touchIO(1)
     clear = reset_buffer
 
     def close(self):        
@@ -670,9 +745,8 @@ class GenericChannel(object):
         """
         assert not self.closed
         self.closed = True
-        if self._dumpThread.is_alive():
-            self._dumpThread.join()
-        self._dumpBuf.close()
+        #self._dumpBuf.close()
         self._stdout.close()
         self._stderr.close()
+        #self.owner.event_loop.stop()
 

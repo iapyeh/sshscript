@@ -96,8 +96,8 @@ import os, sys
 from logging import DEBUG
 assert DEBUG == 10
 DEBUG8 = 8
-global logger
 ## default logger
+global logger
 logger = logging.getLogger('sshscript')
 
 def log_debug(mesg,*args):
@@ -154,7 +154,7 @@ def set_logger(_logger=None):
             #handler.setFormatter(logging.Formatter('%(thread_id)d:%(asctime)s:%(message)s',"%Y-%m-%d %H:%M:%S")) 
             handler.setFormatter(logging.Formatter('%(asctime)s:%(message)s',"%Y-%m-%d %H:%M:%S")) 
             logger.addHandler(handler)
-            logger.log(DEBUG,'sys.stdout added to logger')
+            log_debug_8('sys.stdout added to logger')
     else:
         logger = _logger
     return logger

@@ -29,16 +29,15 @@ import os
 import sys
 import traceback
 import __main__
-import re
 import copy
 from io import StringIO
 import types
-import signal
+import asyncio
 
 try:
     from .dollar import Dollar
     from .sessionwrapper import SessionWrapper,SudoConsole,SuConsole
-    from .errorutils import  get_logger, SSHScriptExit, SSHScriptBreak, SSHScriptException, log_debug, log_debug_8, dumpScript, listRightIndex
+    from .errorutils import get_logger, SSHScriptExit, SSHScriptBreak, SSHScriptException, log_debug, log_debug_8, dumpScript, listRightIndex
     ## v2.0.3 changes from sshscriptparserng to dollarparser
     from . import dollarparser
     ## this is required for user to "import *.spy"  in a .py script
@@ -90,11 +89,13 @@ class ConsoleWrapper:
         self.funcname = funcname
         ## session's _lastDollar instance
         self.channel = channel
+        assert self.channel is not None
         self.args = args
         self.kwargs = kwargs
         self.wrapper = None
         self.enter_count = 0
     def __enter__(self):
+        print('ConsoleWrapper.__enter__ called, self.channel.layer_count=',self.channel.layer_count,',self.enter_count=',self.enter_count)
         ## could enter many times.
         ## eg.
         ## with $.su(...) as console:
@@ -113,11 +114,33 @@ class ConsoleWrapper:
     enter = __enter__
 
     def __exit__(self,exc_type, exc_value, _traceback):
+        print('ConsoleWrapper.__exit__ called, self.channel.layer_count=',self.channel.layer_count,',self.enter_count=',self.enter_count,_traceback)
+        if _traceback is not None:
+            traceback.print_exc()
+
+            sys.exit(1)
         assert self.enter_count >= 1
         if self.enter_count == 1:
             ## EnterConsole.__exit__ etc.
             self.innerConsole.__exit__(exc_type, exc_value, _traceback)
             self.channel.__exit__(exc_type, exc_value, _traceback)
+            
+            ## close event loop
+            # 1. 取得當前所有還在運行的任務 (排除自己)
+            current_task = asyncio.current_task()
+            tasks = [t for t in asyncio.all_tasks(self.channel.owner.event_loop) if t is not current_task]            
+            if tasks:          
+                # 2. 對所有任務發送取消訊號
+                for task in tasks:
+                    task.cancel()
+                ## 3. 給任務一點時間處理 CancelledError (這步最關鍵)
+                ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
+                #await asyncio.gather(*tasks, return_exceptions=True)            
+                time.sleep(0.2)
+            
+            self.channel.owner.event_loop.call_soon_threadsafe(self.channel.owner.event_loop.stop) 
+            self.channel.owner.call_thread.join()
+
             self.wrapper.__exit__(exc_value, _traceback)
             self.wrapper = None
         self.enter_count -= 1
@@ -181,19 +204,7 @@ class Session(object):
         ## by self.stdout and self.stderr, self.exitcode
         self._lastDollar = None
 
-        log_debug_8(f'{self} was created')
         self._append_to_thread_stack()
-        '''
-        try:
-            if len(threading.current_thread().sshscriptstack) == 0:
-                ## be the first session in this thread
-                self.bindThread()
-                #self.enteringThreads.append(threading.current_thread())
-        except AttributeError:
-            ## be the first session in this thread
-            self.bindThread()
-            #self.enteringThreads.append(threading.current_thread())
-        '''
     ## added in v2.0.3
     ## always return the session which is not connected to execute commands by subprocess at localhost
     @property
@@ -301,19 +312,7 @@ class Session(object):
                 return True
             else:
                 return False
-    '''
-    def _enter_thread(self,thread):
-        s = Session(self)
-        s._console_info = self._console_info
-        s._host = self._host
-        s._username = self._username
-        s._port = self._port
-        s._client = self._client
-        s._lastDollar = self._lastDollar
-        s._sock = self._sock
-        s._socket_of_proxy_command = self._socket_of_proxy_command
-        return s
-    '''
+
     def new_session(self):
         s = Session(self)
         s._console_info = self._console_info
@@ -329,15 +328,6 @@ class Session(object):
     @export2Dollar
     def close_session(self):
         return self.close()
-
-    #@export2Dollar
-    #def bind(self,func):
-    #    if isinstance(func,threading.Thread):
-    #        return self.bindThread(func)
-    #    elif callable(func):
-    #        raise ValueError('donot use bind(), use "with $ as session:" instead')
-    #    else:
-    #        raise  ValueError(f'bind() only accept a callable or a threading.Thread, not {type(func)}')
 
     def _append_to_thread_stack(self,the_thread=None):
         """ make this session to be the attached session in given thread."""
@@ -364,14 +354,7 @@ class Session(object):
             return f'<Session {self.id}:{self._host}>'
         else:
             return f'<Session {self.id}>'
-    
-    #def __del__(self):
-    #    ## when the belonging thread was completed
-    #    log_debug_8(f'{self} was deleted')
-    #    if not self.closed: self.close()
 
-    ## with $.connect() as
-    ## with $.session as
     def __enter__(self):
         self.enteringThreadsLocker.acquire()
         threading.current_thread().sshscriptstack.append(self)
@@ -678,27 +661,54 @@ class Session(object):
 
     
     ## v3.0 no more globals() and locals()
+    ## v3.1, run a asyncio event loop
     def run(self,script,vars=None,showScript=False,timeout=None):
-        ## timeout:int, in seconds
-        ## Returns the locals() (a dict) of the given script
+        ## setup the event loop for running the script, and run the script in the event loop
+
+        if timeout is not None:
+            raise NotImplementedError('sshscript.run() timeout is not implemented yet')
+
+        ## run in current thread.
+        loop = asyncio.get_event_loop()
+        if not loop or loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
         ## v2.0 default running locals and globals to caller function's locals() and globals() 
         if vars is None:
             vars = sys._getframe(1).f_locals
-        #if globals is None:
-        #    globals = sys._getframe(1).f_globals
 
-        ## v2.0.3
-        ## starts from python 3.12, sys._getframe(1).f_globals is of type 'FrameLocalsProxy' not 'dict'
-        ## (but don't know how to get the FrameLocalsProxy class)
-        #if not isinstance(vars,dict):
-        #    _globals = {}
-        #    for k,v in globals.items():
-        #        _globals[k] = v
-        #    globals = _globals
+        try:
+            return loop.run_until_complete(self.run_in_eventloop(script,vars,showScript,timeout))
+        except Exception as e:
+            print('------erot ',e)
+            traceback.print_exc()
+            raise
+        finally:
+            ## miso
+            ## close event loop
+            # 1. 取得當前所有還在運行的任務 (排除自己)
+            try:
+                current_task = asyncio.current_task()
+            except RuntimeError:
+                ## no event loop
+                pass
+            else:
+                tasks = [t for t in asyncio.all_tasks(loop) if t is not current_task]            
+                if tasks:          
+                    # 2. 對所有任務發送取消訊號
+                    for task in tasks:
+                        task.cancel()
+                    ## 3. 給任務一點時間處理 CancelledError (這步最關鍵)
+                    ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
+                    #await asyncio.gather(*tasks, return_exceptions=True)            
+                    time.sleep(0.2)                
+                loop.call_soon_threadsafe(loop.stop) 
+            finally:
+                loop.close()
 
-        ## for implementing "timeout", this task is run in an individual thread
-        ## Pending: should have a way to notify the running script that it reached "Timeout" 
+    async def run_in_eventloop(self,script,vars=None,showScript=False,timeout=None):
+        ## timeout:int, in seconds
         def executeScript(script,_vars,showScript=False):
             filepath = _vars.get('__file__')
             ## v2.0 auto detecting script types
@@ -735,9 +745,10 @@ class Session(object):
             except KeyError:
                 exec_vars['__name__'] = '__main__'
 
+            ## setup the _sshscriptstacks_ for the session
             _sshscriptstacks_ = exec_vars.get('_sshscriptstacks_')
             threading.current_thread().sshscriptstack = _sshscriptstacks_ or patching.SshscriptStack(threading.current_thread(),[self])
-            log_debug_8( f'set starting session to {_sshscriptstacks_ or self}')
+
             exec_vars['threading']= threading
             exec_vars['types']= types
             exec_vars['Dollar'] = Dollar
@@ -757,21 +768,24 @@ class Session(object):
                 raise
             except SSHScriptException:
                 raise
-            except:
+            except Exception as e:
+                traceback.print_exc()
                 raise
             else:
                 return exec_vars
+            finally:
+                pass
             
         ## v.1.18
         self.runLocker.acquire(timeout=60)
         if not self.runLocker.locked():
             raise TimeoutError('sshscript.run() require locker timeout')
         
-        ret = {}
-        runSession = f"{self.host}:{threading.current_thread().native_id}"
-        log_debug(f"{runSession}: sshscript.run() starts")
         
         def runner(*args):
+            runSession = f"{self.host}:{threading.current_thread().native_id}"
+            log_debug(f"{runSession}: sshscript.run() starts")
+            ret = {}
             try:
                 ret['value'] = executeScript(*args)
             except SystemExit as e:
@@ -798,28 +812,11 @@ class Session(object):
                 pass
             finally:
                 log_debug(f"{runSession}: sshscript.run() completed")
+            return ret
 
-        execution_thread = threading.Thread(target=runner,args=(script,vars,showScript),name=f'_session_run_{int(time.time())}',daemon=True)
-        execution_thread.start()
+        ret = runner(script,vars,showScript)
 
-        ## Checking running state of the above thread
-        if timeout is not None:
-            timeOfTimeout = time.time() + timeout
-        else:
-            timeOfTimeout = 0
-        timeout_error = None
-        while True:
-            ## timeout 1 seconds
-            execution_thread.join(1)
 
-            if not execution_thread.is_alive():
-                break
-            elif timeOfTimeout == 0: ## no timeout
-                continue
-            elif time.time() > timeOfTimeout:
-                ## why not kill the thread?
-                timeout_error = TimeoutError(f'{self} sshscript.run() runs over {timeout} seconds')
-                break
         ## self.runLocker might be already released by caller because of timeout
         if self.runLocker.locked(): self.runLocker.release()
         log_debug_8(f'{self} run() release lock, locked= {self.runLocker.locked()}')
@@ -828,12 +825,10 @@ class Session(object):
             raise ret['exception']
         elif ret.get('system_exit'):
             sys.exit(ret['system_exit'].code)
-        elif timeout_error:
-            raise timeout_error
         else:
             log_debug(f'{self} run() complete')
             ## what is for, for next spy script?
-            ret['value']['_sshscriptstacks_'] = execution_thread.sshscriptstack
+            ret['value']['_sshscriptstacks_'] = threading.current_thread().sshscriptstack
             return ret['value']
 
     ## v2.0.3 added feature
@@ -844,9 +839,10 @@ class Session(object):
 
     ## v2 added feature
     def onedollar(self,cmd,*args,**kw):
-        cmd = cmd.strip()      
+        cmd = cmd.strip()
         inWith = False
-        self._lastDollar = Dollar(self,cmd,inWith,*args,**kw)(False)
+        self._lastDollar = Dollar(self,cmd,inWith,*args,**kw)
+        self._lastDollar(False)
         ## v2.0.3 no more returns exitcode
         return self._lastDollar.stdout,self._lastDollar.stderr
     
@@ -888,8 +884,10 @@ class Session(object):
         """
         ## sudo,su,enter should set get_pty when calling this function
         assert base_shell_for in (None,'enter','su','sudo')
-        if get_pty is None:
-            get_pty = False
+        
+        ## default to True, might be more closed to regular experience
+        if get_pty is None: get_pty = True
+
         if command:
             command = command.strip()
         elif self.connected:
@@ -899,8 +897,8 @@ class Session(object):
             else:
                 command = 'bash'
         else:
+            ## for local subprocess, default shell is bash
             command = 'bash'
-
         if isinstance(self._lastDollar,ConsoleWrapper) and \
             not self._lastDollar.channel.closed:
             ## already has an open channel ($.shell)
@@ -908,8 +906,11 @@ class Session(object):
         else:
             dollar = Dollar(self,command,inWith=True)
             ## self._lastDollar is an instance of SSHChannel or POpenChannel
-            self._lastDollar = dollar(False,get_pty=get_pty) ## False = not-twodollars
-
+            dollar(False,get_pty=get_pty) ## False = not-twodollars
+            if dollar.inWith:
+                self._lastDollar = dollar.channel
+            else:
+                self._lastDollar = dollar
         if base_shell_for is not None:
             ## wrapping for top-level $.enter, $.sudo, $.su
             return self._lastDollar
@@ -920,7 +921,7 @@ class Session(object):
     withdollar = shell
 
     ## v2.0 added feature
-    def su(self,username,password=None,expect=None,initials=None,shell:str=None,login=True,get_pty=False):
+    def su(self,username,password=None,expect=None,initials=None,shell:str=None,login=True,get_pty=True):
         """
         shell:str, the shell command to run as the base-shell
         """
@@ -937,7 +938,7 @@ class Session(object):
             command = False
         return ConsoleWrapper(self._lastDollar,'su',username,password=password,expect=expect,initials=initials,login=login,command=command)
     ## v2.0 added feature
-    def sudo(self,password=None,expect=None,initials=None,shell=None,login=True,username=None,get_pty=False):
+    def sudo(self,password=None,expect=None,initials=None,shell=None,login=True,username=None,get_pty=True):
         if shell:
             self.shell(shell,base_shell_for='sudo',get_pty=get_pty)
             ## command=None is passed to SudoConsole()
@@ -950,10 +951,10 @@ class Session(object):
             command = False
         return ConsoleWrapper(self._lastDollar,'sudo',password=password,expect=expect,initials=initials,command=command,login=login,username=username)
    
-    def enter(self,command,expect=None,password=None,exit=None,shell=None,get_pty=True):
+    ## $.enter
+    def enter(self,command,expect=None,password=None,exit=None,shell=None,get_pty=True,prompt=None):
         ## when base_shell is True, self.shell would assign value of self._lastDollar
         ## by assign to self._lastDollar, the $.exitcode and $.stderr would be available after "exit" the "enter"
-        
         ## ensure having self._lastDollar (channel of ssh or popen)
         if shell:
             self.shell(shell,base_shell_for='enter',get_pty=get_pty)
@@ -961,7 +962,7 @@ class Session(object):
             self.shell(command,base_shell_for='enter',get_pty=get_pty)
             command = False
         
-        return ConsoleWrapper(self._lastDollar,'enter',command,expect=expect,password=password,exit=exit)
+        return ConsoleWrapper(self._lastDollar,'enter',command,expect=expect,password=password,exit=exit,prompt=prompt)
 
     ## delegates to self._lastDollar
     ## eg. 1st level $.wait
@@ -990,6 +991,7 @@ class Session(object):
         return self._lastDollar.exitcode
     def wait_for_silent(self,seconds):
         return self._lastDollar.wait_for_silent(seconds)
+    wait = wait_for_silent
     def wait_for_output(self,timeout=0,silent=False):
         return self._lastDollar.wait_for_silent(timeout,silent)
 

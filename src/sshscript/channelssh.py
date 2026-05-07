@@ -14,13 +14,14 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 import __main__
-import threading, os, logging
+import os, traceback
+import socket
 import paramiko
 from paramiko.ssh_exception import SSHException
-import tty
 import time
-from select import select
-
+#from select import select
+import selectors
+import asyncio
 try:
     from .channelgeneric import GenericChannel
     from .errorutils import log_debug_8,EXITCODE_DEFAULT,logger
@@ -72,48 +73,54 @@ class ParamikoChannel(object):
             self.channel.exec_command(self.sshchannel.owner.command)
 
         ParamikoChannel.count += 1
-        threading.Thread(target=self._reading,name=f'ssh{ParamikoChannel.count}',daemon=True,no_patch=True).start()
+        #threading.Thread(target=self._reading,name=f'ssh{ParamikoChannel.count}',daemon=True,no_patch=True).start()
 
-        if self.sshchannel.owner.inWith:
-            ## wait for message of today, prompt of the shell
-            self.sshchannel.wait_for_silent(0.25)
-        else:
-            ## twodollars
-            self.sshchannel.wait_for_silent(0.25)    
+        ## wait for message of today, prompt of the shell
+        self.sshchannel.wait_for_silent(0.25)
 
-    def _reading(self):
-        """Background thread for reading from SSH channel.
-        
-        Reads from stdout/stderr and adds data to parent channel buffers.
-        """
-        ## this runs in a thread
-        stdout = self.channel.makefile()
-        stderr = self.channel.makefile_stderr()
-        ## by checking self.closed, "exit" would not be put into stdout
-        while True:
-            if self.suspending:
-                time.sleep(1)
-                continue            
-            elif (self.channel.closed or self.channel.exit_status_ready()):
-                break
-            else:
-                try:
-                    if select([self.channel],[],[],0.25)[0]:
+    async def _start_reading(self):         
+        async def _reading():
+            """Background thread for reading from SSH channel.
+            
+            Reads from stdout/stderr and adds data to parent channel buffers.
+            """
+            ## this runs in a thread
+            stdout = self.channel.makefile()
+            stderr = self.channel.makefile_stderr()
+            ## by checking self.closed, "exit" would not be put into stdout
+            sel = selectors.DefaultSelector()
+            sel.register(self.channel, selectors.EVENT_READ, data="stdout")
+            try:
+                while not (self.channel.closed or self.channel.exit_status_ready()):
+                    if self.suspending:
+                        await asyncio.sleep(1)
+                        continue            
+                    events = sel.select(timeout=0.1)
+                    if len(events):
+                        #for key, mask in events:
+                        # key.fileobj 是原始的 pipe 物件
+                        # key.data 是我們剛才註冊的自定義字串
                         try:
                             while self.channel.recv_ready():
-                                self.sshchannel._add_stdout_data(stdout._read(1024))     
+                                await self.sshchannel._add_stdout_data(stdout._read(1024)) 
                             while self.channel.recv_stderr_ready():
-                                self.sshchannel._add_stderr_data(stderr._read(1024))
+                                await self.sshchannel._add_stderr_data(stderr._read(1024))
                         except (SSHException,ValueError) as e:
                             self.sshchannel.log(f'{id(self)}, closed={self.sshchannel.closed}, Error on reading:{e}')
                             break 
-                except OSError as e:
-                    log_debug_8(str(e))
-        ## some command (eg. $.enter('mariadb -uroot -p myrpki < /tmp/test.sql')) would auto close the channel,
-        ## so we need to close the sshchannel too
-        #if not self.sshchannel.closed:
-        #    self.sshchannel.close()
-    def send(self,s):
+                    await asyncio.sleep(0.1)
+            except OSError as e:
+                log_debug_8(str(e))
+            except asyncio.exceptions.CancelledError as e:
+                log_debug_8(str(e))
+            finally:
+                sel.close()
+            ## some command (eg. $.enter('mariadb -uroot -p myrpki < /tmp/test.sql')) would auto close the channel,
+            ## so we need to close the sshchannel too
+            #if not self.sshchannel.closed:
+            #    self.sshchannel.close()
+        await _reading()
+    def raw_send(self,s):
         """Send data through SSH channel.
         
         :s: string to send
@@ -121,7 +128,7 @@ class ParamikoChannel(object):
         if self.channel.closed:
             logger.error(f'{self.sshchannel.owner.session.host} channel is closed, can not send "{s}"')
             return
-        self.sshchannel.log8(f'[{self.sshchannel.owner.session.host}] send->{[s]}')
+        self.sshchannel.log8(f'[{self.sshchannel.owner.session.host}] ssh send->{[s]}')
         self.channel.sendall(s)
     
     def exit_status_ready(self):
@@ -154,9 +161,8 @@ class ParamikoChannel(object):
         ## automatically send exit to shell
         try:
             if not self.channel.exit_status_ready():
-                self.send('exit\n')                
-                self.channel.shutdown_write()
-            
+                self.channel.shutdown_write()            
+            ## wait for exit_status_ready()
             timeout = time.time() + 20
             while True:
                 if time.time() > timeout:
@@ -190,7 +196,7 @@ class SSHChannel(GenericChannel):
         :client: SSH client instance
         :get_pty: whether to enable PTY mode (default: True)
         """
-        super(SSHChannel,self).__init__(owner)
+        super().__init__(owner)
         self.get_pty = get_pty
         with self.executing_lock:
             assert not self.closed
@@ -199,7 +205,7 @@ class SSHChannel(GenericChannel):
             if isinstance(client,paramiko.client.SSHClient):
                 ## paramiko's invoke_shell
                 self.client = client
-                self._dumpThread.start()
+                #self._dumpThread.start()
                 self.channel = ParamikoChannel(self,get_pty)
                 if self.get_pty:
                     ## help to remove garbage from stdout or stderr
@@ -212,7 +218,7 @@ class SSHChannel(GenericChannel):
             elif isinstance(client,paramiko.channel.Channel):
                 ## paramiko's invoke_shell
                 self.client = None
-                self._dumpThread.start()
+                #self._dumpThread.start()
                 self.channel = ParamikoChannel(self,get_pty,channel=client)
                 if self.get_pty:
                     ## help to remove garbage from stdout or stderr
@@ -227,13 +233,18 @@ class SSHChannel(GenericChannel):
                 self.client = None
                 self.channel = None
         
-    def send(self,s):
+    def raw_send(self,s):
         """Send data through SSH channel.
         
         :s: string to send
         """
-        self.channel.send(s)
-        self.touchIO(False)
+        try:
+            self.channel.raw_send(s)
+        finally:
+            self.touchIO(False)
+    
+    async def _start_reading(self):
+        await self.channel._start_reading()
 
     def close(self):
         """Close SSH channel and cleanup.
@@ -241,6 +252,8 @@ class SSHChannel(GenericChannel):
         Closes main channel and any cached PTY/non-PTY channels.
         """
         ## close the i/o of remote server
+        while self.sending_queue.qsize() > 0:
+            time.sleep(0.1)
         if self.channel and not self.channel.channel.closed:
             if self._exitcode == EXITCODE_DEFAULT:
                 ## The last command's exitcode not yet been retrieved.
@@ -249,7 +262,6 @@ class SSHChannel(GenericChannel):
                 ##       ... without calling getExitcode() ...
                 ## print($.exitcode) <== here, would raise "OSError: [Errno 9] Bad file descriptor", since file has closed
                 self._exitcode = self.channel.recv_exit_status()
-
             self.channel.close()
         ## close the i/o of local buffers
         super().close()

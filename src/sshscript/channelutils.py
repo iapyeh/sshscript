@@ -70,7 +70,7 @@ class InnerConsole(GenericConsole):
 
     Handles shell authentication, command execution, and state management.
     """
-    def __init__(self,wcw,command,expect=None,password=None,initials=None,create_inner_bash=False,exit=None):
+    def __init__(self,wcw,command,expect=None,password=None,initials=None,exit=None,prompt=None):
         """Initialize InnerConsole instance.
 
         Args:
@@ -103,7 +103,9 @@ class InnerConsole(GenericConsole):
         self.password = password
         self.loginExpect = expect
         self.initials = initials
-        self.create_inner_bash = create_inner_bash
+        self.prompt = prompt
+        #self.create_inner_bash = create_inner_bash
+        #assert not create_inner_bash ## not implemented yet
         self.returnObjectWhenEnter = self.wcw
 
     def enter(self):
@@ -122,15 +124,19 @@ class InnerConsole(GenericConsole):
             PermissionError: If authentication fails
         """
 
-        self.channel.executing_lock.acquire()
+        #print('reset buffer')
+        #self.channel.reset_buffer()
         if self.command:
-            ## seprating from previous command
-            if self.channel._exitcode == EXITCODE_DEFAULT:
-                self.channel.get_exit_code()
-            self.channel.reset_buffer()
+            ## su, sudo, enter
             self.channel.input(self.command)
-            
+        else:
+            ## shell
+            pass
+ 
+        login_success = True
         if self.password is not None:
+            ## when password is not None, we have to test if login is successful
+            login_success = False 
             ## suppose password is always right
             if self.loginExpect:
                 ## test if we got a prompt asking for password
@@ -141,43 +147,80 @@ class InnerConsole(GenericConsole):
                     self.channel.touchIO(True)
                     self.channel.input(self.password)
                     self.channel.wait_for_silent(1)
-                    m = self.channel.expect(self.loginExpect,timeout=3,silent=True)
+                    ## reconfirm login is ok
+                    m = self.channel.expect(self.loginExpect,timeout=2,silent=True)
                     if m:
                         raise PermissionError(f'"{self.loginExpect}" prompted again')
+                    login_success = True
                 else:
                     log_debug_8(f'{self.loginExpect} not found, would not send password')
             else:                
                 ## has password, but no prompt have to wait
-                log_debug_8(f'no prompt, still sending password')
+                log_debug_8(f'no prompt was set, still sending password')
                 self.channel.wait_for_silent(0.5)
                 self.channel.touchIO(True)
                 ## when password = '', only a newline would be sent
                 self.channel.input(self.password)
                 self.channel.wait_for_silent(1)
+        if not login_success:
+            log_debug_8(f'login failed, would not execute initials, and exit immediately')
+            raise PermissionError('login failed')
+
+        ## wait for shell's greeting to stop
+        self.channel.wait_for_silent(1)
+
+
+        ## guesting the prompt
+        user_prompt = self.channel._stdout.splitlines()[-1]
+        print(f'user_prompt================>',[user_prompt])
 
         ## create a bash shell
-        if self.create_inner_bash:
-            self.channel.input('bash')
-
-        # call initials
-        if isinstance(self.initials,str):
+        #if self.create_inner_bash:
+        #    self.channel.input('bash')
+        #    ## wait for shell's greeting to stop
+        #    self.channel.wait_for_silent(1)
+        
+        if self.initials is None:
+            ## shell, su, sudo
+            self.channel.input("tty >/dev/null 2>&1 && stty -echo && PS1=$'_\\011%s_' && echo -OKOK-" % self.channel.layer_count)
+            self.channel.expect('-OKOK-')
+            self.channel.wait_for_silent(0.5)
+            prompt = '_\t%s_' % self.channel.layer_count
+            if self.channel.on_generic_layer:
+                self.channel.prompt = prompt
+                self.channel.on_generic_layer = False
+            else:
+                self.channel.increase_layer(prompt)                
+        else:
+            ## enter-console
+            if self.channel.on_generic_layer:
+                self.channel.prompt = self.prompt
+                self.channel.on_generic_layer = False
+            else:
+                self.channel.increase_layer(self.prompt)
+        
+        """
+        if self.initials is None:
+        elif isinstance(self.initials,str):
             self.channel.input(self.initials)
+            self.channel.get_exit_code()
         elif isinstance(self.initials,list) or isinstance(self.initials,tuple):
             for command in self.initials:
                 self.channel.input(command)
-                self.channel.wait_for_silent(0.25)
+                self.channel.wait_for_silent(1)
+            #self.channel.get_exit_code()
         elif callable(self.initials):
             self.initials(self.channel)
+        """
 
         ## don't call reset_buffer(), otherwise first-line expect() would failed
         #self.channel.reset_buffer()        
 
         ## simulate executing a command,reset the exitcode and buffer
-        if self.channel._exitcode is None:
-            pass ## do nothing, this would let the first command not to call get_exit_code() in send_command()
-        else:
-            self.channel._exitcode = EXITCODE_DEFAULT ## should be "255" not "None",
-        self.channel.executing_lock.release()
+        #if self.channel._exitcode is None:
+        #    pass ## do nothing, this would let the first command not to call get_exit_code() in send_command()
+        #else:
+        #    self.channel._exitcode = EXITCODE_DEFAULT ## should be "255" not "None",
         return self.wcw
     
     __enter__ = enter
@@ -197,16 +240,71 @@ class InnerConsole(GenericConsole):
             traceback: The traceback if any
         """
         ## let next $.command not to call this console
-        with self.channel.executing_lock:
-            if self.create_inner_bash:
-                ## leaving bash shell
-                self.channel.input('exit')
-                self.channel.wait_for_silent(1)
-            ## leaving the sudo or su
-            if self.exit_command is not None:
-                self.channel.input(self.exit_command)
-                self.channel.wait_for_silent(1)
+        #if self.create_inner_bash:
+        #    ## leaving bash shell auto created by su or sudo
+        #    print('exit bash=====2==========',self.channel._exitcode) ## for debug
+        #    self.channel._exitcode = EXITCODE_DEFAULT
+        #    self.channel.input('exit')
 
+        ## make sure all command has sent
+        while self.channel.sending_queue.qsize() > 0:
+            time.sleep(0.1)
+
+        if self.exit_command is not None:
+            ## leaving the shell, sudo or su
+            #if self.channel._exitcode is None:
+            #    ## nothing executed, just exit
+            #    pass
+            #elif self.channel._exitcode == EXITCODE_DEFAULT:
+            #    ## something executed, but exit code not yet retrieved, call get_exit_code() to retrieve it before sending #exit command
+            #    self.channel.get_exit_code()
+            if self.channel.layer_count > 1:
+                ## the su,sudo layer (above shell layer)
+                if self.channel.executing_lock.locked(): raise RuntimeError('locked')
+                if self.channel.hijacked:
+                    ## enterConsole would hijack self.channel.send_command() to self.channel.input()
+                    ## and when hijacked, self.channel.input would acquire lock by itself
+                    self.channel.input(self.exit_command)
+                else:
+                    self.channel.executing_lock.acquire()
+                    ## 這個command一送，shell會立刻把prompt送出來，但是，會跟上層的輸出混在一起，這是一個麻煩的問題
+                    #self.channel.raw_send(self.exit_command+'\n')
+                    self.channel._stdout.set_callback(None,None)
+                    self.channel._stderr.set_callback(None,None)
+                    ## 確保最後一個指令已經沒有輸出，有助於順利結束
+                    self.channel.wait_for_silent(1)
+                    self.channel.input(self.exit_command)
+                    self.channel.executing_lock.release()
+                self.channel.decrease_layer()
+            else:
+                self.channel.on_generic_layour = True
+                ## the 1-level $.shell layer, or $.enter
+                #self.channel.wait_for_silent(1)
+                if self.channel.executing_lock.locked(): raise RuntimeError('locked')
+                if self.channel.hijacked:
+                    ## enterConsole would hijack self.channel.send_command() to self.channel.input()
+                    ## and when hijacked, self.channel.input would acquire lock by itself
+                    self.channel.input(self.exit_command)
+                else:
+                    self.channel.executing_lock.acquire()
+                    ## 這個command一送，shell會立刻把prompt送出來，但是，會跟上層的輸出混在一起，這是一個麻煩的問題
+                    #self.channel.raw_send(self.exit_command+'\n')
+                    self.channel._stdout.set_callback(None,None)
+                    self.channel._stderr.set_callback(None,None)
+                    ## 確保最後一個指令已經沒有輸出，有助於順利結束
+                    self.channel.wait_for_silent(1)
+                    self.channel.input(self.exit_command)
+                    ## the 1-level $.shell layer, or $.enter
+                    self.channel.executing_lock.release()
+        else:
+            ## 程式會自己結束的情況(包括使用者自己輸入quit,exit)
+            #self.channel._stdout.set_callback(None,None)
+            #self.channel._stderr.set_callback(None,None)
+            if self.channel.layer_count > 1:
+                self.channel.decrease_layer()
+            else:
+                ## would end this process later
+                self.channel.on_generic_layour = True
     def __exit__(self,exc_type, exc_value, traceback):
         return self.exit(exc_type, exc_value, traceback)
 
@@ -230,7 +328,7 @@ class ShellConsole(InnerConsole):
             AssertionError: If command is not a string or starts with '#!'
         """
         ## command: the shell command
-
+        #print('00' * 100)
         assert wcw ,f'wcw={wcw}'
         if isinstance(command,str):
             command = command.strip()
@@ -240,17 +338,13 @@ class ShellConsole(InnerConsole):
             if isinstance(kw['initials'],str):
                 kw['initials'] = [kw['initials']]
         else:
-            kw['initials'] = ['tty >/dev/null 2>&1 && stty -echo && PS1=\'\'']
+            kw['initials'] = None 
 
         kw['exit'] = kw.get('exit','exit')
 
-        kw['create_inner_bash'] = False
+        #kw['create_inner_bash'] = False
 
         super().__init__(wcw,command,*args,**kw)
-        
-        ## enter a shell, no need to check password
-        #self.password = None
-        #self.loginExpect = None
 
 ## v2.0.3 : ensure we have english prompt for "password", add "--prompt=password"
 ##          but "su" has not this argument
@@ -271,7 +365,7 @@ class SuConsole(InnerConsole):
             su = 'su' ## subprocess does not have "alias" issue
         ## if "-c bash" adding to the command end, "chr(3)" will not work as expected in $.enter()
         ## but "-c bash --pty" does.
-        command = f'env LANG=en_US.UTF-8 {su} {"-" if login else ""} {username} -c "bash -l"'
+        command = f'env LANG=en_US.UTF-8 {su} {"-" if login else ""} {username} -c "bash"'
         if get_pty and session.is_su_pty_ok:
             ## Debian,Ubuntu
             command += ' --pty'
@@ -291,7 +385,7 @@ class SuConsole(InnerConsole):
                 False: no command to send (see "def su" in session.py for example)
             with_pty: check pty for underlying channel
         """
-        log_debug_8(f'suConsole wcw.channel.with_pty={wcw.channel},{ wcw.channel.with_pty},is_su_pty_ok={wcw.channel.is_su_pty_ok}')
+        #log_debug_8(f'suConsole wcw.channel.with_pty={wcw.channel},{ wcw.channel.with_pty},is_su_pty_ok={wcw.channel.is_su_pty_ok}')
 
         if expect is None:
             expect = 'password'
@@ -302,11 +396,22 @@ class SuConsole(InnerConsole):
         
         log_debug_8(f'suConsole command={command},password={password},expect={expect},initials={initials}')
         
-        if initials is None: 
-            initials = ['tty >/dev/null 2>&1 && stty -echo && PS1=\'\'']
-
-
         super().__init__(wcw,command,expect=expect,password=password,initials=initials,exit='exit')
+    def __enter__(self):
+        if self.channel.layer_count > 1 or not self.channel.on_generic_layer:
+            self.channel.executing_lock.acquire()
+            self._executing_lock = self.channel.executing_lock
+        else:
+            self._executing_lock = None
+        return super().__enter__()
+    def __exit__(self,exc_type, exc_value, traceback):
+        super().__exit__(exc_type, exc_value, traceback)
+        if self._executing_lock:#self.channel.layer_count > 1 or not self.channel.on_generic_layer:
+            #self.channel.executing_lock.release()
+            ## 等久一點可以避免僅接下來的指令跟exit糾結在一起
+            self.channel.wait_for_silent(2)
+            self._executing_lock.release()
+
 
 class SudoConsole(InnerConsole):
     """Console implementation for 'sudo' command operations.
@@ -354,17 +459,27 @@ class SudoConsole(InnerConsole):
        
         if command is None:
             command = SudoConsole.get_command(wcw.channel.owner.session,username,login)
-        
-        #if [ $? -eq 0 ]; then command2; fi
-        if initials is None: 
-            #initials = ['tty >/dev/null 2>&1 && stty -echo',"PS1=''"]
-            initials = ['tty >/dev/null 2>&1 && stty -echo && PS1=\'\'']
+
+        if expect is None:
+            expect = 'password'
 
         super(SudoConsole,self).__init__(wcw,command,expect=expect,
                                          password=password,
                                          initials=initials,
                                          exit='exit')
-
+    def __enter__(self):
+        if self.channel.layer_count > 1 or not self.channel.on_generic_layer:
+            self.channel.executing_lock.acquire()
+            self._executing_lock = self.channel.executing_lock
+        else:
+            self._executing_lock = None
+        return super().__enter__()
+    def __exit__(self,exc_type, exc_value, traceback):
+        super().__exit__(exc_type, exc_value, traceback)
+        if self._executing_lock:#self.channel.layer_count > 1 or not self.channel.on_generic_layer:
+            ## 等久一點可以避免僅接下來的指令跟exit糾結在一起
+            self.channel.wait_for_silent(2)
+            self._executing_lock.release()
 ## $.enter
 class EnterConsole(InnerConsole):
     """A console implementation for handling command entry operations.
@@ -372,7 +487,7 @@ class EnterConsole(InnerConsole):
     This class provides functionality for entering and managing command contexts,
     including handling of input prompts and exit commands.
     """
-    def __init__(self,parentConsole,command,expect=None,password=None,exit=None):
+    def __init__(self,parentConsole,command,expect=None,password=None,exit=None,prompt=None):
         """Initialize an EnterConsole instance.
         
         Args:
@@ -396,8 +511,9 @@ class EnterConsole(InnerConsole):
                                         expect=expect,
                                         password=password,
                                         initials=[],
-                                        create_inner_bash=False,
-                                        exit=exit)        
+                                        #create_inner_bash=False,
+                                        exit=exit,
+                                        prompt=prompt)
         
     def __enter__(self):
         """Enter the command context.
@@ -417,9 +533,14 @@ class EnterConsole(InnerConsole):
         """
         ## wait a moment to let  self.channel._resetBuffer() really work
         ## that we can get a clear buffer
+        
+        if self.channel.layer_count > 1 or not self.channel.on_generic_layer:
+            self.channel.executing_lock.acquire()
+            self._executing_lock = self.channel.executing_lock
+        else:
+            self._executing_lock = None
+
         super(EnterConsole,self).__enter__() 
-        ## prevent other execution          
-        self.channel.executing_lock.acquire()
         ## hijack sendline() to be input()
         self._restore_hijack = self.parentConsole.channel.hijack(True)
         return self.parentConsole
@@ -440,12 +561,17 @@ class EnterConsole(InnerConsole):
         """
         ## allow super(EnterConsole,self).__exit__() to acquire
 
-        self.channel.executing_lock.release()
-
-        super(EnterConsole,self).__exit__(exc_type, exc_value, traceback)
-
+        #self.channel.executing_lock.release()
+        super().__exit__(exc_type, exc_value, traceback)        
+        if self._executing_lock:#self.channel.layer_count > 1 or not self.channel.on_generic_layer:
+            #self.channel.executing_lock.release()
+            ## 等久一點可以避免僅接下來的指令跟exit糾結在一起
+            self.channel.wait_for_silent(2)
+            self._executing_lock.release()
         ## restore wcw.input() to be wcw.send_line()
         if self._restore_hijack: self.parentConsole.channel.hijack(False)
+        return
+        
 
         ## 
         if self.channel._enter_counter > 1:

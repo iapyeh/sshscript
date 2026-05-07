@@ -14,7 +14,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
-__version__ = "3.0"
+## starts from 3.1, asynicio is introduced.
+__version__ = "3.1.0"
 import ast
 import traceback
 

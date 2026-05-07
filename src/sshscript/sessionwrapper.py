@@ -178,7 +178,7 @@ class SessionWrapper(object):
             bool: True if the channel became silent, False otherwise.
         """
         return self.channel.wait_for_silent(seconds)
-
+    wait = wait_for_silent
     def wait_for_output(self,timeout=0,silent=False):
         """Wait for output from the channel.
         
@@ -246,7 +246,7 @@ class SessionWrapper(object):
         """
         return SudoConsole(self,password,expect=expect,initials=initials,command=command,login=login,username=username)
 
-    def enter(self,command,expect=None,password=None,exit=None,shell=None,get_pty=None):
+    def enter(self,command,expect=None,password=None,exit=None,shell=None,get_pty=None,prompt=None):
         """Enter a command and handle its execution.
                    
         Args:
@@ -261,7 +261,7 @@ class SessionWrapper(object):
             EnterConsole: A console object for command execution.
         """
 
-        return EnterConsole(self,command,expect=expect,password=password,exit=exit)
+        return EnterConsole(self,command,expect=expect,password=password,exit=exit,prompt=prompt)
 
     ## $sh      => with _sshscriptstack_[-1].shell(' sh ') 
     ## $sudo    => with _sshscriptstack_[-1].shell(' sudo ') 
@@ -296,7 +296,9 @@ class SessionWrapper(object):
             return ShellConsole(self,command,*args,**kw)
         else:
             raise ValueError(f'command "{command}" is not a shell, maybe you want to use $.enter("{command}") instead') 
-    
+    def set_prompt(self,prompt):
+        self.channel.prompt = prompt
+        self.channel._stdout.callback_pattern = prompt
     def log(self, level, msg, *args):
         """Log a message at the specified level.
         
