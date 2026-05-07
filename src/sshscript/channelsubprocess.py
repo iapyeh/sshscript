@@ -14,13 +14,13 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
-import threading, os
+import threading, os,sys
 
 import time,random
 import subprocess
-from select import select
+import selectors
 import errno
-
+import asyncio
 try:
     from .channelgeneric import GenericChannel
     from .errorutils import EXITCODE_DEFAULT
@@ -56,58 +56,78 @@ class POpenChannel(GenericChannel):
         self._pty_to_close = pty_to_close
         self._reading_thread = None
         if self.cp:
-            self._dumpThread.start()
-
-    def _start_reading(self):  
+            assert isinstance(self.stdouterr,list) and len(self.stdouterr)==2, f'standard output and error should be in a list of 2 elements, but got {self.stdouterr}'
+            #self._dumpThread.start()
+    async def _start_reading(self):  
+        #asyncio.create_task(self._dumpThread.start())
         assert self.cp is not None 
+        
         ## important for getting correct value of command output, can not be slow
-        interval = 0.1
+        interval = 0.01
+        callback = {
+            self.stdouterr[0]: self._add_stdout_data,
+            self.stdouterr[1]: self._add_stderr_data
+        }
         if self.get_pty:
             ## 2025/05/12, when get_pty is True, stdout and stdin were mixed
-            def _reading():
-                ## reads pty
-                while self.cp.poll() is None:
-                    for fd in select(self.stdouterr, [], [],interval)[0]:
-                        try:
-                            self._add_stdout_data(os.read(fd,1024))
-                        except BlockingIOError:
-                            ## when os.set_blocking(..False) this would happen
-                            pass
-                ## the process
-                #if not self.closed:
-                #    self.close()
+            async def _reading():
+                try:
+                    ## reads pty
+                    sel = selectors.DefaultSelector()
+                    sel.register(self.stdouterr[0], selectors.EVENT_READ, data="stdout")
+                    sel.register(self.stdouterr[1], selectors.EVENT_READ, data="stderr")
+                    while self.cp.poll() is None:
+                        events = sel.select(timeout=0.1)
+                        for key, mask in events:
+                            # key.fileobj 是原始的 pipe 物件
+                            # key.data 是我們剛才註冊的自定義字串
+                            await callback[key.fileobj](os.read(key.fileobj,1024))          
+                        await asyncio.sleep(interval)
+                    
+                except asyncio.exceptions.CancelledError:
+                    pass
+                finally:
+                    sel.close()
         else:
-            def _reading():
-                ## reads without pty (e.g. subprocess.PIPE)
-                callback = {
-                    self.stdouterr[0]: self._add_stdout_data,
-                    self.stdouterr[1]: self._add_stderr_data
-                }
-                stream = list(callback.keys())
-                while self.cp.poll() is None:
-                    for fd in select(stream, [], [],interval)[0]:
-                        callback[fd](os.read(fd,1024))
-                #if not self.closed: self.close()
-        POpenChannel.count += 1
-        self._reading_thread = threading.Thread(target=_reading,name=f'popen{POpenChannel.count}',daemon=True,no_patch=True)
-        self._reading_thread.start()        
+            async def _reading():
+                try:
+                    ## reads without pty (e.g. subprocess.PIPE)
+                    sel = selectors.DefaultSelector()
+                    sel.register(self.stdouterr[0], selectors.EVENT_READ, data="stdout")
+                    sel.register(self.stdouterr[1], selectors.EVENT_READ, data="stderr")
 
-    def send(self,s):
+                    while self.cp.poll() is None:
+                        """
+                        for fd in select(stream, [], [],interval)[0]:
+                            callback[fd](os.read(fd,1024))
+                        """
+                        events = sel.select(timeout=0.1)
+                        for key, mask in events:
+                            # key.fileobj 是原始的 pipe 物件
+                            # key.data 是我們剛才註冊的自定義字串
+                            await callback[key.fileobj](os.read(key.fileobj,1024))
+                        await asyncio.sleep(interval)
+                finally:
+                    sel.close()
+        POpenChannel.count += 1
+        await _reading()
+
+    def raw_send(self,s):
         """Send data to subprocess through stdin.
         
         :s: string to send
         """
-        self.log8(f'send->{[s]},{self.closed},{self.cp},self={id(self)}')
+        self.log8(f'send->{[s]}')
         assert not self.closed and self.cp.poll() is None, f'subprocess {self.cp} has closed,closed={self.closed}, poll={self.cp.poll()}'
         
         try:
             os.write(self.stdin,s.encode('utf-8'))
-            ## would raise OSError on Ubuntu
+            ## would raise OSError on Ubuntu and Macos
             #os.fsync(self.stdin)
         except OSError as e:
             self.log(f'{self.cp}: OSError on writing; {e}')
             raise
-        else:
+        finally:
             self.touchIO(False)
     
     def close(self):
@@ -117,8 +137,15 @@ class POpenChannel(GenericChannel):
         """
         
         if self.cp:
+            if self.cp.poll() is None:
+                self.log(f'Waiting for subprocess to exit...')
+                while self.cp.poll() is None:                
+                    time.sleep(0.1)
+
             ## 不要把 self.cp.returncode 設定為 _exitcode
             ## 因為這會導致在shell內執行的command 的 exit code 被改變
+            
+
             if self.cp.poll() is None:
 
                 if self._exitcode == EXITCODE_DEFAULT:
@@ -129,11 +156,11 @@ class POpenChannel(GenericChannel):
                     ## print($.exitcode) <== here, would raise "OSError: [Errno 9] Bad file descriptor", since file has closed
                     self.get_exit_code()
                 
-                ## exit the shell
-                try:
-                    self.send('exit\n')
-                except OSError as e:
-                    pass
+                ## disabled becaue this subprocess not nessary to be a shell
+                #try:
+                #    self.send('exit\n')
+                #except OSError as e:
+                #    pass
                 
                 try:
                     ## 2秒離開(這會卡住subprocess)
@@ -145,12 +172,6 @@ class POpenChannel(GenericChannel):
             else:
                 self._exitcode = self.cp.poll()
             
-            ## self.close() might be call in  self._reading_thread
-            if threading.current_thread() != self._reading_thread:
-                while self._reading_thread.is_alive():
-                    self._reading_thread.join()
-
-            #print('close ' * 100,self._exitcode)
             ## close the pty
             for fd in self._pty_to_close:
                 if isinstance(fd,int):
@@ -158,8 +179,8 @@ class POpenChannel(GenericChannel):
                 else:
                     fd.close()
 
-            assert self.cp.poll() is not None
-            self.log8(f'self={id(self)},cp=> {self.cp} closed')
+            #assert self.cp.poll() is not None
+            self.log8(f'self={id(self)},cp=> {self.cp} closed, exitcode={self.cp.poll()}')
             
         ## close the i/o of local buffers
         super().close()

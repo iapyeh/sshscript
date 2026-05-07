@@ -157,8 +157,10 @@ def run_file(givenPaths,
     
     return exitcode
 
+
 def run_script(script,varGlobals=None,showScript=False):
     session = Session()
+    ## this is a blocking call
     session.run(script,globals=varGlobals,showScript=showScript)
     session.close()  
 
