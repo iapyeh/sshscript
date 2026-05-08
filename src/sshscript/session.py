@@ -95,7 +95,6 @@ class ConsoleWrapper:
         self.wrapper = None
         self.enter_count = 0
     def __enter__(self):
-        print('ConsoleWrapper.__enter__ called, self.channel.layer_count=',self.channel.layer_count,',self.enter_count=',self.enter_count)
         ## could enter many times.
         ## eg.
         ## with $.su(...) as console:
@@ -114,10 +113,8 @@ class ConsoleWrapper:
     enter = __enter__
 
     def __exit__(self,exc_type, exc_value, _traceback):
-        print('ConsoleWrapper.__exit__ called, self.channel.layer_count=',self.channel.layer_count,',self.enter_count=',self.enter_count,_traceback)
         if _traceback is not None:
             traceback.print_exc()
-
             sys.exit(1)
         assert self.enter_count >= 1
         if self.enter_count == 1:
@@ -125,6 +122,9 @@ class ConsoleWrapper:
             self.innerConsole.__exit__(exc_type, exc_value, _traceback)
             self.channel.__exit__(exc_type, exc_value, _traceback)
             
+
+            self.channel.interaction_loop.call_soon_threadsafe(self.channel.interaction_loop.stop) 
+            self.channel.interaction_thread.join()
             ## close event loop
             # 1. 取得當前所有還在運行的任務 (排除自己)
             current_task = asyncio.current_task()
@@ -137,7 +137,6 @@ class ConsoleWrapper:
                 ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
                 #await asyncio.gather(*tasks, return_exceptions=True)            
                 time.sleep(0.2)
-            
             self.channel.owner.event_loop.call_soon_threadsafe(self.channel.owner.event_loop.stop) 
             self.channel.owner.call_thread.join()
 
@@ -677,11 +676,9 @@ class Session(object):
         ## v2.0 default running locals and globals to caller function's locals() and globals() 
         if vars is None:
             vars = sys._getframe(1).f_locals
-
         try:
             return loop.run_until_complete(self.run_in_eventloop(script,vars,showScript,timeout))
         except Exception as e:
-            print('------erot ',e)
             traceback.print_exc()
             raise
         finally:
@@ -713,9 +710,14 @@ class Session(object):
             filepath = _vars.get('__file__')
             ## v2.0 auto detecting script types
             try:
+                ## testing if this is a regular python script
                 ast.parse(script)
             except SyntaxError:
-                scriptChunk = 'import sys,threading\n' + dollarparser.convert(filepath or '<str>',script)
+                try:
+                    ## testing if this is a spy script
+                    scriptChunk = 'import sys,threading\n' +  dollarparser.convert(filepath or '<str>',script)
+                except SyntaxError:
+                    raise
             else:
                 ## saved content of --script output
                 scriptChunk = script

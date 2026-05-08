@@ -143,7 +143,6 @@ def unittest():
         if not final: continue
 
         ## comparing 
-        print('*' * 40,'comparing')
         convertedlines = convertedFinal.splitlines()
         expectedlines = final.splitlines()
         errorCount = 0

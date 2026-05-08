@@ -61,7 +61,9 @@ class GenericChannel(object):
         ##lastOutputTime :最後一次有輸出的時間
         self.lastIOAtTime = [time.time(),time.time()] ## input(send), output(stderr,stdout)
 
+        ## this is for onedollar and twodollar
         self._dumpCondition = asyncio.Condition()
+        #self._dumpCondition = None
         #self._dumpBuf = DequeString(maxlen=1000)
         self._dumpBuf = []
         self._stdoutDumpBuf = b''
@@ -118,6 +120,7 @@ class GenericChannel(object):
         self.prefixOfLog = '[Channel]'
 
         self.sending_queue = asyncio.Queue()
+        self.expecting_queue = asyncio.Queue()
 
         ## initailly set layer 1
         self.increase_layer('')
@@ -344,6 +347,7 @@ class GenericChannel(object):
         :*args: Additional arguments for formatting
         """
         log_debug(f'{self.prefixOfLog}{msg}', *args)
+
     def log8(self,msg, *args):
         """Log a debug message with level 8.
         
@@ -352,7 +356,6 @@ class GenericChannel(object):
         """
         log_debug_8(f'T{self._native_id}:{self.prefixOfLog}{msg}', *args)
 
-    
     def expect(self,rawpat,timeout=None,stdout=True,stderr=True,silent=False):
         """Block until a pattern is matched in output or timeout reached.
         
@@ -383,10 +386,15 @@ class GenericChannel(object):
 
         ## prepare matching objects
         regularPats = []
-        if not (isinstance(rawpat,list) or isinstance(rawpat,tuple)):
-            rawpat = [rawpat]
+        if isinstance(rawpat,dict):
+            rawpat = dict(zip([x.lower() for x in rawpat.keys()],rawpat.values()))
+            pats = list(rawpat.keys())
+        elif (isinstance(rawpat,list) or isinstance(rawpat,tuple)):
+            pats = rawpat
+        else:
+            pats = [rawpat]
         callablePats = []
-        for pat in rawpat:
+        for pat in pats:
             if isinstance(pat,str):
                 regularPats.append(re.compile(pat,re.I))
             elif isinstance(pat,bytes):
@@ -398,9 +406,7 @@ class GenericChannel(object):
                 regularPats.append(pat)
             else:
                 raise ValueError('expect() only accept bytes,str,re.Pattern(str) or list of them')
-                
         ## comparing starts
-        endTime = (time.time() + timeout) if timeout else 0       
         def searching(items):
             for callback in callablePats:
                 if callback(items):
@@ -409,46 +415,79 @@ class GenericChannel(object):
                 m = pat.search(items[0])
                 if m :
                     return m
-
+        
         ret = [None]
-        def listener(items):
-            m = searching(items)
-            if m:
+        listener_pushed = False
+        def found(m):
+            nonlocal regularPats
+            if isinstance(rawpat,dict):
+                if ret[0] is None:
+                    ret[0] = m
+                else:
+                    ret.append(m)
+                self.raw_send(rawpat[m.group(0).lower()]+'\n')
+                self.wait_for_silent(1)
+                del rawpat[m.group(0).lower()]
+                if len(rawpat) == 0:
+                    remove_listener()
+                else:
+                    ## update pattern
+                    regularPats = [re.compile(x,re.I) for x in rawpat.keys()]
+            else:
                 ret[0] = m
                 remove_listener()
 
-        def set_listener():
+        def listener(items)->bool:
+            """ return True if completed"""
+            nonlocal regularPats
+            m = searching(items)
+            if m is None: return 
+            found(m)
+            if isinstance(rawpat,dict):
+                if len(rawpat) == 0:
+                    return True
+            else:
+                return True
+
+        def set_listener()->bool:
+            nonlocal listener_pushed
+            """ return True if completed"""
+
+            ## searching existing buffer
             if stdout:
-                ## searching existing data
-                for line in self._stdout:
-                    m = searching([line])
-                    if m:
-                        print('got ',m)
-                        return m
+                for line in self._stdout.splitlines():
+                    if listener([line]): return True                           
+            
             if stderr:
                 ## searching existing data
-                for line in self._stderr:
-                    m = searching([line])
-                    if m: return m
+                for line in self._stderr.splitlines():
+                    if listener([line]): return True
+            
             if stdout:
                 self._stdout.push_listener(listener)
             if stderr:
                 self._stderr.push_listener(listener)
+            listener_pushed = True
         
         def remove_listener():
-            if stdout:
-                self._stdout.pop_listener(listener)
-            if stderr:
-                self._stderr.pop_listener(listener)
+            nonlocal listener_pushed
+            if listener_pushed:
+                if stdout:
+                    self._stdout.pop_listener(listener)
+                if stderr:
+                    self._stderr.pop_listener(listener)
         
-        ## searching existing buffer
-        ret[0] = set_listener()
-        if ret[0] is None:
+        ## waiting for pattern shows up
+        endTime = (time.time() + timeout) if timeout else 0       
+        if not set_listener():
             while True:
-                if ret[0] is not None:
+                if isinstance(rawpat,dict):
+                    if len(rawpat) == 0:
+                        break
+                elif ret[0] is not None:
                     break
                 ## checking timeout 
-                if endTime == 0:
+                elif endTime == 0:
                     pass
                 elif time.time() >= endTime:
                     remove_listener()
@@ -456,9 +495,14 @@ class GenericChannel(object):
                         break
                     else:
                         raise TimeoutError(f'Not found: {rawpat}')
-                time.sleep(0.25)
-        print(f'->expect returns {ret[0]}')
-        return ret[0]
+                time.sleep(0.1)
+                #await asyncio.sleep(0.1)
+        #print(f'->expect returns {ret}')
+        #asyncio.get_event_loop().stop()
+        if isinstance(rawpat,dict):
+            return ret
+        else:
+            return ret[0]
 
     def __enter__(self):
         self._enter_counter += 1
@@ -478,7 +522,35 @@ class GenericChannel(object):
         raise   NotImplementedError('raw_send() not implemented')
 
     async def _start_interaction(self):
-        await asyncio.gather(self._start_reading(),self.consume_sending_queue(),self._dump_stdout_err_job())
+        ## miso
+        await asyncio.gather(self._start_reading(),self.consume_sending_queue(),self._dump_stdout_err_job())#,self.consume_expecting_queue())
+    def start_interaction(self):
+        def r():
+            newloop = asyncio.new_event_loop()
+            self.interaction_loop = newloop
+            asyncio.set_event_loop(newloop)
+            ## create another new Condition for this event loop
+            self._dumpCondition = asyncio.Condition()
+            if hasattr(asyncio, "get_child_watcher"):
+                watcher = asyncio.get_child_watcher()
+                watcher.attach_loop(newloop)
+            task = newloop.create_task(self._start_interaction())
+            try:
+                newloop.run_forever()
+            except Exception as e:
+                traceback.print_exc()
+            finally:
+                task.cancel()
+                newloop.run_until_complete(newloop.shutdown_default_executor())
+                newloop.run_until_complete(newloop.shutdown_asyncgens())
+                if hasattr(asyncio, "get_child_watcher"):                
+                    try:
+                        watcher.attach_loop(None)
+                    except: pass 
+                newloop.close()
+                asyncio.set_event_loop(None)
+        self.interaction_thread = threading.Thread(target=r,daemon=True,name='expect.call')
+        self.interaction_thread.start()
     async def consume_sending_queue(self):
         empty = asyncio.queues.QueueEmpty
         while not self.closed:
@@ -494,7 +566,32 @@ class GenericChannel(object):
                     self.log('failure to send')
                     traceback.print_exc()
                     raise
-        self.sending_queue.join()
+                else:
+                    ## let other coroutine has chances to work
+                    ## this is important
+                    await asyncio.sleep(0.1)
+        #self.sending_queue.join()
+    async def consume_expecting_queue(self):
+        empty = asyncio.queues.QueueEmpty
+        self._expect_ret = None
+        while not self.closed:
+            try:
+                args = self.expecting_queue.get_nowait()
+            except empty:
+                await asyncio.sleep(0.1)
+                
+            else:
+                self._expect_ret = None
+                try:
+                    self._expect_ret = await self.aexpect(*args)
+                    print('self._expect_ret==',self._expect_ret)
+                except OSError:
+                    ## eg. socket closed
+                    traceback.print_exc()
+                    raise
+                else:
+                    self.expecting_queue.task_done()
+        #self.expecting_queue.join()
     def input(self,text):
         """Send text as input to the channel.
         
@@ -506,13 +603,17 @@ class GenericChannel(object):
             ## caution: if user's last command is "exit", this lock would not be release
             ##      but it does not matter, becuase that layer would be removed as well as this lock
             self.executing_lock.acquire()
-            self.reset_buffer()
-            print('input reset buffer to',self._stdout.sessionId)
-            def prompt_found_callback():
-                self.executing_lock.release()
-            self._stdout.set_callback(prompt_found_callback,self.prompt)
-            self._stderr.set_callback(prompt_found_callback,self.prompt)
+            if self.prompt:
+                self.reset_buffer()
+                def prompt_found_callback():
+                    self.executing_lock.release()
+                self._stdout.set_callback(prompt_found_callback,self.prompt)
+                self._stderr.set_callback(prompt_found_callback,self.prompt)
         self.send(text+'\n')
+        if self.hijacked and not self.prompt:
+            ## when inputing password
+            self.wait_for_silent(1)
+            self.executing_lock.release()
 
     def get_exit_code(self,timeout=None):
         """Get the exit code of the last command.
@@ -571,18 +672,20 @@ class GenericChannel(object):
             self._exitcode = exitcode
         '''
     ## run the commands
-    def send_line(self,line):
+    def send_line(self,line,**expections):
         """Send a line or multiple lines to the channel.
         
         :line: String or list of strings to send
         """
         assert not self.hijacked, 'can not sendline when hijacked'
 
-        return self.send_command(line)
+        return self.send_command(line,**expections)
 
-    def send_command(self,command):
+    def send_command(self,command,**expections):
         """Send a command to the channel.       
         :command: Command to execute
+        :expections: expecting and inputing, eg.
+
         :return: Tuple of (stdout, stderr)
         """
         self.log8(f'send_command: {command},prompt={self.prompt},self._exitcode={self._exitcode}')
@@ -591,12 +694,28 @@ class GenericChannel(object):
         self.executing_lock.acquire()
         self._exitcode = EXITCODE_DEFAULT
         self.reset_buffer()
-        def prompt_found_callback():
-            self.executing_lock.release()
-        self._stdout.set_callback(prompt_found_callback,self.prompt)
-        self._stderr.set_callback(prompt_found_callback,self.prompt)
+        if len(expections)==0:
+            if self.prompt:
+                def prompt_found_callback():
+                    self.executing_lock.release()
+                self._stdout.set_callback(prompt_found_callback,self.prompt)
+                self._stderr.set_callback(prompt_found_callback,self.prompt)
         ## for powershell, send \n would get \n back; send \r\n would get \r\n back
-        self.send(command+'\n')        
+        self.send(command+'\n')
+        if len(expections):
+            lowerkey_expections = dict(zip([x.lower() for x in expections.keys()],expections.values()))
+            while len(lowerkey_expections):
+                m = self.expect(list(lowerkey_expections.keys()),timeout=60)
+                self.input(lowerkey_expections[m.group(0).lower()])
+                del lowerkey_expections[m.group(0).lower()]
+            if self.prompt:
+                def prompt_found_callback():
+                    self.executing_lock.release()
+                self._stdout.set_callback(prompt_found_callback,self.prompt)
+                self._stderr.set_callback(prompt_found_callback,self.prompt)
+            else:
+                self.wait_for_silent(1)
+                self.executing_lock.release()
         return self._stdout, self._stderr
    
     def send_signal(self,sig):
@@ -700,7 +819,9 @@ class GenericChannel(object):
                 async with self._dumpCondition:
                     if self.closed: break
                     try:
-                        await asyncio.wait_for(self._dumpCondition.wait(),timeout=0.1)
+                        #await asyncio.wait_for(self._dumpCondition.wait(),timeout=0.1)
+                        #newloop.run_until_complete(self._start_interaction())
+                        await self._dumpCondition.wait()
                     except (asyncio.exceptions.CancelledError,GeneratorExit):
                         break
                     except asyncio.exceptions.TimeoutError:

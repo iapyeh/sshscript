@@ -143,11 +143,12 @@ class InnerConsole(GenericConsole):
                 m = self.channel.expect(self.loginExpect,timeout=5,silent=True)
                 if m:
                     log_debug_8(f'got {[m.group(0)]}, sending password')
+                    self.channel.wait_for_silent(1)
                     self.channel.clear()
                     self.channel.touchIO(True)
-                    self.channel.input(self.password)
-                    self.channel.wait_for_silent(1)
+                    self.channel.send(self.password+'\n')
                     ## reconfirm login is ok
+                    self.channel.wait_for_silent(1)
                     m = self.channel.expect(self.loginExpect,timeout=2,silent=True)
                     if m:
                         raise PermissionError(f'"{self.loginExpect}" prompted again')
@@ -157,10 +158,10 @@ class InnerConsole(GenericConsole):
             else:                
                 ## has password, but no prompt have to wait
                 log_debug_8(f'no prompt was set, still sending password')
-                self.channel.wait_for_silent(0.5)
+                #self.channel.wait_for_silent(0.5)
                 self.channel.touchIO(True)
                 ## when password = '', only a newline would be sent
-                self.channel.input(self.password)
+                self.channel.send(self.password+'\n')
                 self.channel.wait_for_silent(1)
         if not login_success:
             log_debug_8(f'login failed, would not execute initials, and exit immediately')
@@ -171,9 +172,11 @@ class InnerConsole(GenericConsole):
 
 
         ## guesting the prompt
-        user_prompt = self.channel._stdout.splitlines()[-1]
-        print(f'user_prompt================>',[user_prompt])
-
+        try:
+            user_prompt = self.channel._stdout.splitlines()[-1]
+            print(f'user_prompt================>',[user_prompt])
+        except IndexError:
+            print(f'user_prompt====no stdout========>',[str(self.channel._stdout)])
         ## create a bash shell
         #if self.create_inner_bash:
         #    self.channel.input('bash')
@@ -261,41 +264,42 @@ class InnerConsole(GenericConsole):
             if self.channel.layer_count > 1:
                 ## the su,sudo layer (above shell layer)
                 if self.channel.executing_lock.locked(): raise RuntimeError('locked')
+                self.channel.executing_lock.acquire()
                 if self.channel.hijacked:
                     ## enterConsole would hijack self.channel.send_command() to self.channel.input()
                     ## and when hijacked, self.channel.input would acquire lock by itself
-                    self.channel.input(self.exit_command)
+                    self.channel.send(self.exit_command+'\n')
                 else:
-                    self.channel.executing_lock.acquire()
                     ## 這個command一送，shell會立刻把prompt送出來，但是，會跟上層的輸出混在一起，這是一個麻煩的問題
                     #self.channel.raw_send(self.exit_command+'\n')
                     self.channel._stdout.set_callback(None,None)
                     self.channel._stderr.set_callback(None,None)
                     ## 確保最後一個指令已經沒有輸出，有助於順利結束
-                    self.channel.wait_for_silent(1)
-                    self.channel.input(self.exit_command)
-                    self.channel.executing_lock.release()
+                    self.channel.send(self.exit_command+'\n')
+                self.channel.wait_for_silent(1)                    
+                self.channel.executing_lock.release()
                 self.channel.decrease_layer()
             else:
                 self.channel.on_generic_layour = True
                 ## the 1-level $.shell layer, or $.enter
                 #self.channel.wait_for_silent(1)
                 if self.channel.executing_lock.locked(): raise RuntimeError('locked')
+                self.channel.executing_lock.acquire()
                 if self.channel.hijacked:
                     ## enterConsole would hijack self.channel.send_command() to self.channel.input()
                     ## and when hijacked, self.channel.input would acquire lock by itself
-                    self.channel.input(self.exit_command)
+                    self.channel.send(self.exit_command+'\n')
                 else:
-                    self.channel.executing_lock.acquire()
                     ## 這個command一送，shell會立刻把prompt送出來，但是，會跟上層的輸出混在一起，這是一個麻煩的問題
                     #self.channel.raw_send(self.exit_command+'\n')
                     self.channel._stdout.set_callback(None,None)
                     self.channel._stderr.set_callback(None,None)
                     ## 確保最後一個指令已經沒有輸出，有助於順利結束
-                    self.channel.wait_for_silent(1)
-                    self.channel.input(self.exit_command)
-                    ## the 1-level $.shell layer, or $.enter
-                    self.channel.executing_lock.release()
+                    self.channel.send(self.exit_command+'\n')
+                    #self.channel.input(self.exit_command)
+                self.channel.wait_for_silent(1)
+                ## the 1-level $.shell layer, or $.enter
+                self.channel.executing_lock.release()
         else:
             ## 程式會自己結束的情況(包括使用者自己輸入quit,exit)
             #self.channel._stdout.set_callback(None,None)
