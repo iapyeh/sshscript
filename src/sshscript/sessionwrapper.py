@@ -139,7 +139,7 @@ class SessionWrapper(object):
         """
         return self.channel.input(s)
 
-    def send_line(self,s):
+    def send_line(self,s,**expections):
         """Send a line of text to the channel.
         
         Args:
@@ -148,7 +148,7 @@ class SessionWrapper(object):
         Returns:
             int: The number of bytes sent.
         """
-        return self.channel.send_line(s)
+        return self.channel.send_line(s,**expections)
     ## alias for sendline
     __call__ = send_line
     exec_command = send_line

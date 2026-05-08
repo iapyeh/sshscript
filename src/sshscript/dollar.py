@@ -209,22 +209,28 @@ class Dollar(object):
             newloop = asyncio.new_event_loop()
             asyncio.set_event_loop(newloop)
             self.event_loop = newloop
-        # 取得全域 watcher 並綁定到目前的 loop
-            watcher = asyncio.get_child_watcher()
-            watcher.attach_loop(newloop)
 
-            newloop.create_task(self.__call__worker(isTwodollars,get_pty))
+            if hasattr(asyncio, "get_child_watcher"):
+                ## get_child_watcher was depreciated after python v3.12
+                # 取得全域 watcher 並綁定到目前的 loop
+                watcher = asyncio.get_child_watcher()
+                watcher.attach_loop(newloop)
+
+            task = newloop.create_task(self.__call__worker(isTwodollars,get_pty))
             #newloop.(self.__call__worker(isTwodollars,get_pty))
             try:
                 newloop.run_forever()
             except Exception as e:
                 traceback.print_exc()
             finally:
+                task.cancel()
                 newloop.run_until_complete(newloop.shutdown_default_executor())
                 newloop.run_until_complete(newloop.shutdown_asyncgens())
-                try:
-                    watcher.attach_loop(None)
-                except: pass 
+                if hasattr(asyncio, "get_child_watcher"):
+                    ## get_child_watcher was depreciated after python v3.12
+                    try:
+                        watcher.attach_loop(None)
+                    except: pass 
                 newloop.close()
                 asyncio.set_event_loop(None)
         t = threading.Thread(target=r,daemon=True,name='dollar.call')
@@ -310,7 +316,7 @@ class Dollar(object):
             assert '\n' not in self.command
             cpargs = shlex.split(self.command)
             if get_pty:
-                log_debug_8(f'with pty for command: {cpargs}')
+                log_debug_8(f'with pty for command: {cpargs} in {threading.current_thread()}')
                 ## master for reading, slave for writing
                 masterFd,slaveFd = pty.openpty()
                 ## Should use this style of codes, otherwise in CKJ environment something would be wrong
@@ -339,7 +345,8 @@ class Dollar(object):
                     ## this command is still running, assign channel and start reading
                     self.channel = POpenChannel(self,cp,[masterFd,slaveFd],masterFd,[masterFd,slaveFd],get_pty) 
                     if not self.sendline2execute: self.channel.hijack(True)
-                    asyncio.create_task(self.channel._start_interaction())
+                    #asyncio.create_task(self.channel._start_interaction())
+                    self.channel.start_interaction()
                 else:
                     raise RuntimeError(f'failure on {self.command}(exitcode={cp.poll()})')
             elif 1:
@@ -478,7 +485,8 @@ class Dollar(object):
         if self.inWith:
             ## paramiko always not acquire pty to have stdout and stderr seperately
             self.channel = SSHChannel(self,client,get_pty=get_pty)
-            asyncio.create_task(self.channel._start_interaction())
+            #asyncio.create_task(self.channel._start_interaction())
+            self.channel.start_interaction()
             if not self.sendline2execute:
                 self.channel.hijack(True)            
         else:

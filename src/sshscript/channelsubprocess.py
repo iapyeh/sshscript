@@ -21,6 +21,7 @@ import subprocess
 import selectors
 import errno
 import asyncio
+import fcntl
 try:
     from .channelgeneric import GenericChannel
     from .errorutils import EXITCODE_DEFAULT
@@ -71,6 +72,10 @@ class POpenChannel(GenericChannel):
         if self.get_pty:
             ## 2025/05/12, when get_pty is True, stdout and stdin were mixed
             async def _reading():
+                flags = fcntl.fcntl(self.stdouterr[0], fcntl.F_GETFL)
+                fcntl.fcntl(self.stdouterr[0], fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                flags = fcntl.fcntl(self.stdouterr[1], fcntl.F_GETFL)
+                #fcntl.fcntl(self.stdouterr[1], fcntl.F_SETFL, flags | os.O_NONBLOCK)
                 try:
                     ## reads pty
                     sel = selectors.DefaultSelector()
@@ -81,9 +86,14 @@ class POpenChannel(GenericChannel):
                         for key, mask in events:
                             # key.fileobj 是原始的 pipe 物件
                             # key.data 是我們剛才註冊的自定義字串
-                            await callback[key.fileobj](os.read(key.fileobj,1024))          
+                            data = os.read(key.fileobj,1024)
+                            if data:
+                                await callback[key.fileobj](data)
+                            else:
+                                #EOF
+                                #break
+                                pass
                         await asyncio.sleep(interval)
-                    
                 except asyncio.exceptions.CancelledError:
                     pass
                 finally:
@@ -187,5 +197,5 @@ class POpenChannel(GenericChannel):
         ## becase self.closed was set in super().close(),
         ## so that the reading thread exited after super.close() was called.
         ## that's the reason "self.cp" was set to None after super().close()
-        self.cp = None
+        #self.cp = None
        

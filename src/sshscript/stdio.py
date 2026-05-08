@@ -60,7 +60,7 @@ class DequeStringIter:
                         if self.sessionId != ds.sessionId: return 
                         elif (endtime is not None) and (time.time() > endtime):
                             if self.silent:
-                                print(f'{type(self)} {id(self)}:{self.sessionId} iter silent timeout')  
+                                #print(f'{type(self)} {id(self)}:{self.sessionId} iter silent timeout')  
                                 return
                             else:
                                 raise TimeoutError(f'no data over {self.timeout} seconds')
@@ -265,10 +265,10 @@ class DequeString(str):
         there is no string-copy , it saves memory usage.
         """
         assert isinstance(item,str),f'{[item]} is not str'
-        callback_triggered = self.callback and self.callback_pattern in item
+        #print('ioooo>>',self.sessionId,[item,self.callback ,self.callback_pattern])
+        callback_triggered = self.callback and self.callback_pattern and self.callback_pattern in item
         if callback_triggered:
             item = item.replace(self.callback_pattern,'')
-        print('ioooo>>',self.sessionId,[item,callback_triggered,self.callback_pattern])
         
         items = [item]
         with self._condition:
