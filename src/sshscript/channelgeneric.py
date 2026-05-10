@@ -128,6 +128,7 @@ class GenericChannel(object):
         ## this flag control $.shell to use existing layer or increase layer
         self.on_generic_layer = True 
 
+        self.interaction_thread = None
     @property
     def executing_lock(self):
         return self.executing_locks[-1]
@@ -528,9 +529,10 @@ class GenericChannel(object):
     def raw_send(self,text):
         raise   NotImplementedError('raw_send() not implemented')
 
-    async def _start_interaction(self):
+    async def async_start_interaction(self):
         ## miso
         await asyncio.gather(self._start_reading(),self.consume_sending_queue(),self._dump_stdout_err_job())#,self.consume_expecting_queue())
+    
     def start_interaction(self):
         def r():
             newloop = asyncio.new_event_loop()
@@ -541,7 +543,7 @@ class GenericChannel(object):
             if hasattr(asyncio, "get_child_watcher"):
                 watcher = asyncio.get_child_watcher()
                 watcher.attach_loop(newloop)
-            task = newloop.create_task(self._start_interaction())
+            task = newloop.create_task(self.async_start_interaction())
             try:
                 newloop.run_forever()
             except Exception as e:
@@ -558,6 +560,7 @@ class GenericChannel(object):
                 asyncio.set_event_loop(None)
         self.interaction_thread = threading.Thread(target=r,daemon=True,name='expect.call')
         self.interaction_thread.start()
+    
     async def consume_sending_queue(self):
         empty = asyncio.queues.QueueEmpty
         while not self.closed:
@@ -830,8 +833,6 @@ class GenericChannel(object):
                 async with self._dumpCondition:
                     if self.closed: break
                     try:
-                        #await asyncio.wait_for(self._dumpCondition.wait(),timeout=0.1)
-                        #newloop.run_until_complete(self._start_interaction())
                         await self._dumpCondition.wait()
                     except (asyncio.exceptions.CancelledError,GeneratorExit):
                         break

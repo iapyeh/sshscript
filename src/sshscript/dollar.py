@@ -218,12 +218,22 @@ class Dollar(object):
 
             task = newloop.create_task(self.__call__worker(isTwodollars,get_pty))
             #newloop.(self.__call__worker(isTwodollars,get_pty))
+            #current_task = asyncio.current_task()
             try:
                 newloop.run_forever()
             except Exception as e:
                 traceback.print_exc()
             finally:
-                task.cancel()
+                #task.cancel()
+                tasks = [t for t in asyncio.all_tasks(newloop)]
+                if tasks:          
+                    # 2. 對所有任務發送取消訊號
+                    for task in tasks:
+                        task.cancel()
+                    ## 3. 給任務一點時間處理 CancelledError (這步最關鍵)
+                    ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
+                    #await asyncio.gather(*tasks, return_exceptions=True)            
+                    time.sleep(0.2)
                 newloop.run_until_complete(newloop.shutdown_default_executor())
                 newloop.run_until_complete(newloop.shutdown_asyncgens())
                 if hasattr(asyncio, "get_child_watcher"):
@@ -247,6 +257,7 @@ class Dollar(object):
             while not self.channel.closed:
                 time.sleep(0.01)
             return self
+    
     async def __call__worker(self,isTwodollars=False,get_pty=None):
         """
         Execute the command based on the session context.
@@ -345,8 +356,8 @@ class Dollar(object):
                     ## this command is still running, assign channel and start reading
                     self.channel = POpenChannel(self,cp,[masterFd,slaveFd],masterFd,[masterFd,slaveFd],get_pty) 
                     if not self.sendline2execute: self.channel.hijack(True)
-                    #asyncio.create_task(self.channel._start_interaction())
-                    self.channel.start_interaction()
+                    #self.channel.start_interaction()
+                    asyncio.create_task(self.channel.async_start_interaction())
                 else:
                     raise RuntimeError(f'failure on {self.command}(exitcode={cp.poll()})')
             elif 1:
@@ -485,8 +496,8 @@ class Dollar(object):
         if self.inWith:
             ## paramiko always not acquire pty to have stdout and stderr seperately
             self.channel = SSHChannel(self,client,get_pty=get_pty)
-            #asyncio.create_task(self.channel._start_interaction())
-            self.channel.start_interaction()
+            asyncio.create_task(self.channel.async_start_interaction())
+            #self.channel.start_interaction()
             if not self.sendline2execute:
                 self.channel.hijack(True)            
         else:

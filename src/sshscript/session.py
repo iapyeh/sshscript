@@ -123,10 +123,12 @@ class ConsoleWrapper:
             self.channel.__exit__(exc_type, exc_value, _traceback)
             
 
-            self.channel.interaction_loop.call_soon_threadsafe(self.channel.interaction_loop.stop) 
-            self.channel.interaction_thread.join()
+            if self.channel.interaction_thread:
+                self.channel.interaction_loop.call_soon_threadsafe(self.channel.interaction_loop.stop) 
+                self.channel.interaction_thread.join()
+
             ## close event loop
-            # 1. 取得當前所有還在運行的任務 (排除自己)
+            '''
             try:
                 current_task = asyncio.current_task()
                 tasks = [t for t in asyncio.all_tasks(self.channel.owner.event_loop) if t is not current_task]            
@@ -140,6 +142,12 @@ class ConsoleWrapper:
                     time.sleep(0.2)
             except RuntimeError:
                 pass
+            '''
+            tasks = asyncio.all_tasks(self.channel.owner.event_loop)
+            if tasks:          
+                for task in tasks:
+                    task.cancel()
+                time.sleep(0.2)
             self.channel.owner.event_loop.call_soon_threadsafe(self.channel.owner.event_loop.stop) 
             self.channel.owner.call_thread.join()
 
@@ -688,24 +696,17 @@ class Session(object):
             ## miso
             ## close event loop
             # 1. 取得當前所有還在運行的任務 (排除自己)
-            try:
-                current_task = asyncio.current_task()
-            except RuntimeError:
-                ## no event loop
-                pass
-            else:
-                tasks = [t for t in asyncio.all_tasks(loop) if t is not current_task]            
-                if tasks:          
-                    # 2. 對所有任務發送取消訊號
-                    for task in tasks:
-                        task.cancel()
-                    ## 3. 給任務一點時間處理 CancelledError (這步最關鍵)
-                    ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
-                    #await asyncio.gather(*tasks, return_exceptions=True)            
-                    time.sleep(0.2)                
-                loop.call_soon_threadsafe(loop.stop) 
-            finally:
-                loop.close()
+            tasks =  asyncio.all_tasks(loop)
+            if tasks:          
+                # 2. 對所有任務發送取消訊號
+                for task in tasks:
+                    task.cancel()
+                ## 3. 給任務一點時間處理 CancelledError (這步最關鍵)
+                ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
+                #await asyncio.gather(*tasks, return_exceptions=True)            
+                time.sleep(0.2)                
+            loop.call_soon_threadsafe(loop.stop) 
+            loop.close()
 
     def run(self,script,vars=None,showScript=False,timeout=None):
         if vars is None:
