@@ -451,7 +451,13 @@ class SudoConsole(InnerConsole):
 
         if expect is None:
             ## matching there must be a line start with "Password"
-            expect = re.compile('^\W?password',re.M|re.I)
+            ## sudo's prompt could be like this:
+            ##      [sudo] password for REDACTED_PRIVATE_SETTING
+            expect = [
+                re.compile('^\W?password',re.M|re.I),
+                ## something like: [sudo] password for REDACTED_PRIVATE_SETTING
+                re.compile('^.{,10}\spassword',re.M|re.I)
+            ]
 
         super(SudoConsole,self).__init__(wcw,command,expect=expect,
                                          password=password,
