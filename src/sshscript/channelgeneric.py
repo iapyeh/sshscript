@@ -55,7 +55,8 @@ class GenericChannel(object):
         self._enter_counter = 0
 
         ## Guarding self._stdout, self._stderr
-        self._lock = asyncio.Lock()
+        #self._lock = asyncio.Lock()
+        self._lock = threading.Lock()
         #self._stdout = SSHScriptStdout()
         #self._stderr = SSHScriptStderr()
         ##lastOutputTime :最後一次有輸出的時間
@@ -149,18 +150,20 @@ class GenericChannel(object):
         ## clone the current _stdout, stderr
         ## there are the message of shell, su or sudo, and important
         ## there also having "password:" prompt, it would be the targets for expect()
-        if len(self.stdio_store):
-            self.stdio_store.append([SSHScriptStdout(self._stdout),SSHScriptStderr(self._stderr)])
-        else:
-            self.stdio_store.append([SSHScriptStdout(),SSHScriptStderr()])
-        self.prompts.append(prompt)
-        self.executing_locks.append(threading.Lock())
+        with self._lock:
+            if len(self.stdio_store):
+                self.stdio_store.append([SSHScriptStdout(self._stdout),SSHScriptStderr(self._stderr)])
+            else:
+                self.stdio_store.append([SSHScriptStdout(),SSHScriptStderr()])
+            self.prompts.append(prompt)
+            self.executing_locks.append(threading.Lock())
     def decrease_layer(self):
         ## keep at least one layer
         assert self.layer_count > 1
-        self.prompts.pop()
-        self.executing_locks.pop()
-        self.stdio_store.pop()
+        with self._lock:
+            self.prompts.pop()
+            self.executing_locks.pop()
+            self.stdio_store.pop()
     
     def _increase_exitcode_sno(self):
         """Increment the exit code sequence number.
@@ -272,12 +275,14 @@ class GenericChannel(object):
         """
         if self.hijacked:
             with self.executing_lock:
-                return self._stdout
+                with self._lock:
+                    return self._stdout
         else:    
             ## by getting exitcode, make sure we have got all the output of stdout and stderr
             #if self._exitcode == EXITCODE_DEFAULT: self.get_exit_code()
             with self.executing_lock:
-                return self._stdout
+                with self._lock:
+                    return self._stdout
 
 
     @property
@@ -425,7 +430,7 @@ class GenericChannel(object):
                     ret[0] = m
                 else:
                     ret.append(m)
-                self.raw_send(rawpat[m.group(0).lower()]+'\n')
+                self.send(rawpat[m.group(0).lower()]+'\n')
                 self.wait_for_silent(1)
                 del rawpat[m.group(0).lower()]
                 if len(rawpat) == 0:
@@ -516,6 +521,8 @@ class GenericChannel(object):
             self.close()
     
     def send(self,text):
+        while self.sending_queue.qsize():
+            time.sleep(0.01)
         self.sending_queue.put_nowait(text)
 
     def raw_send(self,text):
@@ -624,38 +631,38 @@ class GenericChannel(object):
         assert not self.closed
        
         ## important for stability
-        with self.executing_lock:
-            #self.wait_for_silent(1)
-            sno = self._increase_exitcode_sno()
-            pat = self.exitcodePatterns[sno]
-            #_stdout = self._stdout
-            #_stderr = self._stderr
-            _backup_stdio = self.stdio_store[-1][:]
-            self.reset_buffer()
-            
-            complete = False
-            def prompt_found_callback():
-                nonlocal complete
-                m = pat.search(str(self._stdout))
+        self.executing_lock.acquire()
+        #self.wait_for_silent(1)
+        sno = self._increase_exitcode_sno()
+        pat = self.exitcodePatterns[sno]
+        #_stdout = self._stdout
+        #_stderr = self._stderr
+        _backup_stdio = self.stdio_store[-1][:]
+        self.reset_buffer('get_exit_code')
+        
+        complete = False
+        def prompt_found_callback():
+            nonlocal complete
+            m = pat.search(str(self._stdout))
+            if m:
+                self._exitcode = int(m.group(2))
+                #self._stdout = _stdout
+                #self._stderr = _stderr
+            else:
+                m = pat.search(str(self._stderr))
                 if m:
                     self._exitcode = int(m.group(2))
                     #self._stdout = _stdout
                     #self._stderr = _stderr
-                else:
-                    m = pat.search(str(self._stderr))
-                    if m:
-                        self._exitcode = int(m.group(2))
-                        #self._stdout = _stdout
-                        #self._stderr = _stderr
-                self.stdio_store[-1] = _backup_stdio
-                complete = True
-                #self.executing_lock.release()
-            self._stdout.set_callback(prompt_found_callback,self.prompt)
-            self._stderr.set_callback(prompt_found_callback,self.prompt)
-            self.send(f'{self._exitcodeSymbol[0]} __exitcode{sno}-_-{self._exitcodeSymbol[1]}-_-\n')
-            while not complete:
-                time.sleep(0.1)
-            return self._exitcode
+            self.stdio_store[-1] = _backup_stdio
+            complete = True
+            self.executing_lock.release()
+        self._stdout.set_callback(prompt_found_callback,self.prompt)
+        self._stderr.set_callback(prompt_found_callback,self.prompt)
+        self.send(f'{self._exitcodeSymbol[0]} __exitcode{sno}-_-{self._exitcodeSymbol[1]}-_-\n')
+        while not complete:
+            time.sleep(0.1)
+        return self._exitcode
         '''
         exitcode = None
         def callback(items):
@@ -694,6 +701,7 @@ class GenericChannel(object):
         self.executing_lock.acquire()
         self._exitcode = EXITCODE_DEFAULT
         self.reset_buffer()
+        print('send_command newstdout',self._stdout.sessionId)
         if len(expections)==0:
             if self.prompt:
                 def prompt_found_callback():
@@ -716,6 +724,9 @@ class GenericChannel(object):
             else:
                 self.wait_for_silent(1)
                 self.executing_lock.release()
+        #while self.executing_lock.locked():
+        #    time.sleep(0.01)
+        print('send_command complete tdout',self._stdout.sessionId)
         return self._stdout, self._stderr
    
     def send_signal(self,sig):
@@ -749,7 +760,7 @@ class GenericChannel(object):
         ## when user set "encoding=utf8" for subprocess.run,newbytes is string. 
         #if isinstance(newbytes,str):
         #    newbytes = newbytes.encode()
-        async with self._lock:
+        with self._lock:
             try:
                 self._stdout.append(newbytes.decode('utf8'),True)
             except UnicodeDecodeError:
@@ -770,7 +781,7 @@ class GenericChannel(object):
         ## by checking self.closed, "exit" would not be put into stdout
         if self.closed: return
 
-        async with self._lock:         
+        with self._lock:         
             try:
                 self._stderr.append(newbytes.decode('utf8'),True)
             except UnicodeDecodeError:
@@ -846,17 +857,19 @@ class GenericChannel(object):
             await handler[x](newbytes)
         self._dumpBuf.clear()
     
-    def reset_buffer(self):
+    def reset_buffer(self,reason=None):
         """Clear stdout and stderr buffers.
         
         Also dumps buffers to screen in verbose mode.
         """
         ## clean up console.stdout, console.stderr
         ## dump to screen for verbose mode, then clean up its buffers
-        self.stdio_store[-1][0] = SSHScriptStdout()
-        self.stdio_store[-1][1] = SSHScriptStderr()
-        self.touchIO(0)
-        self.touchIO(1)
+        with self._lock:
+            self.stdio_store[-1][0] = SSHScriptStdout()
+            print(f'reset buffer@@@@ {reason}',self._stdout.sessionId)   
+            self.stdio_store[-1][1] = SSHScriptStderr()
+            self.touchIO(0)
+            self.touchIO(1)
     clear = reset_buffer
 
     def close(self):        
