@@ -127,16 +127,19 @@ class ConsoleWrapper:
             self.channel.interaction_thread.join()
             ## close event loop
             # 1. 取得當前所有還在運行的任務 (排除自己)
-            current_task = asyncio.current_task()
-            tasks = [t for t in asyncio.all_tasks(self.channel.owner.event_loop) if t is not current_task]            
-            if tasks:          
-                # 2. 對所有任務發送取消訊號
-                for task in tasks:
-                    task.cancel()
-                ## 3. 給任務一點時間處理 CancelledError (這步最關鍵)
-                ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
-                #await asyncio.gather(*tasks, return_exceptions=True)            
-                time.sleep(0.2)
+            try:
+                current_task = asyncio.current_task()
+                tasks = [t for t in asyncio.all_tasks(self.channel.owner.event_loop) if t is not current_task]            
+                if tasks:          
+                    # 2. 對所有任務發送取消訊號
+                    for task in tasks:
+                        task.cancel()
+                    ## 3. 給任務一點時間處理 CancelledError (這步最關鍵)
+                    ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
+                    #await asyncio.gather(*tasks, return_exceptions=True)            
+                    time.sleep(0.2)
+            except RuntimeError:
+                pass
             self.channel.owner.event_loop.call_soon_threadsafe(self.channel.owner.event_loop.stop) 
             self.channel.owner.call_thread.join()
 
@@ -661,7 +664,7 @@ class Session(object):
     
     ## v3.0 no more globals() and locals()
     ## v3.1, run a asyncio event loop
-    def run(self,script,vars=None,showScript=False,timeout=None):
+    def async_run(self,script,vars=None,showScript=False,timeout=None):
         ## setup the event loop for running the script, and run the script in the event loop
 
         if timeout is not None:
@@ -704,7 +707,15 @@ class Session(object):
             finally:
                 loop.close()
 
-    async def run_in_eventloop(self,script,vars=None,showScript=False,timeout=None):
+    def run(self,script,vars=None,showScript=False,timeout=None):
+        if vars is None:
+            vars = sys._getframe(1).f_locals
+        try:
+            return self.run_in_eventloop(script,vars,showScript,timeout)
+        except Exception as e:
+            traceback.print_exc()
+            raise
+    def run_in_eventloop(self,script,vars=None,showScript=False,timeout=None):
         ## timeout:int, in seconds
         def executeScript(script,_vars,showScript=False):
             filepath = _vars.get('__file__')
@@ -892,7 +903,10 @@ class Session(object):
 
         if command:
             command = command.strip()
-        elif self.connected:
+        else:
+            command = 'bash'
+        '''
+            if self.connected:
             if base_shell_for == 'enter':
                 #command = 'script -q bash'
                 command = 'bash'
@@ -901,6 +915,7 @@ class Session(object):
         else:
             ## for local subprocess, default shell is bash
             command = 'bash'
+        '''
         if isinstance(self._lastDollar,ConsoleWrapper) and \
             not self._lastDollar.channel.closed:
             ## already has an open channel ($.shell)
@@ -909,10 +924,11 @@ class Session(object):
             dollar = Dollar(self,command,inWith=True)
             ## self._lastDollar is an instance of SSHChannel or POpenChannel
             dollar(False,get_pty=get_pty) ## False = not-twodollars
-            if dollar.inWith:
-                self._lastDollar = dollar.channel
-            else:
-                self._lastDollar = dollar
+            self._lastDollar = dollar.channel
+            #if dollar.inWith:
+            #    self._lastDollar = dollar.channel
+            #else:
+            #    self._lastDollar = dollar
         if base_shell_for is not None:
             ## wrapping for top-level $.enter, $.sudo, $.su
             return self._lastDollar
@@ -958,12 +974,14 @@ class Session(object):
         ## when base_shell is True, self.shell would assign value of self._lastDollar
         ## by assign to self._lastDollar, the $.exitcode and $.stderr would be available after "exit" the "enter"
         ## ensure having self._lastDollar (channel of ssh or popen)
+
         if shell:
-            self.shell(shell,base_shell_for='enter',get_pty=get_pty)
+            self.shell('bash',base_shell_for='enter',get_pty=get_pty)
         else:
             self.shell(command,base_shell_for='enter',get_pty=get_pty)
             command = False
         
+        ## arguments after "enter", aka, command, expect ... are submitted to SessionWrapper.enter()
         return ConsoleWrapper(self._lastDollar,'enter',command,expect=expect,password=password,exit=exit,prompt=prompt)
 
     ## delegates to self._lastDollar

@@ -24,10 +24,10 @@ import asyncio
 import fcntl
 try:
     from .channelgeneric import GenericChannel
-    from .errorutils import EXITCODE_DEFAULT
+    from .errorutils import EXITCODE_DEFAULT,logger
 except ImportError:
     from channelgeneric import GenericChannel
-    from errorutils import EXITCODE_DEFAULT
+    from errorutils import EXITCODE_DEFAULT,logger
 
 class POpenChannel(GenericChannel):
     """Channel implementation for subprocess communication using POpen.
@@ -98,6 +98,8 @@ class POpenChannel(GenericChannel):
                     pass
                 finally:
                     sel.close()
+                logger.debug(f'POpenChannel stop reading, self.cp.poll()={self.cp.poll()}')
+                
         else:
             async def _reading():
                 try:
@@ -119,6 +121,7 @@ class POpenChannel(GenericChannel):
                         await asyncio.sleep(interval)
                 finally:
                     sel.close()
+                logger.debug(f'POpenChannel stop reading, self.cp.poll()={self.cp.poll()}')
         POpenChannel.count += 1
         await _reading()
 

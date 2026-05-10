@@ -104,8 +104,6 @@ class InnerConsole(GenericConsole):
         self.loginExpect = expect
         self.initials = initials
         self.prompt = prompt
-        #self.create_inner_bash = create_inner_bash
-        #assert not create_inner_bash ## not implemented yet
         self.returnObjectWhenEnter = self.wcw
 
     def enter(self):
@@ -124,8 +122,6 @@ class InnerConsole(GenericConsole):
             PermissionError: If authentication fails
         """
 
-        #print('reset buffer')
-        #self.channel.reset_buffer()
         if self.command:
             ## su, sudo, enter
             self.channel.input(self.command)
@@ -143,14 +139,16 @@ class InnerConsole(GenericConsole):
                 m = self.channel.expect(self.loginExpect,timeout=5,silent=True)
                 if m:
                     log_debug_8(f'got {[m.group(0)]}, sending password')
-                    self.channel.wait_for_silent(1)
+                    #self.channel.wait_for_silent(1)
                     self.channel.clear()
                     self.channel.touchIO(True)
                     self.channel.send(self.password+'\n')
                     ## reconfirm login is ok
-                    self.channel.wait_for_silent(1)
                     m = self.channel.expect(self.loginExpect,timeout=2,silent=True)
                     if m:
+                        ## Chances is MOT like this:
+                        ##    Time to change your password? Type "passwd" and follow the prompts.
+                        ##		    -- Dru <genesis@istar.ca>
                         raise PermissionError(f'"{self.loginExpect}" prompted again')
                     login_success = True
                 else:
@@ -158,11 +156,9 @@ class InnerConsole(GenericConsole):
             else:                
                 ## has password, but no prompt have to wait
                 log_debug_8(f'no prompt was set, still sending password')
-                #self.channel.wait_for_silent(0.5)
                 self.channel.touchIO(True)
                 ## when password = '', only a newline would be sent
                 self.channel.send(self.password+'\n')
-                self.channel.wait_for_silent(1)
         if not login_success:
             log_debug_8(f'login failed, would not execute initials, and exit immediately')
             raise PermissionError('login failed')
@@ -170,25 +166,21 @@ class InnerConsole(GenericConsole):
         ## wait for shell's greeting to stop
         self.channel.wait_for_silent(1)
 
-
         ## guesting the prompt
         try:
             user_prompt = self.channel._stdout.splitlines()[-1]
             print(f'user_prompt================>',[user_prompt])
         except IndexError:
             print(f'user_prompt====no stdout========>',[str(self.channel._stdout)])
-        ## create a bash shell
-        #if self.create_inner_bash:
-        #    self.channel.input('bash')
-        #    ## wait for shell's greeting to stop
-        #    self.channel.wait_for_silent(1)
+
         
         if self.initials is None:
             ## shell, su, sudo
+            prompt = '_\t%s_' % self.channel.layer_count
             self.channel.input("tty >/dev/null 2>&1 && stty -echo && PS1=$'_\\011%s_' && echo -OKOK-" % self.channel.layer_count)
             self.channel.expect('-OKOK-')
-            self.channel.wait_for_silent(0.5)
-            prompt = '_\t%s_' % self.channel.layer_count
+            ## this is very important
+            self.channel.expect(prompt)
             if self.channel.on_generic_layer:
                 self.channel.prompt = prompt
                 self.channel.on_generic_layer = False
@@ -242,12 +234,6 @@ class InnerConsole(GenericConsole):
             exc_value: The value of the exception if any
             traceback: The traceback if any
         """
-        ## let next $.command not to call this console
-        #if self.create_inner_bash:
-        #    ## leaving bash shell auto created by su or sudo
-        #    print('exit bash=====2==========',self.channel._exitcode) ## for debug
-        #    self.channel._exitcode = EXITCODE_DEFAULT
-        #    self.channel.input('exit')
 
         ## make sure all command has sent
         while self.channel.sending_queue.qsize() > 0:
@@ -276,7 +262,7 @@ class InnerConsole(GenericConsole):
                     self.channel._stderr.set_callback(None,None)
                     ## 確保最後一個指令已經沒有輸出，有助於順利結束
                     self.channel.send(self.exit_command+'\n')
-                self.channel.wait_for_silent(1)                    
+                #self.channel.wait_for_silent(1)                    
                 self.channel.executing_lock.release()
                 self.channel.decrease_layer()
             else:
@@ -297,7 +283,7 @@ class InnerConsole(GenericConsole):
                     ## 確保最後一個指令已經沒有輸出，有助於順利結束
                     self.channel.send(self.exit_command+'\n')
                     #self.channel.input(self.exit_command)
-                self.channel.wait_for_silent(1)
+                #self.channel.wait_for_silent(1)
                 ## the 1-level $.shell layer, or $.enter
                 self.channel.executing_lock.release()
         else:
@@ -346,8 +332,6 @@ class ShellConsole(InnerConsole):
 
         kw['exit'] = kw.get('exit','exit')
 
-        #kw['create_inner_bash'] = False
-
         super().__init__(wcw,command,*args,**kw)
 
 ## v2.0.3 : ensure we have english prompt for "password", add "--prompt=password"
@@ -392,7 +376,8 @@ class SuConsole(InnerConsole):
         #log_debug_8(f'suConsole wcw.channel.with_pty={wcw.channel},{ wcw.channel.with_pty},is_su_pty_ok={wcw.channel.is_su_pty_ok}')
 
         if expect is None:
-            expect = 'password'
+            ## matching there must be a line start with "Password"
+            expect = re.compile('^\W?password',re.M|re.I)
 
         if command is None:
             ## default to get_pty=True
@@ -465,7 +450,8 @@ class SudoConsole(InnerConsole):
             command = SudoConsole.get_command(wcw.channel.owner.session,username,login)
 
         if expect is None:
-            expect = 'password'
+            ## matching there must be a line start with "Password"
+            expect = re.compile('^\W?password',re.M|re.I)
 
         super(SudoConsole,self).__init__(wcw,command,expect=expect,
                                          password=password,
@@ -515,7 +501,6 @@ class EnterConsole(InnerConsole):
                                         expect=expect,
                                         password=password,
                                         initials=[],
-                                        #create_inner_bash=False,
                                         exit=exit,
                                         prompt=prompt)
         

@@ -191,7 +191,7 @@ class DequeString(str):
         os.set_blocking(self._write_fd, False)
         ## reset for every refresh()
         ## for non-popleft iteration(see SSHScriptStderr.iter())
-        self.sessionId = time.time() + random.random()
+        self.sessionId = f'{time.time()}.{random.random()}'
         self._listeners = []
 
         ## this is one shot only
@@ -302,7 +302,7 @@ class DequeString(str):
         assert self._listeners.pop() == listener
     def clear(self):
         self._deque.clear()
-        self.sessionId = time.time()
+        self.sessionId = f'{time.time()}.{random.random()}'
         try:
             if os.get_blocking(self._read_fd):
                 os.set_blocking(self._read_fd,False)
