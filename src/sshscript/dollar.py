@@ -31,61 +31,6 @@ except ImportError:
 
 import pty
 from io import BufferedWriter,TextIOWrapper
-'''
-class PTYSlaveWrapper:
-    def __init__(self, slave_fd):
-        # Create a file object for the slave PTY
-        self.slave_file = os.fdopen(slave_fd, 'w', buffering=1)  # Line buffering for TTY
-        self.slave_file = TextIOWrapper(self.slave_file.detach(), encoding='utf-8')
-    
-    def write(self, data):
-        # Intercept the write operation
-        print(f"Intercepted write: {data!r}",'<' * 100)
-        # Forward the data to the slave PTY
-        self.slave_file.write(data)
-    
-    def flush(self):
-        # Forward flush to the underlying file
-        self.slave_file.flush()
-    
-    def fileno(self):
-        # Return the file descriptor for subprocess compatibility
-        return self.slave_file.fileno()
-    
-    def isatty(self):
-        # Ensure the wrapper reports as a TTY
-        return self.slave_file.isatty()
-    
-    def close(self):
-        # Close the underlying file
-        self.slave_file.close()
-    
-    __index__ = fileno
-
-class PseudoTTY:
-    def __init__(self):
-        self.r,self.w = os.pipe()
-        # Create a file object for the write end of the pipe
-        self.write_file = os.fdopen(self.w, 'bw')
-        # Wrap it in a TextIOWrapper to handle text (optional, for text mode)
-        self.write_file = BufferedWriter(self.write_file.detach())
-    def __getattr__(self,n):
-        print('$' * 100,n)
-        return getattr(self.write_file,n)
-    def fileno(self):
-        return self
-    def isatty(self):
-        print('$' * 100)
-        return True
-    def write(self,data):
-        print('>' * 100)
-        self.write_file.write(data)
-    def read(self,n):
-        return self.r(n)
-    def __index__(self):
-        return self.write_file.fileno()
-     
-'''
 ## ['stdout','stderr','exitcode','channel'] are basic members, exitcode and channel are properties
 ## v1.1.14: add "exitcode", "channel", v2.0: remove "stdin", because "stdin" is useless
 __main__.DollarExportedNames = set(['stdout','stderr','exitcode','channel'])
@@ -104,33 +49,8 @@ def export2Dollar(func):
     __main__.DollarExportedNames.add(func.__name__)
     return func
 
-## replace $.stdout, $.stderr to _c.stdout, _c.stderr, $.host     
-## v2.0.3 2024/11/24 for compatible with python 3.12
-#pstd = re.compile(r'\$\.([a-z]+)')
-#def pstdSub(m):
-#    """
-#    Substitutes $.attribute references with appropriate context variables.
-#    
-#    Args:
-#        m: A regex match object containing the attribute name.
-#        
-#    Returns:
-#        A string with the appropriate context variable reference.
-#    """
-#    post = m.group(1)
-#    if post in __main__.DollarExportedNames:
-#        return f'_c.{post}'
-#    elif post in __main__.SSHScriptExportedNames:
-#        return f'_sshscript_in_context_.{post}'
-#    elif post in __main__.SSHScriptExportedNamesByAlias:
-#        return f'_sshscript_in_context_.{__main__.SSHScriptExportedNamesByAlias[post]}'
-#    elif post == 'break':
-#        return f'_sshscript_in_context_._{post}'
-#    else:
-#        return f'_sshscript_in_context_.{post}'
-
 class Dollar(object):
-    def __init__(self,session,command=None,inWith=False,**kw):
+    def __init__(self,session,command=None,for_with=False,**kw):
         """
         Initialize a Dollar object for command execution.
         
@@ -139,13 +59,18 @@ class Dollar(object):
             command: The command to execute.
             globals: Global variables for command execution.
             locals: Local variables for command execution.
-            inWith: Whether this Dollar object is used in a 'with' context.
+            for_with: Whether this Dollar object is used in a 'with' context.
+            kw:
+                shell
+                get_pty
+                input
+                env            
         """
         
         command = command.strip() if command else None
         ## this is appeared in "with $command"
-        assert not isinstance(inWith,str),f'"inWith" should be bool, not {inWith}'
-        self.inWith = inWith
+        assert not isinstance(for_with,str),f'"for_with" should be bool, not {for_with}'
+        self.for_with = for_with
 
         self.command = command
         self.session = session # Session instance in context
@@ -198,7 +123,6 @@ class Dollar(object):
         """
         if self.channel: self.channel.reset_buffer()
     def __del__(self):
-        #print('*'*100,self,'deleted')
         ## ensure to release memory
         if self.call_thread and self.call_thread.is_alive():
             self.call_thread.join()
@@ -216,22 +140,16 @@ class Dollar(object):
                 watcher = asyncio.get_child_watcher()
                 watcher.attach_loop(newloop)
 
-            task = newloop.create_task(self.__call__worker(isTwodollars,get_pty))
-            #newloop.(self.__call__worker(isTwodollars,get_pty))
-            #current_task = asyncio.current_task()
+            task = newloop.create_task(self.async_call_worker(isTwodollars,get_pty))
             try:
                 newloop.run_forever()
             except Exception as e:
                 traceback.print_exc()
             finally:
-                #task.cancel()
                 tasks = [t for t in asyncio.all_tasks(newloop)]
                 if tasks:          
-                    # 2. 對所有任務發送取消訊號
                     for task in tasks:
                         task.cancel()
-                    ## 3. 給任務一點時間處理 CancelledError (這步最關鍵)
-                    ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
                     #await asyncio.gather(*tasks, return_exceptions=True)            
                     time.sleep(0.2)
                 newloop.run_until_complete(newloop.shutdown_default_executor())
@@ -250,7 +168,7 @@ class Dollar(object):
         while self.channel is None:
             time.sleep(0.01)
         
-        if self.inWith:
+        if self.for_with:
             return self.channel
         else:
             ## wait for onedollar and twodollar to complete
@@ -258,7 +176,7 @@ class Dollar(object):
                 time.sleep(0.01)
             return self
     
-    async def __call__worker(self,isTwodollars=False,get_pty=None):
+    async def async_call_worker(self,isTwodollars=False,get_pty=None):
         """
         Execute the command based on the session context.
         
@@ -271,38 +189,21 @@ class Dollar(object):
         """
         self.get_pty = get_pty
         if self.session.connected:
-            #task = asyncio.create_task(self.exec_by_ssh(isTwodollars,get_pty))
-
-            ## assign self to be the "lastDollar" of owner Session instance
-            ## why?
-            #assert  self.session._lastDollar is None or self.session._lastDollar == self,f'{self.session._lastDollar} != {self}'
-            #self.session._lastDollar = self
-
             ## necessary for this instance to be put in "with context"
-            if self.inWith:
+            if self.for_with:
                 ## self.channel is SSHChannel  instance
-                #await task
                 await self.exec_by_ssh(isTwodollars,get_pty)
-                #asyncio.create_task(self.exec_by_ssh(isTwodollars,get_pty))
                 return self.channel
             else:
-                #task.result()
-                #await task
                 await self.exec_by_ssh(isTwodollars,get_pty)
                 self.event_loop.stop()
                 return self
         else:
-            ## assign self to be the "lastDollar" of owner Session instance
-            #self.session._lastDollar = self
-            if self.inWith:
+            if self.for_with:
                 await self.exec_by_subprocess(isTwodollars,get_pty)
-                ## self.channel would stop the self.event_loop
-                #asyncio.create_task(self.exec_by_ssh(isTwodollars,get_pty))
                 return self.channel
             else:
                 ## onedollar or twodollars, wait for the task to complete and return self
-                #task = asyncio.create_task(self.exec_by_subprocess(isTwodollars,get_pty))
-                #await task
                 await self.exec_by_subprocess(isTwodollars,get_pty)
                 self.event_loop.stop()
                 return self
@@ -323,7 +224,7 @@ class Dollar(object):
 
         assert get_pty is None or isinstance(get_pty,bool)
         
-        if self.inWith:
+        if self.for_with:
             assert '\n' not in self.command
             cpargs = shlex.split(self.command)
             if get_pty:
@@ -366,7 +267,7 @@ class Dollar(object):
                 ##  su (get_pty=False) works and stderr does not mixed with stdout
                 ## cons:
                 ##  stderr would having terminal control codes
-                masterFd,slaveFd = pty.openpty()
+                #masterFd,slaveFd = pty.openpty()
                 cp = subprocess.Popen( cpargs,
                     ## when shell=True, it was forced to use /bin/sh
                     shell=False,
@@ -493,7 +394,7 @@ class Dollar(object):
             kw['environment'] = kw['env']
             del kw['env']
 
-        if self.inWith:
+        if self.for_with:
             ## paramiko always not acquire pty to have stdout and stderr seperately
             self.channel = SSHChannel(self,client,get_pty=get_pty)
             asyncio.create_task(self.channel.async_start_interaction())
@@ -504,8 +405,8 @@ class Dollar(object):
             ## one-dollar,twodollars           
             if get_pty: kw['get_pty'] = True
             ## The paramiko documentation says:
-            ## "using exec_command or invoke_shell without a pty will ever have data on the stderr stream." So, we always need not a pty.
-            ## paramiko's client
+            ##    "using exec_command or invoke_shell without a pty will ever have data on the stderr stream." So, we always need not a pty.
+            ##     paramiko's client
 
             if 'input' in kw:
                 kw_input = kw['input']
@@ -517,24 +418,24 @@ class Dollar(object):
 
             if isTwodollars:
                 log_debug(f'[{host}]paramiko twodollars:{self.command},{kw}')
-                if 1:
-                    ## for "$$(f'sudo -S ls -l  > {path2download}',input='password')"
-                    ## this is the best practice
-                    self.channel = SSHChannel(self,None,get_pty)
-                    command = f'''bash -c {shlex.quote(self.command)}'''
-                    self.on_top_of_shell = True ##since we put command into bash to execute
+                ## for "$$(f'sudo -S ls -l  > {path2download}',input='password')"
+                ## this is the best practice
+                self.channel = SSHChannel(self,None,get_pty)
+                command = f'''bash -c {shlex.quote(self.command)}'''
+                self.on_top_of_shell = True ##since we put command into bash to execute
 
-                    stdin, stdout,stderr = client.exec_command(command,**kw)
-                    if kw_input:
-                        stdin.write(kw_input+'\n')
-                        stdin.flush()
-                    await self.channel._add_stderr_data(stderr.read())
-                    await self.channel._add_stdout_data(stdout.read())
-                    await self.channel._dump_stdout_err()
-                    self.channel._exitcode = stdout.channel.recv_exit_status()
-                    log_debug(f'[{host}]exitcode={self.exitcode}')
-                    ## self.channel.close() will set up self._stdout and self._stderr
-                    self.channel.close()                    
+                stdin, stdout,stderr = client.exec_command(command,**kw)
+                if kw_input:
+                    stdin.write(kw_input+'\n')
+                    stdin.flush()
+                await self.channel._add_stderr_data(stderr.read())
+                await self.channel._add_stdout_data(stdout.read())
+                await self.channel._dump_stdout_err()
+                self.channel._exitcode = stdout.channel.recv_exit_status()
+                log_debug(f'[{host}]exitcode={self.exitcode}')
+                ## self.channel.close() will set up self._stdout and self._stderr
+                self.channel.close()
+                '''
                 elif kw_input:
                     ## borrowed from paramiko source (client.invoke_shell)
                     channel = client._transport.open_session()
@@ -560,6 +461,7 @@ class Dollar(object):
                     ## 需要改成asyncio
                     self.channel.close()
                     log_debug(f'[{host}]exitcode={self.exitcode}')
+                '''
             else:
                 self.channel = SSHChannel(self,None,get_pty)
                 log_debug(f'[{host}]paramiko onedollar:{self.command}')
