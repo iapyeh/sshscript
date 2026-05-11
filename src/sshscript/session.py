@@ -852,10 +852,10 @@ class Session(object):
 
 
     ## v2 added feature
-    def onedollar(self,cmd,*args,**kw):
+    def onedollar(self,cmd,**kw):
         cmd = cmd.strip()
-        inWith = False
-        self._lastDollar = Dollar(self,cmd,inWith,*args,**kw)
+        for_with = False
+        self._lastDollar = Dollar(self,cmd,for_with,**kw)
         self._lastDollar(False)
         ## v2.0.3 no more returns exitcode
         return self._lastDollar.stdout,self._lastDollar.stderr
@@ -869,8 +869,8 @@ class Session(object):
             to subprocess.run
         """
         cmd = cmd.strip()
-        inWith = False
-        self._lastDollar = Dollar(self,cmd,inWith,**kw)(True)
+        for_with = False
+        self._lastDollar = Dollar(self,cmd,for_with,**kw)(True)
         ## v2.0.3 no more returns exitcode
         return self._lastDollar.stdout, self._lastDollar.stderr
 
@@ -922,11 +922,11 @@ class Session(object):
             ## already has an open channel ($.shell)
             pass
         else:
-            dollar = Dollar(self,command,inWith=True)
+            dollar = Dollar(self,command,for_with=True)
             ## self._lastDollar is an instance of SSHChannel or POpenChannel
             dollar(False,get_pty=get_pty) ## False = not-twodollars
             self._lastDollar = dollar.channel
-            #if dollar.inWith:
+            #if dollar.for_with:
             #    self._lastDollar = dollar.channel
             #else:
             #    self._lastDollar = dollar
