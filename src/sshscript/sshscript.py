@@ -27,7 +27,7 @@ warnings.formatwarning = warning_on_one_line
 
 try:
     from .session import Session
-    from .errorutils import SSHScriptExit, SSHScriptBreak,  set_logger, log_debug, log_debug_8,SSHScriptException
+    from .errorutils import SSHScriptExit, SSHScriptBreak,  get_logger, log_debug, log_debug_8,SSHScriptException
     ## 2025/3/3 v2.0.3 feature: import *.spy file directly
     from . import spyimporter
 except ImportError:
@@ -35,10 +35,13 @@ except ImportError:
     mydir = os.path.abspath(os.path.dirname(__file__))
     if not mydir in sys.path: sys.path.insert(0,mydir)
     from session import Session
-    from errorutils import SSHScriptExit, SSHScriptBreak, set_logger, log_debug, log_debug_8, SSHScriptException
+    from errorutils import SSHScriptExit, SSHScriptBreak, get_logger, log_debug, log_debug_8, SSHScriptException
     import spyimporter
     ## 2024/8/16, should remove mydir out of sys.path for python 3.11
     if mydir == sys.path[0]: del sys.path[0]
+
+## initial logger
+logger = get_logger()
 
 def run_file(givenPaths,
         vars=None,
@@ -281,13 +284,12 @@ def main():
 
         if args.debug:
             os.environ['DEBUG'] = str(args.debug)
+            logger.reset_debug()
         
         if args.verbose:
             os.environ['VERBOSE'] = '1'
         elif args.verbose_stderr:
             os.environ['VERBOSE_STDERR'] = '1'
-        
-        set_logger()
 
         ## v3, only one .spy file is allowed, this makes no sense
         #if args.folder:
