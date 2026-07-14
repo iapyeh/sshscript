@@ -1,4 +1,33 @@
-theme: jekyll-theme-cayman
-title: [SSHScript]
-description: [Automating Shell Tasks in Python]
-highlighter: none
+remote_theme: just-the-docs/just-the-docs
+
+title: SSHScript
+description: Automating shell tasks in Python
+url: "https://iapyeh.github.io"
+baseurl: "/sshscript"
+permalink: pretty
+
+search_enabled: true
+heading_anchors: true
+enable_copy_code_button: true
+back_to_top: true
+back_to_top_text: "Back to top"
+
+aux_links:
+  "SSHScript on GitHub":
+    - "https://github.com/iapyeh/sshscript"
+aux_links_new_tab: true
+
+footer_content: "Copyright &copy; 2026 SSHScript."
+
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-include-cache
+
+defaults:
+  - scope:
+      path: "v3a"
+      type: "pages"
+    values:
+      layout: "default"
+      nav_enabled: true

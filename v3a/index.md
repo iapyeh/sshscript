@@ -1,4 +1,10 @@
-# SSHScript v3.a.0 Reference Guide, 2026
+---
+title: "SSHScript v3.0"
+nav_order: 1
+has_children: true
+---
+
+# SSHScript v3.0 Reference Guide, 2026
 
 ## What is SSHScript?
 
