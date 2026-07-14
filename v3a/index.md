@@ -1,10 +1,10 @@
 ---
-title: "SSHScript v3.0"
+title: "SSHScript v3 Documents"
 nav_order: 1
 has_children: true
 ---
 
-# SSHScript v3.0 Reference Guide, 2026
+# SSHScript v3 Documents
 
 ## What is SSHScript?
 
@@ -48,7 +48,7 @@ pip3 install --upgrade sshscript
 ```
 
 ## Learning
-* [SSHScript v3.0 Tutorial（繁體中文）](tutorial-v3.0.zh-tw) 
+* [Tutorial (zh-TW)](tutorial-v3.0.zh-tw)
 
 ## References
 

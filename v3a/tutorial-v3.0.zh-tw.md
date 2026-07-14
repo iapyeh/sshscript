@@ -1,7 +1,7 @@
 ---
-title: "Tutorial（繁體中文）"
-parent: "SSHScript v3.0"
-nav_order: 1
+title: "zh-TW"
+parent: "Tutorial"
+nav_order: 2
 ---
 
 # SSHScript v3.0 Tutorial
@@ -82,9 +82,9 @@ for row in report:
 
 `with $.connect(...)` 之內的 dollar command 在遠端執行；離開區塊後，自動回到原來的 session。這個「目前有效 session」的概念，是 SSHScript 的核心。
 
-## 3. 單 `$`：直接執行程式
+## 3. 單 `$`：執行指令與 shell 功能
 
-單 `$` 適合一般 OS 指令。SSHScript 直接啟動程式，不先交給 shell 解讀，因此行為較單純，也較不容易受到 shell expansion 影響。
+SSHScript v3 以單 `$` 作為統一的指令語法。它會以 quote-aware 的方式檢查指令：一般 OS 指令以直接模式執行；遇到管線、重導向、控制運算子或未加引號的 shell 變數時，會自動改用 shell 模式。不需要再為 shell 功能改寫成雙 `$$`。
 
 ```python
 $python3 -c "print('hello')"
@@ -166,31 +166,31 @@ username = $.stdout.strip()
 print(hostname, username)
 ```
 
-## 4. 雙 `$$`：使用 shell 功能
+### 3.3 自動使用 shell 功能
 
-管線、重導向、shell 變數、萬用字元或多行 shell script 必須由 shell 解讀，這時使用雙 `$$`：
+管線、重導向、shell 變數、萬用字元與多行 shell script 都可以直接使用單 `$`。SSHScript 會自動選擇 shell 模式：
 
 ```python
-$$printf 'alpha\nbeta\n' | grep beta
+$printf 'alpha\nbeta\n' | grep beta
 assert $.stdout.strip() == "beta"
 ```
 
-動態指令可使用 `$$(...)`：
+動態指令同樣會自動判斷：
 
 ```python
 pipeline = "printf dynamic | tr a-z A-Z"
-$$(pipeline, timeout=5)
+$(pipeline, timeout=5)
 assert $.stdout == "DYNAMIC"
 ```
 
-和單 `$` 一樣，雙 `$$` 也接受一般字串與 raw string：
+一般字串與 raw string 仍可照常使用；不含 shell 語法時會採直接模式：
 
 ```python
-$$'printf string-shell'
-$$r'printf raw-shell'
+$'printf string-direct'
+$r'printf raw-direct'
 ```
 
-f-string 與多行 shell script 也可以一起使用：
+f-string 與多行 shell script 也可以直接使用：
 
 ```python
 import shlex
@@ -198,16 +198,27 @@ import shlex
 folder = "/tmp/sshscript tutorial"
 path = f"{folder}/result.txt"
 
-$$f'''mkdir -p {shlex.quote(folder)}
+$f'''mkdir -p {shlex.quote(folder)}
 printf 'line-1\nline-2\n' > {shlex.quote(path)}
 tail -n 1 {shlex.quote(path)}'''
 
 assert $.stdout.strip() == "line-2"
 ```
 
-簡單原則是：一般程式優先用 `$`；真的需要 shell expansion、pipe、redirect 或多行 shell 時才用 `$$`。
+若指令內容本身無法可靠地呈現意圖，可以明確指定模式：
 
-## 5. v3.0 的 Python 相容性
+```python
+# 把 | 當成一般參數，而不是 pipe。
+$("python3 -c \"import sys; print(sys.argv[1:])\" '|' cat", shell=False)
+
+# 強制使用 POSIX shell；也可以指定 shell="bash"。
+$("printf forced-shell", shell=True)
+$("printf bash-shell", shell="bash")
+```
+
+`$$` 僅保留給舊程式相容使用，已在 v3 中 deprecated；新程式應只使用單 `$`。
+
+## 4. v3.0 的 Python 相容性
 
 SSHScript v3.0 以 Python token 為基礎辨識 dollar syntax。一般 Python 字串、raw string、f-string 的文字區與註解中的 `$` 不會被當成指令：
 
@@ -238,7 +249,7 @@ with $.connect("ops@remote.example.net"):
 
 這種寫法讓「要做什麼」與「在哪一台主機做」彼此分離，同一個函式可重複套用到本機或不同遠端主機。
 
-## 6. 持續存在的 shell：`with $`
+## 5. 持續存在的 shell：`with $`
 
 每個獨立的 `$command` 都是一次指令執行。如果多個指令必須共享目前目錄、shell 變數或 shell 狀態，使用 `with $`：
 
@@ -286,7 +297,7 @@ with $.shell('bash') as shell:
 
 `with` 區塊可巢狀使用；離開內層 console 後，外層 shell 會恢復成有效 session。
 
-## 7. 遠端與巢狀 SSH 連線
+## 6. 遠端與巢狀 SSH 連線
 
 使用帳號與密碼：
 
@@ -336,7 +347,7 @@ print(jump_host, internal_host)
 
 把連線寫成 `with` 區塊可以清楚表達 session 的生命週期，也可確保發生例外時執行清理。
 
-## 8. 互動式程式：`$.enter()`
+## 7. 互動式程式：`$.enter()`
 
 需要 prompt、輸入與等待特定輸出的程式，例如 Python REPL、資料庫 console 或設備 CLI，可使用 `$.enter()`：
 
@@ -364,7 +375,7 @@ with $.enter(
 
 互動程式的 prompt 與退出方式各不相同，應依實際程式設定 `prompt`、`expect` 與 `exit`，並為可能卡住的操作規劃 timeout。
 
-## 9. sudo 與 su
+## 8. sudo 與 su
 
 需要提升權限時，用 context manager 明確界定範圍：
 
@@ -388,7 +399,7 @@ with $.su("service-user", password="secret"):
 
 不要把真實密碼提交到版本控制。可使用 `getpass()`、環境變數或組織既有的 secret 管理方式取得憑證。
 
-## 10. 上傳與下載
+## 9. 上傳與下載
 
 遠端 session 可使用 SFTP 上傳與下載檔案：
 
@@ -405,7 +416,7 @@ with $.connect("user@host.example.net") as remote:
 
 若下一步要把檔案移到只有 root 能寫入的位置，可先上傳至一般使用者可寫入的目錄，再進入 `$.sudo()` 執行 `install` 或 `mv`。
 
-## 11. 直接匯入 `.spy` 模組
+## 10. 直接匯入 `.spy` 模組
 
 SSHScript v3.0 可以像 Python 模組一樣匯入另一個 `.spy` 檔。這適合把可重用的檢查或操作拆成小函式。
 
@@ -432,7 +443,7 @@ with $.connect("ops@host.example.net"):
 
 模組中的 dollar command 同樣使用呼叫端當下的有效 session，因此很適合建立自己的維運函式庫。
 
-## 12. 多執行緒與有效 session
+## 11. 多執行緒與有效 session
 
 每個執行緒都有自己的 session stack。新連線進入 stack 頂端，離開 `with` 區塊後回到上一層，所以不同執行緒可以同時在不同主機工作。
 
@@ -473,7 +484,7 @@ for account, row in results.items():
 - worker 內的例外應收集並在主執行緒重新拋出，避免失敗只出現在背景輸出中。
 - 設定合理的連線與指令 timeout。
 
-## 13. 在一般 Python 程式使用 SSHScript
+## 12. 在一般 Python 程式使用 SSHScript
 
 若專案不想使用 dollar syntax，也可以直接使用 v3 的 `Session` API：
 
@@ -485,7 +496,7 @@ session = sshscript.Session()
 session("hostname")
 print(session.stdout.strip())
 
-session("printf 'a\\nb\\n' | tail -n 1", shell=True)
+session("printf 'a\\nb\\n' | tail -n 1")
 print(session.stdout.strip())
 
 with session.connect("ops@host.example.net") as remote:
@@ -495,14 +506,14 @@ with session.connect("ops@host.example.net") as remote:
 
 兩種寫法的概念相同：
 
-- `$command` 對應 `session(command)`。
-- `$$command` 對應 `session(command, shell=True)`。
+- `$command` 對應 `session(command)`，兩者都會自動選擇直接或 shell 模式。
+- `$(command, shell=False)` 可強制直接模式；`$(command, shell=True)` 或 `shell="bash"` 可強制 shell 模式。
 - `with $` 對應 `with session.shell()`。
 - `$.stdout` 對應 `session.stdout`，其餘結果屬性亦同。
 
 Dollar syntax 適合讓維運步驟一眼可讀；`Session` API 則適合整合既有 Python 專案。
 
-## 14. 完整範例：找出磁碟使用率過高的主機
+## 13. 完整範例：找出磁碟使用率過高的主機
 
 下面的程式保留系統工程師熟悉的 `df` 指令，再使用 Python 做資料整理與判斷：
 
@@ -568,7 +579,7 @@ else:
 
 這個例子呈現 SSHScript 的主要精神：指令負責取得系統事實，Python 負責流程、結構化資料、判斷與錯誤處理，而 `$.connect()` 只決定同一套工作要在哪裡執行。
 
-## 15. 除錯與常見陷阱
+## 14. 除錯與常見陷阱
 
 顯示執行時輸出：
 
@@ -592,7 +603,7 @@ sshscript --debug 8 example.spy
 撰寫程式時，建議特別留意：
 
 1. `$.stdout` 等結果會被下一個指令更新，需要時立即保存。
-2. Pipe、redirect、`$HOME` 等 shell 功能應使用 `$$` 或持續 shell。
+2. Pipe、redirect 與未加引號的 `$HOME` 會自動使用 shell；若要表達字面的 `$HOME`，請加上引號或跳脫 `$`。必要時可用 `shell=False` 或 `shell=True` 明確指定。
 3. Python 值插入 shell 指令時使用 f-string，外部值再以 `shlex.quote()` 處理。
 4. 遠端連線、sudo、shell 與互動 console 優先使用 `with` 管理生命週期。
 5. 不要把密碼或 private key 內容寫進程式庫。
