@@ -31,3 +31,16 @@ defaults:
     values:
       layout: "default"
       nav_enabled: true
+
+  - scope:
+      path: "v1"
+    values:
+      nav_exclude: true
+  - scope:
+      path: "v2"
+    values:
+      nav_exclude: true
+  - scope:
+      path: "v3"
+    values:
+      nav_exclude: true
