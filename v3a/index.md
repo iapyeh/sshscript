@@ -1,7 +1,7 @@
 # SSHScript v3.a.0 Reference Guide, 2026
 
 ## Learning
-* [Commands Execution and Console](tutorial) 
+* [SSHScript v3.0 Tutorial（繁體中文）](tutorial-v3.0.zh-tw) 
 
 ## References
 
