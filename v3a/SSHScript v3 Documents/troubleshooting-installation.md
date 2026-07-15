@@ -1,10 +1,9 @@
 ---
-title: "Troubleshooting of installation"
+title: "Troubleshooting of installation (EN)"
 parent: "SSHScript v3 Documents"
-nav_order: 6
-has_children: true
+nav_order: 7
 ---
 
-# Troubleshooting of installation
+# Troubleshooting of installation (EN)
 
-Choose a language.
+Placeholder for English installation troubleshooting.

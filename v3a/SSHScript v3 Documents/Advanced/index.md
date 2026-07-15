@@ -1,10 +1,15 @@
 ---
 title: "Advanced"
 parent: "SSHScript v3 Documents"
-nav_order: 3
+nav_order: 4
 has_children: true
 ---
 
 # Advanced
 
-Placeholder for advanced SSHScript v3 topics.
+## Contents
+
+- [$.enter](enter)
+- [$.upload and $.download](file-transfer)
+- [Threading](threading)
+- [Looping Output](looping-output)

@@ -1,10 +1,10 @@
 ---
-title: "zh-TW"
-parent: "Tutorial"
+title: "SSHScript v3.0 Tutorial (zh-TW)"
+parent: "SSHScript v3 Documents"
 nav_order: 2
 ---
 
-# SSHScript v3.0 Tutorial
+# SSHScript v3.0 Tutorial (zh-TW)
 
 SSHScript 讓你把熟悉的系統指令直接寫進 Python，並以同一套程式處理本機、遠端主機與巢狀 SSH 連線。
 

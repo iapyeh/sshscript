@@ -1,10 +1,15 @@
 ---
 title: "Basic"
 parent: "SSHScript v3 Documents"
-nav_order: 2
+nav_order: 3
 has_children: true
 ---
 
 # Basic
 
-Placeholder for basic SSHScript v3 topics.
+## Contents
+
+- [$](dollar)
+- [$.su](su)
+- [$.sudo](sudo)
+- [$.connect](connect)
