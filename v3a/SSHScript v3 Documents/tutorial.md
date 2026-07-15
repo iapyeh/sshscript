@@ -1,10 +1,9 @@
 ---
-title: "Tutorial"
+title: "Tutorial (EN)"
 parent: "SSHScript v3 Documents"
 nav_order: 1
-has_children: true
 ---
 
-# Tutorial
+# Tutorial (EN)
 
 Choose a language.
