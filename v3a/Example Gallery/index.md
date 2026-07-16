@@ -5,9 +5,3 @@ has_children: true
 ---
 
 # Example Gallery
-
-## Contents
-
-- [System Administration](system-administration)
-- [Networking](networking)
-- [Accounts](accoutns)

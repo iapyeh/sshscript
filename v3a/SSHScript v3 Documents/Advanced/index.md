@@ -6,10 +6,3 @@ has_children: true
 ---
 
 # Advanced
-
-## Contents
-
-- [$.enter](enter)
-- [$.upload and $.download](file-transfer)
-- [Threading](threading)
-- [Looping Output](looping-output)
