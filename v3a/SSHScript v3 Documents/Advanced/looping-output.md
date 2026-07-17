@@ -120,7 +120,7 @@ The same iterator works in an SSH connection and in other SSHScript contexts:
 
 ```python
 with $.connect("ops@example.net"):
-    with $.sudo():
+    with $.sudo(password):
         with $.enter("journalctl -f -u nginx", exit=chr(3)):
             for line in $.stdout(30):
                 if "error" in line.lower():
