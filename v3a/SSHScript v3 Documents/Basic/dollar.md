@@ -135,3 +135,62 @@ with $.connect("ops@example.net"):
 ```
 
 See [`$.connect`](connect) for authentication and nested connections.
+
+## Developer self-tests
+
+The SSHScript source checkout includes a credential-free smoke suite for
+dollar syntax:
+
+```text
+unittest/dollar_syntax.spy
+```
+
+It runs only local subprocesses. It does not load `localsecret.py` or
+`secret.py`, connect to an SSH server, use an SSH agent, or read a
+private key. Run it from the root of the SSHScript source checkout:
+
+```sh
+python3 sshscript.py unittest/dollar_syntax.spy
+```
+
+The suite checks:
+
+- bare, string, raw-string, expression, and f-string command forms;
+- command assignment and `$.stdout`, `$.stderr`, and
+  `$.exitcode`;
+- automatic shell selection for pipelines, assignments, operators,
+  expansion, and redirection;
+- structured argument lists plus explicit `shell=False` and
+  `shell=True`;
+- dollar commands inside Python functions;
+- a persistent local shell created with `with $(...)`; and
+- importing another `.spy` module that contains dollar syntax.
+
+## Run through Python unittest
+
+A standard-library wrapper runs the same `.spy` suite in an isolated
+subprocess. It creates an empty temporary home directory and removes
+SSH-agent environment variables, ensuring that the test remains independent
+of the developer's SSH configuration:
+
+```sh
+python3 -m unittest discover -v -s unittest \
+  -p 'test_sshscript_dollar_syntax.py'
+```
+
+To run this suite together with the regular [Module](../module) API tests:
+
+```sh
+python3 -m unittest discover -v -s unittest -p 'test_sshscript_*.py'
+```
+
+The command returns a non-zero status if any check fails. These tests are a
+quick local regression check; SSH integration tests remain separate because
+they require explicit host credentials and configuration.
+
+## Inputing Password
+If a command requires password to execute, 
+
+```
+$mysqldump -uroot -p database > backup.sql
+```
