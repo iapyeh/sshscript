@@ -113,3 +113,5 @@ Functionally, SSHScript dollar-syntax and the SSHScript module can do the same t
 Which Should You Use?
 
 Which method you choose to use depends on your personal preference and the needs of your project. If you are familiar with shell scripting and want to write scripts that are close to shell scripts, then SSHScript dollar-syntax is a good choice. If you are more comfortable with Python and want to write scripts that are easy to integrate with existing Python projects, then the SSHScript module is a good choice.
+
+Last Updated: 2026-07-25 16:59:40

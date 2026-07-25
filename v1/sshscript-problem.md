@@ -95,3 +95,5 @@ then, you can change the first line of "sshcript" to be
 # Non of above cases:
 
 You are welcome to issue a ticket on [the Github's issue system](https://github.com/iapyeh/sshscript/issues)
+
+Last Updated: 2026-07-25 16:59:40

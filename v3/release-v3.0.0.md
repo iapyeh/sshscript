@@ -49,3 +49,5 @@ with $.enter('tcpdump -vv') as stream:
 
 - Fixed an issue where `$.sudo()` could block indefinitely if an incorrect password was provided.
 - Resolved an exception raised by `sys.exit()` when called from within a `.spy` file.
+
+Last Updated: 2026-07-25 16:59:40

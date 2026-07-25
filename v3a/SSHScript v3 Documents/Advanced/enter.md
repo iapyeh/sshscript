@@ -1,7 +1,8 @@
 ---
-title: "$.enter"
-parent: "Advanced"
+title: $.enter
+parent: Advanced
 nav_order: 1
+updated:
 ---
 
 # $.enter
@@ -96,6 +97,43 @@ Do not hard-code secrets in a `.spy` file. Use `getpass` for an interactive
 script or retrieve the secret from the deployment environment's secret
 manager.
 
+## Supply a password to mysqldump
+
+Some commands are not interactive shells, but still pause for a password.
+For example, `mysqldump -p` reads its password from the terminal after the
+command has started. Use `$.enter` to wait for that prompt before providing
+the password:
+
+```python
+from getpass import getpass
+
+database_password = getpass("MySQL password: ")
+remote_dump = "/tmp/application-backup.sql"
+
+with $.connect("backup@example.net"):
+    with $.enter(
+        f"mysqldump -u backup -p --all-databases > {remote_dump}"
+    ):
+        $.expect("password")
+        $.input(database_password)
+
+    $f'test -s {remote_dump}'
+    assert $.exitcode == 0
+    $.download(remote_dump, "./downloads/")
+```
+
+The command includes shell redirection, so SSHScript runs it in the shell
+context created for `$.enter`. `mysqldump` finishes after receiving the
+password, therefore this example does not need `exit=`; leaving the block
+waits for the command to finish. Check the resulting file before downloading
+or restoring it, and remove the remote staging file when it is no longer
+needed.
+
+Use a specific prompt pattern if the MySQL client has been configured with a
+different language or customised prompt. Keep the password in a short-lived
+variable and never put it on the command line, where it can be visible in
+process listings or shell history.
+
 ## End the program deliberately
 
 Choose `exit=` based on the program:
@@ -152,3 +190,5 @@ with $.connect("ops@example.net"):
 
 When the inner block exits, the script returns to the preceding `sudo`
 session; when that block exits, it returns to the original SSH login session.
+
+Last Updated: 2026-07-25 16:59:40

@@ -188,9 +188,4 @@ The command returns a non-zero status if any check fails. These tests are a
 quick local regression check; SSH integration tests remain separate because
 they require explicit host credentials and configuration.
 
-## Inputing Password
-If a command requires password to execute, 
-
-```
-$mysqldump -uroot -p database > backup.sql
-```
+Last Updated: 2026-07-25 16:59:40

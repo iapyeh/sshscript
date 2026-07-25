@@ -67,3 +67,5 @@ $sshscript example.spy
 $sshscript example.spy --verbose
 $sshscript example.spy --debug
 ```
+
+Last Updated: 2026-07-25 16:59:40

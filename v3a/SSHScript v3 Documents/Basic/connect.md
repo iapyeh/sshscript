@@ -97,3 +97,5 @@ with $.connect("ops@example.net"):
 ```
 
 See [`$.sudo`](sudo) and [`$.su`](su) for privilege changes.
+
+Last Updated: 2026-07-25 16:59:40

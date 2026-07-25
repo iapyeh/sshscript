@@ -68,3 +68,5 @@ with session.shell() as console:
 $python3 exportvmguest.py
 ```
 ![image](https://user-images.githubusercontent.com/4695577/182324261-f6e0579c-df39-4e76-bbfe-00722200450c.png)
+
+Last Updated: 2026-07-25 16:59:40
