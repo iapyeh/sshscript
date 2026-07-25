@@ -184,3 +184,5 @@ password = getpass()
 ```
 
 這樣一來，你只需要把密碼放在心底。只是run-from-safe-host.spy必須手動執行，再也不能用cron執行而已。
+
+Last Updated: 2026-07-25 16:59:40

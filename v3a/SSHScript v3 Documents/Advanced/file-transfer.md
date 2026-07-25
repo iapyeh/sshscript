@@ -170,3 +170,5 @@ with $.connect("ops@bastion.example.net"):
 
 The local source and destination paths remain paths on the machine running
 SSHScript; only the transfer's remote side follows the active SSH session.
+
+Last Updated: 2026-07-25 16:59:40

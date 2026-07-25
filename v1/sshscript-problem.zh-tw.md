@@ -65,3 +65,5 @@ $ which sshscript
 ### 其他狀況：
 
 如果不是上述兩種情況，請到本專案[Github上的issue](https://github.com/iapyeh/sshscript/issues)裡留言。
+
+Last Updated: 2026-07-25 16:59:40

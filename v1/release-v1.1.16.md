@@ -132,3 +132,5 @@ Before v1.1.16, calling \$.download(src,dst) failed when the “src” was not a
 ## Refine: \$\.paranoid() → \$\.careful()
 
 The \$.paranoid() is renamed to \$.careful(). Due to “paranoid” might be a negative term. When $.careful(1) was called, the execution would be stopped if there is any \$.exitcode > 0. Starting from v1.1.16, the $.careful(1) is regardless of $.stderr. It is based on the value of \$.exitcode. So it works only when the \$.exitcode works.
+
+Last Updated: 2026-07-25 16:59:40

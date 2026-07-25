@@ -48,3 +48,5 @@ for host in hosts:
 ```
 sshscript example.spy --verbose --debug
 ```
+
+Last Updated: 2026-07-25 16:59:40

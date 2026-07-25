@@ -72,3 +72,5 @@ python3 -m unittest discover -v -s unittest -p 'test_sshscript_*.py'
 This command is deliberately limited to localhost-only tests. Integration
 tests that exercise real SSH hosts, privilege changes, or private keys are
 separate and require their own environment configuration.
+
+Last Updated: 2026-07-25 16:59:40

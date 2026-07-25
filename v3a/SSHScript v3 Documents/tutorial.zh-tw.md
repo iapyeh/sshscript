@@ -612,3 +612,5 @@ sshscript --debug 8 example.spy
 ## 結語
 
 SSHScript v3.0 把 shell 擅長的「直接操作系統」和 Python 擅長的「程式結構與資料處理」放在同一個檔案裡。你不必放棄既有指令，也不必先學一套新的任務描述語言；從一行 `$hostname` 開始，加上 `$.connect()`，同一段可讀的 Python 程式就能逐步成長為本機、遠端、巢狀連線與平行作業的自動化工具。
+
+Last Updated: 2026-07-25 16:59:40

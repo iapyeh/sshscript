@@ -36,3 +36,5 @@
 
 ## Need an Example?
 If you need an example or you'd like to share your examples. You are welcome to <a target="_blank" href="https://github.com/iapyeh/sshscript/issues">create an issue</a> for it.
+
+Last Updated: 2026-07-25 16:59:40

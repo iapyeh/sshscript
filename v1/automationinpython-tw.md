@@ -109,3 +109,5 @@ SSHScript會將你內嵌在.spy當中的shell 指令或os指令改寫成pure pyt
 3. 在執行指令之後的資料處理階段，使用SSHScript能同時使用數以萬種的Python的package，尤其是那些能將執行指令產生的非結構化資料轉成結構化資料的那些package（例如 json convert)。這是使用SSHScript比使用shell script方便的地方。
 
 如果你在找尋一種可以兼具shell script與Python優點的自動化程式工具，那就是SSHScript。
+
+Last Updated: 2026-07-25 16:59:40

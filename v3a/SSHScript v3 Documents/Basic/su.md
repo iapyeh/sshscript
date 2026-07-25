@@ -72,3 +72,5 @@ The sudo password, if required, belongs to the account currently running
 
 Never commit passwords to a `.spy` file. Use `getpass`, a secret manager,
 or policy- and key-based access, and grant only the privileges required.
+
+Last Updated: 2026-07-25 16:59:40

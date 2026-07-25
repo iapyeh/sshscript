@@ -35,3 +35,5 @@ for account,password in group:
 ```
 $sshscript example-ping.spy
 ```
+
+Last Updated: 2026-07-25 16:59:40

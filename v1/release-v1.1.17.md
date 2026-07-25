@@ -145,3 +145,5 @@ Starting from v1.1.17, $.careful() would return the current value. This could be
 ## Refine: auto “exit” from shell for remote executions
 
 Remote execution of two-dollars and with-dollar commands would invoke shell. After execution that shell is killed by signal 1. So their \$.exitcode is -1. Starting from v1.1.17, an “exit” command was sent automatically to logout from that shell. So, their \$.exitcode would be 0.
+
+Last Updated: 2026-07-25 16:59:40

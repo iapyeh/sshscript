@@ -129,3 +129,5 @@ with $.connect("ops@example.net"):
 
 This lets one monitoring loop follow local, remote, nested, or privileged
 processes without changing the output-handling code.
+
+Last Updated: 2026-07-25 16:59:40

@@ -23,3 +23,5 @@
 ### SSHScript v3.0 is a major update focusing on simplicity and power. If you find any bugs or have any suggestions, you are welcome to post them on the `issues` page.
 
 [!Downloads](https://pepy.tech/project/sshscript)
+
+Last Updated: 2026-07-25 16:59:40

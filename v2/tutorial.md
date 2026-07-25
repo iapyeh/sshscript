@@ -233,3 +233,5 @@ with session.connect('user@host','1234') as remote_session:
 - ＄ : SSHScript dollar-syntax
 
 - 🐍  : SSHScript module
+
+Last Updated: 2026-07-25 16:59:40

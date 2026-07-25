@@ -75,3 +75,5 @@ with session.connect('user@host','1234') as remote:
 ```
 
 This new `$.enter()` simplifies scripts by removing the distinction between `$.enter` and `$.iterate`, providing a single, intuitive way to manage interactive and streaming processes.
+
+Last Updated: 2026-07-25 16:59:40

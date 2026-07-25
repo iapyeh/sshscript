@@ -92,3 +92,5 @@ Here sudo authenticates as `deploy`, because it is the active account. See
 
 Never hard-code production passwords. Prefer narrowly scoped `sudoers`
 rules, SSH keys, and a secret manager or `getpass` for interactive use.
+
+Last Updated: 2026-07-25 16:59:40
