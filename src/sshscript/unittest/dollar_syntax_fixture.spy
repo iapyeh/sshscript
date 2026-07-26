@@ -1,0 +1,12 @@
+"""Small imported fixture for the credential-free dollar syntax tests."""
+
+import sys
+
+
+FIXTURE_NAME = "dollar-syntax-fixture"
+
+
+def run_fixture(value):
+    command = [sys.executable, "-c", f"print({value!r})"]
+    $(command)
+    return $.stdout.strip(), $.stderr, $.exitcode
