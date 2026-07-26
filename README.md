@@ -41,7 +41,7 @@ import sshscript
 
 session = sshscript.Session()
 try:
-    stdout, stderr = session.exec_command(["hostname"])
+    stdout, stderr = session.exec_command("hostname")
     print(str(stdout).strip())
     print("exit code:", session.exitcode)
 finally:
@@ -52,12 +52,12 @@ finally:
 available through `session.stdout`, `session.stderr`, and
 `session.exitcode`.
 
-Pass a list or tuple for structured direct execution:
+The command must be a string. Use `shell=False` when direct execution must be
+explicit:
 
 ```python
-stdout, stderr = session.exec_command(
-    ["python3", "-c", "print('ready')"]
-)
+command = "python3 -c \"print('ready')\""
+stdout, stderr = session.exec_command(command, shell=False)
 ```
 
 String commands use quote-aware automatic shell detection. Pipelines,
@@ -85,7 +85,7 @@ import sshscript
 session = sshscript.Session()
 try:
     with session.connect("ops@example.net") as remote:
-        stdout, stderr = remote.exec_command(["hostname"])
+        stdout, stderr = remote.exec_command("hostname")
         print("remote host:", str(stdout).strip())
 finally:
     session.close()
@@ -97,7 +97,7 @@ SSHScript also supports nested connections:
 with session.connect("ops@bastion.example.net") as bastion:
     with bastion.connect("db@db.internal") as database:
         stdout, stderr = database.exec_command(
-            ["systemctl", "is-active", "postgresql"]
+            "systemctl is-active postgresql"
         )
 ```
 
@@ -115,7 +115,7 @@ from getpass import getpass
 with session.connect("ops@example.net") as remote:
     password = getpass("sudo password: ")
     with remote.sudo(password=password) as root:
-        root.exec_command(["systemctl", "restart", "nginx"])
+        root.exec_command("systemctl restart nginx")
 ```
 
 `Session.su()` provides the corresponding account-switching context.
