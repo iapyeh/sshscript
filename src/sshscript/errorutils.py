@@ -85,21 +85,16 @@ _SHELL_ASSIGNMENT = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*=')
 _PARAMETER_START = set('_0123456789?*#$!@-({')
 
 
-def command_requires_shell(command):
+def command_requires_shell(command:str):
     """Return whether *command* needs POSIX shell interpretation and why.
 
     Detection is quote-aware: shell operators are ignored inside single and
     double quotes, while parameter and command expansion remain active inside
     double quotes.  The returned reasons are intended for diagnostics and
     tests; callers should normally only use the boolean value.
-
-    A list/tuple command is already structured argv and therefore never uses a
-    shell automatically.
     """
-    if isinstance(command, (list, tuple)):
-        return False, []
     if not isinstance(command, str):
-        raise TypeError(f'command must be str, list, or tuple, not {type(command).__name__}')
+        raise TypeError(f'command must be str, not {type(command).__name__}')
 
     reasons = []
 

@@ -354,17 +354,6 @@ class SessionWrapper(object):
         """
         return self.channel.owner.session.pkey(*args,**kw)
 
-    def exec_command(self,command,**kw):
-        """Execute a command in the already-running persistent shell.
-        
-        Args:
-            *args: Arguments to pass to send_line.
-            
-        Returns:
-            The result of send_line operation.
-        """
-        return self.send_line(command)
-
     def onedollar(self,command,**kw):
         """Compatibility alias for exec_command()."""
         return self.exec_command(command,**kw)

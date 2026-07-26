@@ -41,8 +41,10 @@ def test_command_forms():
     $r'printf raw-command'
     assert $.stdout == "raw-command"
 
-    dynamic_command = [sys.executable, "-c", "print('expression-command')"]
-    $(dynamic_command)
+    dynamic_command = shlex.join(
+        [sys.executable, "-c", "print('expression-command')"]
+    )
+    $(dynamic_command, shell=False)
     assert $.stdout.strip() == "expression-command"
 
     value = "f-string-command"
@@ -113,7 +115,7 @@ def test_redirection_in_temporary_directory():
 
 
 def test_explicit_execution_options():
-    name = "structured argv and explicit shell options"
+    name = "string command validation and explicit shell options"
     case(name)
 
     argv = [
@@ -123,9 +125,21 @@ def test_explicit_execution_options():
         "|",
         "not-a-pipeline",
     ]
-    $(argv, shell=False, timeout=10)
+    $(shlex.join(argv), shell=False, timeout=10)
     assert $.stdout.strip() == "['|', 'not-a-pipeline']"
     assert $.dollar.use_shell is False
+
+    for invalid_command in (argv, tuple(argv)):
+        try:
+            $(invalid_command, shell=False, timeout=10)
+        except TypeError as exc:
+            assert str(exc) == (
+                f"command must be str, not {type(invalid_command).__name__}"
+            )
+        else:
+            raise AssertionError(
+                f"{type(invalid_command).__name__} command was accepted"
+            )
 
     $("printf forced-shell", shell=True, timeout=10)
     assert $.stdout == "forced-shell"
@@ -142,7 +156,9 @@ def test_function_scope():
         stdout, stderr = $(command)
         return stdout.strip(), str(stderr), $.exitcode
 
-    result = run([sys.executable, "-c", "print('function-command')"])
+    result = run(
+        shlex.join([sys.executable, "-c", "print('function-command')"])
+    )
     assert result == ("function-command", "", 0)
 
     done(name)

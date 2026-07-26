@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+import shlex
 import sys
 import tempfile
 import unittest
@@ -37,8 +38,8 @@ class SessionModuleTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no execution result yet"):
             _ = self.session.exitcode
 
-    def test_structured_command_captures_output_and_exit_code(self):
-        stdout, stderr = self.session.exec_command(
+    def test_direct_command_captures_output_and_exit_code(self):
+        command = shlex.join(
             [
                 sys.executable,
                 "-c",
@@ -48,7 +49,11 @@ class SessionModuleTests(unittest.TestCase):
                     "print('module-stderr', file=sys.stderr); "
                     "raise SystemExit(7)"
                 ),
-            ],
+            ]
+        )
+        stdout, stderr = self.session.exec_command(
+            command,
+            shell=False,
             timeout=10,
         )
 
@@ -58,7 +63,7 @@ class SessionModuleTests(unittest.TestCase):
         self.assertFalse(self.session.dollar.use_shell)
 
     def test_call_alias_accepts_input_and_environment(self):
-        stdout, stderr = self.session(
+        command = shlex.join(
             [
                 sys.executable,
                 "-c",
@@ -67,7 +72,11 @@ class SessionModuleTests(unittest.TestCase):
                     "print(os.environ['SSHSCRIPT_MODULE_TEST']); "
                     "print(sys.stdin.read())"
                 ),
-            ],
+            ]
+        )
+        stdout, stderr = self.session(
+            command,
+            shell=False,
             input="input-from-test",
             env={"SSHSCRIPT_MODULE_TEST": "environment-from-test"},
             timeout=10,
@@ -105,7 +114,9 @@ class SessionModuleTests(unittest.TestCase):
         invalid_calls = (
             (TypeError, lambda: self.session.exec_command(None)),
             (ValueError, lambda: self.session.exec_command("   ")),
-            (ValueError, lambda: self.session.exec_command([], shell=True)),
+            (TypeError, lambda: self.session.exec_command(["true"])),
+            (TypeError, lambda: self.session.exec_command(("true",), shell=False)),
+            (TypeError, lambda: self.session.exec_command([], shell=True)),
             (TypeError, lambda: self.session.exec_command("true", shell=1)),
             (
                 ValueError,
@@ -190,7 +201,10 @@ class ThreadedLocalModuleTests(unittest.TestCase):
             session = sshscript.Session()
             try:
                 stdout, stderr = session.exec_command(
-                    [sys.executable, "-c", f"print('worker-{number}')"],
+                    shlex.join(
+                        [sys.executable, "-c", f"print('worker-{number}')"]
+                    ),
+                    shell=False,
                     timeout=10,
                 )
                 return str(stdout).strip(), str(stderr), session.exitcode
