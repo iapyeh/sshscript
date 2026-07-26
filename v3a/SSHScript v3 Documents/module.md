@@ -13,12 +13,16 @@ integrate SSHScript with an existing Python application.
 The public `Session` API executes local commands by default and exposes
 the same output, error, and exit-code information used by dollar syntax:
 
+`Session.exec_command(command)` accepts exactly one string command. Lists,
+tuples, and other command types raise `TypeError`. The compatibility
+`Session.onedollar()` alias follows the same rule.
+
 ```python
 import sshscript
 
 session = sshscript.Session()
 try:
-    stdout, stderr = session.exec_command(["hostname"])
+    stdout, stderr = session.exec_command("hostname")
     print(str(stdout).strip())
     print(session.exitcode)
 finally:
@@ -50,8 +54,8 @@ python3 -m unittest discover -v -s unittest -p 'test_sshscript_module.py'
 The suite uses Python's standard `unittest` framework. It verifies:
 
 - creation, initial state, and repeatable cleanup of a local `Session`;
-- structured argument lists, standard input, environment variables, standard
-  output, standard error, and exit codes;
+- string commands, standard input, environment variables, standard output,
+  standard error, and exit codes;
 - automatic shell detection and explicit shell selection with
   `Session.exec_command()`;
 - argument validation before a process starts;
@@ -73,4 +77,4 @@ This command is deliberately limited to localhost-only tests. Integration
 tests that exercise real SSH hosts, privilege changes, or private keys are
 separate and require their own environment configuration.
 
-Last Updated: 2026-07-25 16:59:40
+Last Updated: 2026-07-26 16:57:06

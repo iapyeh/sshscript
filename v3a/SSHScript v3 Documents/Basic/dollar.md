@@ -55,7 +55,6 @@ $(command, timeout=5)
 name = "SSHScript"
 $f'printf "Hello, %s\\n" {name}'
 
-$(["printf", "argv-list"])  # lists and tuples always execute directly
 $'printf string-literal'
 $r'printf raw-string'
 ```
@@ -95,16 +94,16 @@ assert $.stdout.strip() == "$HOME"
 Override automatic selection when required:
 
 ```python
-# A list is an unambiguous direct command.
-$(["python3", "-c", "import sys; print(sys.argv[1:])", "|", "cat"])
+# Quoted shell-looking characters remain ordinary arguments in direct mode.
+command = 'python3 -c "import sys; print(sys.argv[1:])" "|" "cat"'
+$(command, shell=False)
 
 $(command, shell=True)                    # force the POSIX shell
 $('printf bash-shell', shell='bash')      # select Bash
-$(command, shell=False)                   # force direct execution
 ```
 
-`shell_executable='bash'` is equivalent to `shell='bash'`. A list or tuple
-cannot be used with `shell=True`.
+`shell_executable='bash'` is equivalent to `shell='bash'`. The command passed
+to `$()` must be a string.
 
 ## Migrating from `$$`
 
@@ -160,8 +159,7 @@ The suite checks:
   `$.exitcode`;
 - automatic shell selection for pipelines, assignments, operators,
   expansion, and redirection;
-- structured argument lists plus explicit `shell=False` and
-  `shell=True`;
+- string commands plus explicit `shell=False` and `shell=True`;
 - dollar commands inside Python functions;
 - a persistent local shell created with `with $(...)`; and
 - importing another `.spy` module that contains dollar syntax.
@@ -188,4 +186,4 @@ The command returns a non-zero status if any check fails. These tests are a
 quick local regression check; SSH integration tests remain separate because
 they require explicit host credentials and configuration.
 
-Last Updated: 2026-07-25 16:59:40
+Last Updated: 2026-07-26 16:53:25
