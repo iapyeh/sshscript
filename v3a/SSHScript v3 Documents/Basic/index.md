@@ -1,10 +1,10 @@
 ---
-title: "Basic"
+title: "Core Session API"
 parent: "SSHScript v3 Documents"
-nav_order: 3
+nav_order: 5
 has_children: true
 ---
 
-# Basic
+# Core Session API
 
 Last Updated: 2026-07-25 16:59:40

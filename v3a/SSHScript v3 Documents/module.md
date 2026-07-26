@@ -1,10 +1,10 @@
 ---
-title: "Module"
+title: "Module API"
 parent: "SSHScript v3 Documents"
-nav_order: 6
+nav_order: 1
 ---
 
-# Module
+# Module API
 
 SSHScript can also be used as a regular Python module. This is useful when a
 project does not use the `.spy` dollar syntax, or when it needs to
