@@ -31,7 +31,7 @@ For example, here is a Python script with dollar-syntax that runs the hostname c
 
 Flexible and Robust
 =======================
-SSHScript v2.0 makes a great improvement by providing all the features of dollar-syntax in the sshscript module. This makes SSHScript work exactly like any other counterpart package when integrating with existing projects. This allows users to use all of SSHScript's features in pure Python without writing dollar-syntax. 
+SSHScript v3.1.0 provides all the features of dollar-syntax in the sshscript module. This makes SSHScript work exactly like any other counterpart package when integrating with existing projects. This allows users to use all of SSHScript's features in pure Python without writing dollar-syntax.
 
 Here is an example of the same script as above, but using only the sshscript module:
 
@@ -76,7 +76,7 @@ SSHScript depends on the Paramiko library. In some cases, it has been reported t
 Examples
 =============
 
-An example of SSHScript dollar-syntax (v2.0):
+An example of SSHScript dollar-syntax (v3.1.0):
 
 .. code-block:: 
 
@@ -113,7 +113,7 @@ An example of SSHScript dollar-syntax (v2.0):
                 sudoconsole('ls -l $HOME')
 
 
-An example of SSHScript module(v2.0):
+An example of SSHScript module (v3.1.0):
 
 .. code-block:: 
 
@@ -183,7 +183,7 @@ SSHScript is a powerful tool for system automation, and it is easy to use, even 
 New Releases
 ============
 
-The new experimental release is 2.0.2 (2023/10/17). There are lots of changes.
+The current release is 3.1.0.
 
 * `SSHScript v2.0 Reference Guide`_ https://iapyeh.github.io/sshscript/v2/index
 

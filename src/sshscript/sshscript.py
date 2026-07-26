@@ -163,9 +163,11 @@ def run_file(givenPaths,
 
 def run_script(script,varGlobals=None,showScript=False):
     session = Session()
-    ## this is a blocking call
-    session.run(script,globals=varGlobals,showScript=showScript)
-    session.close()  
+    try:
+        ## this is a blocking call
+        return session.run(script,vars=varGlobals,showScript=showScript)
+    finally:
+        session.close()
 
 def main():
     import argparse
