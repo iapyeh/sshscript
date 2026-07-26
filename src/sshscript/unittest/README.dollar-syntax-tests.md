@@ -32,7 +32,7 @@ The dollar syntax suite covers:
   `$.stderr`, and `$.exitcode`;
 - automatic shell selection for pipelines, assignments, logical operators,
   expansion, and redirection;
-- structured argument lists and explicit `shell=False` or `shell=True`;
+- string-only command validation and explicit `shell=False` or `shell=True`;
 - dollar commands inside Python functions;
 - a persistent local shell created with `with $(...)`; and
 - direct import of another `.spy` module containing dollar syntax.

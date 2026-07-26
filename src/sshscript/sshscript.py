@@ -30,6 +30,7 @@ try:
     from .errorutils import SSHScriptExit, SSHScriptBreak,  get_logger, log_debug, log_debug_8,SSHScriptException
     ## 2025/3/3 v2.0.3 feature: import *.spy file directly
     from . import spyimporter
+    from . import __init__ as sshscript_module
 except ImportError:
     ## 2024/8/16, should add mydir into sys.path for python 3.12
     mydir = os.path.abspath(os.path.dirname(__file__))
@@ -37,6 +38,7 @@ except ImportError:
     from session import Session
     from errorutils import SSHScriptExit, SSHScriptBreak, get_logger, log_debug, log_debug_8, SSHScriptException
     import spyimporter
+    import __init__ as sshscript_module
     ## 2024/8/16, should remove mydir out of sys.path for python 3.11
     if mydir == sys.path[0]: del sys.path[0]
 
@@ -117,6 +119,7 @@ def run_file(givenPaths,
         try:
             _vars['__name__'] = '__main__' if idx == 0 else os.path.basename(absfile)
             _vars['__file__'] = absfile
+            _vars['sshscript'] = sshscript_module
             ## parse the file only if it is .spy
             ## v2.0.3 changes the order from locals,globals to globals,locals
             newvars = session.run(script,_vars,showScript=showScript)
@@ -192,14 +195,6 @@ def main():
                         default=False,
                         help='dump stderr only to console.')   
 
-    ## v2.0.3, fixed to .spy
-    #parser.add_argument('--ext', dest='sshscriptExt', action='store',
-    #                    default='.spy',
-    #                    help='the extension of sshscript file. default is .spy')
-
-    ## v2.0.3, only one .spy file is allowed
-    #parser.add_argument(dest='paths', action='store', nargs='*',
-    #                    help='path of .spy files or folders')
 
     parser.add_argument('path', action='store', nargs='?',default='_',
                         help='path of .spy files or folders')
@@ -207,10 +202,6 @@ def main():
     parser.add_argument('--debug','-d', dest='debug', nargs='*',
                         help='debug level: 8 or 10, default is 10')
 
-
-    ## v2.0.3, only one .spy file is allowed, this makes no sense
-    ## new on v1.1.13
-    #parser.add_argument('--folder', dest='folder', help='base folder of paths')
 
     ## new on v1.1.17
     parser.add_argument('--version', dest='version', action='store_true',default=False,

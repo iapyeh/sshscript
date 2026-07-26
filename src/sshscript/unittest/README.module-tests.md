@@ -17,8 +17,8 @@ required. It covers:
 
 - importing and constructing the public `Session` class;
 - the initial state and lifecycle of a credential-free local session;
-- structured command arguments, stdin, environment variables, stdout, stderr,
-  and exit codes;
+- direct command strings assembled with `shlex.join()`, stdin, environment
+  variables, stdout, stderr, and exit codes;
 - automatic and explicit shell selection through `Session.exec_command()`;
 - invalid command arguments and repeatable cleanup;
 - execution of ordinary Python through `run_script()`;

@@ -1,5 +1,6 @@
 """Small imported fixture for the credential-free dollar syntax tests."""
 
+import shlex
 import sys
 
 
@@ -7,6 +8,6 @@ FIXTURE_NAME = "dollar-syntax-fixture"
 
 
 def run_fixture(value):
-    command = [sys.executable, "-c", f"print({value!r})"]
-    $(command)
+    command = shlex.join([sys.executable, "-c", f"print({value!r})"])
+    $(command, shell=False)
     return $.stdout.strip(), $.stderr, $.exitcode

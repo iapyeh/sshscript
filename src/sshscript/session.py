@@ -881,15 +881,21 @@ class Session(object):
         if self._lastDollar: self._lastDollar.clear()
 
 
-    def exec_command(self,cmd,*,shell=None,shell_executable=None,
+    def exec_command(self,cmd:str,*,shell=None,shell_executable=None,
                      _legacy_twodollars=False,**kw):
         """Execute one command, automatically selecting direct or shell mode.
 
         ``shell=None`` (the default) performs quote-aware command inspection.
-        ``shell=False`` forces structured/direct execution and ``shell=True``
+        ``shell=False`` forces direct execution and ``shell=True``
         forces POSIX shell execution.  ``shell='bash'`` selects and enables a
-        named shell.  A list/tuple command is always direct.
+        named shell.
         """
+        if not isinstance(cmd,str):
+            raise TypeError(f'command must be str, not {type(cmd).__name__}')
+        cmd = cmd.strip()
+        if not cmd:
+            raise ValueError('command must not be empty')
+
         if isinstance(shell,str):
             if shell_executable is not None:
                 raise ValueError('use either shell="name" or shell_executable, not both')
@@ -897,17 +903,6 @@ class Session(object):
             shell = True
         elif shell is not None and not isinstance(shell,bool):
             raise TypeError('shell must be None, bool, or a shell executable name')
-
-        if isinstance(cmd,str):
-            cmd = cmd.strip()
-        elif isinstance(cmd,(list,tuple)):
-            if shell:
-                raise ValueError('list/tuple commands cannot use shell=True')
-            shell = False
-        else:
-            raise TypeError(f'command must be str, list, or tuple, not {type(cmd).__name__}')
-        if not cmd:
-            raise ValueError('command must not be empty')
 
         if _legacy_twodollars:
             warnings.warn(

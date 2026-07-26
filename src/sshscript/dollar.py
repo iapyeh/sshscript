@@ -69,6 +69,8 @@ class Dollar(object):
                 env            
         """
         
+        if not for_with and not isinstance(command,str):
+            raise TypeError(f'command must be str, not {type(command).__name__}')
         command = command.strip() if isinstance(command,str) else command
         ## this is appeared in "with $command"
         assert not isinstance(for_with,str),f'"for_with" should be bool, not {for_with}'
@@ -82,11 +84,7 @@ class Dollar(object):
         self.shell_reasons = []
 
         if not for_with:
-            if isinstance(command,(list,tuple)):
-                if use_shell:
-                    raise ValueError('list/tuple commands cannot use a shell')
-                self.use_shell = False
-            elif use_shell is None and command:
+            if use_shell is None and command:
                 self.use_shell,self.shell_reasons = command_requires_shell(command)
             elif use_shell is not None:
                 self.use_shell = bool(use_shell)
@@ -382,7 +380,7 @@ class Dollar(object):
                 shell_executable = self.shell_executable or '/bin/sh'
                 cpargs = [shell_executable,'-c',self.command]
             else:
-                cpargs = list(self.command) if isinstance(self.command,(list,tuple)) else shlex.split(self.command)
+                cpargs = shlex.split(self.command)
             kw['text'] = False
             ## with_pty is always False
             self.channel = POpenChannel(self,None,None,None,[],False)
@@ -448,7 +446,7 @@ class Dollar(object):
                 shell_executable = self.shell_executable or '/bin/sh'
                 command = f'{shlex.quote(shell_executable)} -c {shlex.quote(self.command)}'
             else:
-                argv = list(self.command) if isinstance(self.command,(list,tuple)) else shlex.split(self.command)
+                argv = shlex.split(self.command)
                 command = 'exec ' + ' '.join(shlex.quote(str(arg)) for arg in argv)
 
             log_debug(
