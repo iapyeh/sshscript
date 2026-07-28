@@ -84,7 +84,9 @@ for row in report:
 
 ## 3. 單 `$`：執行指令與 shell 功能
 
-SSHScript v3 以單 `$` 作為統一的指令語法。它會以 quote-aware 的方式檢查指令：一般 OS 指令以直接模式執行；遇到管線、重導向、控制運算子或未加引號的 shell 變數時，會自動改用 shell 模式。不需要再為 shell 功能改寫成雙 `$$`。
+SSHScript v3 以單 `$` 作為統一的指令語法。它會檢查插值後的最終 command：一般 OS 指令以直接模式執行；遇到管線、重導向、控制運算子或未加引號的 shell 變數時，會自動改由 `/bin/sh -c` 執行。不需要再為 shell 功能改寫成雙 `$$`。
+
+檢查方式會辨識引號與反斜線。被保護的 shell 特殊字元仍是普通參數，不會觸發 shell；不需要 shell 的指令也不會受到不必要的 shell expansion 影響。
 
 ```python
 $python3 -c "print('hello')"
@@ -168,7 +170,7 @@ print(hostname, username)
 
 ### 3.3 自動使用 shell 功能
 
-管線、重導向、shell 變數、萬用字元與多行 shell script 都可以直接使用單 `$`。SSHScript 會自動選擇 shell 模式：
+管線、重導向、shell 變數、萬用字元、邏輯運算、command substitution 與多行 shell script 都可以直接使用單 `$`。SSHScript 會自動選擇 shell 模式：
 
 ```python
 $printf 'alpha\nbeta\n' | grep beta
@@ -190,6 +192,14 @@ $'printf string-direct'
 $r'printf raw-direct'
 ```
 
+shell 變數、redirect 與邏輯運算也不需要另一種 dollar syntax：
+
+```python
+$echo "$HOME"
+$printf 'saved\n' > /tmp/sshscript-result.txt
+$false || printf 'recovered\n'
+```
+
 f-string 與多行 shell script 也可以直接使用：
 
 ```python
@@ -205,29 +215,41 @@ tail -n 1 {shlex.quote(path)}'''
 assert $.stdout.strip() == "line-2"
 ```
 
+被引號或反斜線保護的特殊字元不會觸發 shell。例如下列 `|`、`>` 與 `$HOME` 都是傳給 `printf` 的普通文字：
+
+```python
+$printf '%s' 'a|b>$HOME'
+assert $.stdout == "a|b>$HOME"
+```
+
 若指令內容本身無法可靠地呈現意圖，可以明確指定模式：
 
 ```python
-# 把 | 當成一般參數，而不是 pipe。
-$("python3 -c \"import sys; print(sys.argv[1:])\" '|' cat", shell=False)
+# command 必須是字串；shlex.join() 可安全地組合參數。
+external_value = "a; echo unsafe"
+$(shlex.join(["printf", "%s", external_value]), shell=False)
 
-# 強制使用 POSIX shell；也可以指定 shell="bash"。
-$("printf forced-shell", shell=True)
-$("printf bash-shell", shell="bash")
+# 強制使用預設的 /bin/sh。
+$("printf '%s' shell", shell=True)
+
+# 需要 Bash extension 時才明確選擇 Bash。
+$("printf '%s' \"$BASH_VERSION\"", shell="bash")
 ```
 
-`$$` 僅保留給舊程式相容使用，已在 v3 中 deprecated；新程式應只使用單 `$`。
+自動判斷會檢查插值後的內容，因此外部資料若含有 `;`、`|` 或 `$()`，可能成為可執行的 shell 語法。把不可信資料放入 shell command 時應使用 `shlex.quote()`；若不需要 shell，使用 `shlex.join()` 組合參數，再搭配 `shell=False`。
+
+舊版的 `$$command` 與 `$$(command)` 暫時仍可執行，但已在 v3 中 deprecated，並會強制使用 shell。新程式請分別改寫為 `$command` 與 `$(command)`，交由自動判斷處理。
 
 ## 4. v3.0 的 Python 相容性
 
 SSHScript v3.0 以 Python token 為基礎辨識 dollar syntax。一般 Python 字串、raw string、f-string 的文字區與註解中的 `$` 不會被當成指令：
 
 ```python
-literal = "$.stdout $echo $$echo"
+literal = "$.stdout $echo $HOME"
 home_text = r"$HOME"
 doubled_braces = f"literal={{$.stdout}}"
 
-assert literal == "$.stdout $echo $$echo"
+assert literal == "$.stdout $echo $HOME"
 assert home_text == r"$HOME"
 assert doubled_braces == "literal={$.stdout}"
 ```
@@ -490,6 +512,7 @@ for account, row in results.items():
 
 ```python
 import sshscript
+import shlex
 
 session = sshscript.Session()
 
@@ -498,6 +521,10 @@ print(session.stdout.strip())
 
 session("printf 'a\\nb\\n' | tail -n 1")
 print(session.stdout.strip())
+
+# 視需要覆寫自動判斷。
+session(shlex.join(["printf", "%s", "direct"]), shell=False)
+session("printf '%s' \"$BASH_VERSION\"", shell="bash")
 
 with session.connect("ops@host.example.net") as remote:
     remote("uptime")
@@ -603,7 +630,7 @@ sshscript --debug 8 example.spy
 撰寫程式時，建議特別留意：
 
 1. `$.stdout` 等結果會被下一個指令更新，需要時立即保存。
-2. Pipe、redirect 與未加引號的 `$HOME` 會自動使用 shell；若要表達字面的 `$HOME`，請加上引號或跳脫 `$`。必要時可用 `shell=False` 或 `shell=True` 明確指定。
+2. Pipe、redirect 與未加引號的 `$HOME` 會自動使用 `/bin/sh -c`；若要表達字面的 `$HOME`，請加上引號或跳脫 `$`。需要共享 shell 狀態時才使用持續 shell，必要時可用 `shell=False`、`shell=True` 或 `shell="bash"` 明確指定。
 3. Python 值插入 shell 指令時使用 f-string，外部值再以 `shlex.quote()` 處理。
 4. 遠端連線、sudo、shell 與互動 console 優先使用 `with` 管理生命週期。
 5. 不要把密碼或 private key 內容寫進程式庫。
@@ -613,4 +640,4 @@ sshscript --debug 8 example.spy
 
 SSHScript v3.0 把 shell 擅長的「直接操作系統」和 Python 擅長的「程式結構與資料處理」放在同一個檔案裡。你不必放棄既有指令，也不必先學一套新的任務描述語言；從一行 `$hostname` 開始，加上 `$.connect()`，同一段可讀的 Python 程式就能逐步成長為本機、遠端、巢狀連線與平行作業的自動化工具。
 
-Last Updated: 2026-07-25 16:59:40
+Last Updated: 2026-07-28
