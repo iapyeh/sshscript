@@ -19,11 +19,13 @@
 ##
 from collections import deque
 import time, threading,sys
-import os,traceback,random
-try:
-    from .errorutils import log_debug
-except ImportError:
-    from errorutils import log_debug
+import os,random
+if __package__:
+    from .errorutils import get_logger
+else:
+    from errorutils import get_logger
+
+logger = get_logger()
 
 class DequeStringIter:
     """
@@ -137,22 +139,20 @@ class DequeStringPopleftIter:
 class DequeString(str):
     maxlen = 10000
     sno = 0
-    private_attrs = {'_read_fd','_write_fd','_deque', '_lock', '_condition', '_string','append','_listeners','bytes','glue','__add__','__iter__','iter','__call__','__eq__','__str__','__repr__','__radd__','__getitem__','size','__setitem__','__contains__'}    
-    def __new__(cls,iterable=None, maxlen=None,bytes=False):
-        if iterable is None: iterable = []
-        glue = b'' if bytes else ''
-        instance = super().__new__(cls, glue.join(iterable))
-        return instance    
-    def __init__(self, initial=None,maxlen=None,bytes=False):
-        '''
-        :bytes:
-            True: deque would store bytes
-            False: deque would store string
-        '''
+    private_attrs = {
+        '_read_fd', '_write_fd', '_deque', '_lock', '_condition',
+        '_string', 'append', '_listeners', 'glue', '__add__', '__iter__',
+        'iter', '__call__', '__eq__', '__str__', '__repr__', '__radd__',
+        '__getitem__', 'size', '__setitem__', '__contains__', 'splitlines',
+    }
+    def __new__(cls,initial=None, maxlen=None):
+        initial = ''.join([str(x) for x in initial]) if initial else None
+        value = "" if initial is None else str(initial)  
+        return super().__new__(cls, value)
+    def __init__(self, initial=None,maxlen=None):
         if maxlen is None: maxlen = self.__class__.maxlen
         self.closed = False
-        self.is_bytes = bytes
-        self.glue = b'' if self.is_bytes else ''
+        self.glue = ''
         DequeString.sno += 1
         self.name = f'DS{DequeString.sno}'
         self.iterTimeout = None
@@ -208,11 +208,7 @@ class DequeString(str):
 
     def __str__(self)->str:
         ## f-string would take return value of this call
-        #with self._lock:
-        if self.is_bytes:
-            return self._string.decode('utf8','ignore')
-        else:
-            return self._string
+        return self._string
     
     def __repr__(self)->str:
         ## f-string would not take return value of this call
@@ -224,6 +220,15 @@ class DequeString(str):
     def __contains__(self,s):
         ## cation: not same as "in self._string"
         return s in self._string
+
+    def splitlines(self, keepends=False):
+        """Split the latest buffered content, not the immutable str base value.
+
+        DequeString is a live buffer implemented as a str subclass.  Delegating
+        this method through __getattribute__ binds it to a snapshot too early,
+        which can miss output appended between attribute lookup and invocation.
+        """
+        return self._string.splitlines(keepends)
     
     def __getattribute__(self, name):
         # Allow access to private attributes directly
@@ -240,9 +245,28 @@ class DequeString(str):
 
     def set_callback(self,callback,pattern):
         """ watching content for pattern, call callback() when the pattern shows up"""
-        self.callback = callback
         assert pattern is None or isinstance(pattern,str), '"str" pattern supported only'
-        self.callback_pattern = pattern
+        with self._condition:
+            self.callback = callback
+            self.callback_pattern = pattern
+
+    def _remove_string_range(self, start, end):
+        """Remove a character range while preserving the deque chunk layout."""
+        position = 0
+        retained = []
+        for chunk in self._deque:
+            chunk_end = position + len(chunk)
+            if chunk_end <= start or position >= end:
+                retained.append(chunk)
+            else:
+                left = chunk[:max(0, start - position)]
+                right = chunk[max(0, end - position):]
+                if left or right:
+                    retained.append(left + right)
+            position = chunk_end
+
+        self._deque.clear()
+        self._deque.extend(retained)
 
     def append(self, item,splitlines=False):
         """
@@ -253,20 +277,37 @@ class DequeString(str):
         there is no string-copy , it saves memory usage.
         """
         assert isinstance(item,str),f'{[item]} is not str'
-        #print('ioooo>>',self.sessionId,[len(self._listeners),item,self.callback ,self.callback_pattern])
-        callback_triggered = self.callback and self.callback_pattern and self.callback_pattern in item
-        if callback_triggered:
-            item = item.replace(self.callback_pattern,b'' if self.is_bytes else '')
-        
-        items = [item]
+        #print('ooooo>>',[item])
+        callback_to_call = None
+        listener_item = item
         with self._condition:
-            if len(self._listeners):
-                self._listeners[-1](items)
+            if self.closed:
+                raise IOError('DequeString has closed')
             if splitlines:
                 ## contains newline in line
-                self._deque.extend(items[0].splitlines(True))
+                self._deque.extend(item.splitlines(True))
             else:
-                self._deque.append(items[0])
+                self._deque.append(item)
+
+            callback = self.callback
+            pattern = self.callback_pattern
+            if callback and pattern:
+                content = self.glue.join(self._deque)
+                match_start = content.find(pattern)
+                if match_start >= 0:
+                    match_end = match_start + len(pattern)
+                    self._remove_string_range(match_start, match_end)
+                    callback_to_call = callback
+                    # Keep listener behavior compatible when the whole prompt
+                    # happened to arrive in this append call.
+                    listener_item = item.replace(pattern, '')
+                    self.callback = None
+                    self.callback_pattern = None
+
+            ## Caution: only the top listener was called
+            if len(self._listeners):
+                self._listeners[-1](listener_item)
+
             try:
                 os.write(self._write_fd, b'\x00')
             except BlockingIOError:
@@ -275,37 +316,20 @@ class DequeString(str):
                 pass # might be closed (Errno 9)
             else:
                 self._condition.notify()
-        
-        ## test again, because the expecting pattern might be splited into multiple items
-        ## only check the last 2 items
-        if self.callback and self.callback_pattern and (not callback_triggered) and len(self._deque) > 1:
-            callback_triggered = self.callback_pattern in (self._deque[-2] + self._deque[-1])
-            if callback_triggered:
-                ## remove the pattern from the last 2 items
-                replaced_item_origin = self._deque[-2] + self._deque[-1]
-                replaced_item = (self._deque[-2] + self._deque[-1]).replace(self.callback_pattern, b'' if self.is_bytes else '')
-                #assert isinstance(self._deque,deque), f'{type(self._deque)} is not deque,({self._deque})'
-                self._deque.pop()
-                self._deque.pop()
-                if splitlines:
-                    self._deque.extend(filter(None,replaced_item.splitlines(True)))
-                elif replaced_item:
-                    self._deque.append(replaced_item)
-                #print('*@' * 500,[replaced_item_origin, replaced_item])
 
         ## test callback pattern
-        if callback_triggered:
-            self.callback() 
-            ## this is one shot only
-            self.callback = None
-            self.callback_pattern = None
+        if callback_to_call is not None:
+            try:
+                callback_to_call()
+            except TypeError:
+                ## Preserve the historical one-shot callback behavior.
+                pass
 
     def push_listener(self,listener):
         ## listener is callable, called by listener(items)
         with self._condition:
-            items = list(self._deque)
+            listener(self.glue.join(self._deque))
             self._listeners.append(listener)
-        listener(items)
     def pop_listener(self,listener):
         assert self._listeners.pop() == listener
     def clear(self):
@@ -314,24 +338,24 @@ class DequeString(str):
         try:
             if os.get_blocking(self._read_fd):
                 os.set_blocking(self._read_fd,False)
-                log_debug(f'{"!" * 20} read handle becomes blocking')
+                logger.debug(
+                    'Read descriptor was blocking; switched to non-blocking mode '
+                    '(fd=%s)',
+                    self._read_fd,
+                )
             while os.read(self._read_fd, 1):
                 pass
         except BlockingIOError:
             pass
         except OSError:
             pass
-        except:
-            traceback.print_exc()
 
     def __add__(self, other):
         """Handle ds + other"""
-        #with self._lock:
         return self._string + other
     
     def __radd__(self, other):
         """Handle other + ds"""
-        #with self._lock:
         return other + self._string
             
     def __eq__(self,other):
@@ -383,16 +407,18 @@ class DequeString(str):
 
     def close(self):
         """Clean up pipe file descriptors"""
-        assert not self.closed, f'{type(self)} {id(self)}:{self.name}:{self.sessionId} already closed'
-        self.closed = True
-        try:
-            os.close(self._write_fd)
-        except OSError:
-            pass
-        try:
-            os.close(self._read_fd)
-        except OSError:
-            pass
+        #assert not self.closed, f'{type(self)} {id(self)}:{self.name}:{self.sessionId} already closed'
+        with self._condition:
+            if self.closed: return
+            self.closed = True
+            try:
+                os.close(self._write_fd)
+            except OSError:
+                pass
+            try:
+                os.close(self._read_fd)
+            except OSError:
+                pass
     def __del__(self):
         if not self.closed: self.close()
 
@@ -403,7 +429,7 @@ class SSHScriptStderr(DequeString):
     maxlen = 10000
 
 def unittest():
-    stdout = SSHScriptStdout(maxlen=500,bytes=False)
+    stdout = SSHScriptStdout(maxlen=500)
     assert not stdout,'stdout is empty but with True value'
     def setvalue():
         stdout.append('that')

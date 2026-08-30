@@ -17,20 +17,155 @@
 2025/2/28   rewrite for working with tokenparser.py
 '''
 import ast
+import builtins
+from io import StringIO
+import linecache
+import sys
+import tokenize
 
-try:
+if __package__:
     from .errorutils import  dumpScript, SSHScriptException
-except ImportError:
+    from . import tokenparser
+    from .dollarchanger import DollarChanger
+else:
     from errorutils import  dumpScript, SSHScriptException
+    import tokenparser
+    from dollarchanger import DollarChanger
 
-import tokenparser
+def _cache_source(script_path, spyscript):
+    """Make the original source available to traceback and inspect."""
+    lines = spyscript.splitlines(keepends=True)
+    if spyscript and not spyscript.endswith(('\n', '\r')):
+        # linecache entries conventionally contain complete physical lines.
+        lines[-1] += '\n'
+    linecache.cache[script_path] = (
+        len(spyscript),
+        None,
+        lines,
+        script_path,
+    )
 
-import __main__
 
-## for setting __main__.SSHScriptExportedNames(called in sshscriptdollar.py)
-import session
+def _source_syntax_error(error, script_path, spyscript):
+    """Rebuild a parser error so its displayed text comes from the .spy file."""
+    lineno = getattr(error, 'lineno', None) or 1
+    requested_lineno = lineno
+    source_lines = spyscript.splitlines(keepends=True)
+    if source_lines:
+        lineno = min(max(lineno, 1), len(source_lines))
+    text = source_lines[lineno - 1] if lineno <= len(source_lines) else None
+    offset = getattr(error, 'offset', None)
+    if text is not None and offset is not None:
+        line_end = len(text.rstrip('\r\n')) + 1
+        offset = (
+            line_end
+            if requested_lineno > lineno
+            else min(max(offset, 1), line_end)
+        )
+    details = (
+        script_path,
+        lineno,
+        offset,
+        text,
+    )
+    if sys.version_info >= (3, 10):
+        end_lineno = getattr(error, 'end_lineno', None)
+        if end_lineno is not None and source_lines:
+            end_lineno = min(max(end_lineno, lineno), len(source_lines))
+        end_offset = getattr(error, 'end_offset', None)
+        if end_lineno == lineno and text is not None and end_offset is not None:
+            end_offset = min(max(end_offset, offset or 1), len(text.rstrip('\r\n')) + 1)
+        details += (
+            end_lineno,
+            end_offset,
+        )
+    return type(error)(getattr(error, 'msg', str(error)), details)
 
-from dollarchanger import DollarChanger
+
+def _translation_syntax_error(error, script_path, spyscript):
+    """Turn a transformer failure into a source-located syntax diagnostic."""
+    lineno = 1
+    current = error.__traceback__
+    while current is not None:
+        node = current.tb_frame.f_locals.get('node')
+        if isinstance(node, ast.AST) and getattr(node, 'lineno', None):
+            lineno = node.lineno
+        current = current.tb_next
+    source_lines = spyscript.splitlines()
+    source_line = source_lines[lineno - 1] if lineno <= len(source_lines) else ''
+    offset = len(source_line) - len(source_line.lstrip()) + 1
+    synthetic = SyntaxError(
+        'SSHScript translation failed: %s' % error,
+        (script_path, lineno, offset, None),
+    )
+    return _source_syntax_error(synthetic, script_path, spyscript)
+
+
+def _token_syntax_error(error, script_path, spyscript):
+    """Locate tokenization EOF errors at their unmatched opening delimiter."""
+    message, location = error.args
+    lineno, offset = location
+
+    if message == 'EOF in multi-line statement':
+        opening = {'(': ')', '[': ']', '{': '}'}
+        closing = {value: key for key, value in opening.items()}
+        delimiters = []
+        generator = tokenize.generate_tokens(StringIO(spyscript).readline)
+        try:
+            for token in generator:
+                if token.type != tokenize.OP:
+                    continue
+                if token.string in opening:
+                    delimiters.append(token)
+                elif token.string in closing:
+                    if delimiters and delimiters[-1].string == closing[token.string]:
+                        delimiters.pop()
+        except (StopIteration, tokenize.TokenError):
+            pass
+
+        if delimiters:
+            unmatched = delimiters[-1]
+            lineno = unmatched.start[0]
+            offset = unmatched.start[1] + 1
+
+    synthetic = SyntaxError(
+        message,
+        (script_path, lineno, offset, None),
+    )
+    return _source_syntax_error(synthetic, script_path, spyscript)
+
+
+def parse(script_path, spyscript):
+    """Return a transformed AST whose locations still refer to *spyscript*."""
+    _cache_source(script_path, spyscript)
+    try:
+        token_script = tokenparser.convert(spyscript)
+    except tokenize.TokenError as error:
+        raise _token_syntax_error(error, script_path, spyscript) from None
+
+    try:
+        tree = ast.parse(token_script, filename=script_path)
+    except SyntaxError as error:
+        raise _source_syntax_error(error, script_path, spyscript) from None
+
+    try:
+        py_tree = DollarChanger().visit(tree)
+        return ast.fix_missing_locations(py_tree)
+    except Exception as error:
+        raise _translation_syntax_error(
+            error, script_path, spyscript
+        ) from error
+
+
+def compile_spy(script_path, spyscript):
+    """Compile dollar syntax while retaining original filename and locations."""
+    try:
+        return builtins.compile(parse(script_path, spyscript), script_path, 'exec')
+    except SyntaxError as error:
+        if error.filename == script_path and error.text is None:
+            raise _source_syntax_error(error, script_path, spyscript) from None
+        raise
+
 
 def convert(script_path, spyscript):
     '''
@@ -48,24 +183,9 @@ def convert(script_path, spyscript):
         str: The converted Python script
         
     Raises:
-        SSHScriptException: If there's a syntax error in the token script
+        SyntaxError: If parsing or translation fails
     '''
-    ## convert to token script
-    tokenScript = tokenparser.convert(spyscript)
-    ## convert to ast tree
-    try:
-        tree = ast.parse(tokenScript)
-    except SyntaxError as e:
-        #print(f'file:{script_path}')
-        dumpScript(tokenScript,e.lineno)
-        raise SSHScriptException(str(e))
-    else:
-        ## converting to regular python script
-        pyTree = DollarChanger().visit(tree)
-        ## seems useless
-        #pyTree = ast.fix_missing_locations(pyTree)
-        pyScript = ast.unparse(pyTree)       
-        return pyScript
+    return ast.unparse(parse(script_path, spyscript))
 
 def unittest():
     '''

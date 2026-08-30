@@ -15,9 +15,9 @@
 #
 
 ## firstly patching threading.Thread
-try:
+if __package__:
     from . import patching
-except ImportError:
+else:
     import patching
 
 import ast
@@ -27,37 +27,39 @@ import stat
 import time
 import os
 import sys
-import traceback
 import __main__
 import copy
 from io import StringIO
 import types
 import asyncio
 import warnings
-
-try:
+import subprocess
+import socket
+from select import select
+if __package__:
     from .dollar import Dollar
     from .sessionwrapper import SessionWrapper,SudoConsole,SuConsole
-    from .errorutils import get_logger, SSHScriptExit, SSHScriptBreak, SSHScriptException, log_debug, log_debug_8, dumpScript, listRightIndex
+    from .errorutils import get_logger, SSHScriptExit, SSHScriptBreak, SSHScriptException, dumpScript, listRightIndex
     ## v2.0.3 changes from sshscriptparserng to dollarparser
     from . import dollarparser
     ## this is required for user to "import *.spy"  in a .py script
     ## by onlye "import sshscriptsession" in the .py script
     from . import spyimporter
 
-except ImportError:
+else:
     ## called directly from the same folder
     ## see above "try" block for details
     from dollar import Dollar
     from sessionwrapper import SessionWrapper,SudoConsole,SuConsole
-    from errorutils import  get_logger, SSHScriptException, SSHScriptExit, SSHScriptBreak, log_debug, log_debug_8, dumpScript, listRightIndex
+    from errorutils import get_logger, SSHScriptException, SSHScriptExit, SSHScriptBreak, dumpScript, listRightIndex
     import dollarparser
     import spyimporter
 
+## setup logger
 logger = get_logger()
-
 SSHScriptExportedNames = set(['sftp','client','logger']) # default to exposed properties
 SSHScriptExportedNamesByAlias = {}
+
 ## expose to __main__ for sshdollar.py
 __main__.SSHScriptExportedNames = SSHScriptExportedNames
 __main__.SSHScriptExportedNamesByAlias = SSHScriptExportedNamesByAlias
@@ -72,6 +74,107 @@ def export2Dollar(nameOrFunc):
             SSHScriptExportedNamesByAlias[name] = func.__name__
             return func
         return export2DollarWithName
+
+## 建立可重複 close 的 ProxyCommand
+_PROXY_TERMINATE_TIMEOUT = 2.0
+_PROXY_KILL_TIMEOUT = 2.0
+_TRANSPORT_JOIN_TIMEOUT = 2.0
+class _IdempotentProxyCommand(paramiko.ProxyCommand):
+    def __init__(self, command_line):
+        super().__init__(command_line)
+        self._close_lock = threading.Lock()
+        self._closing = threading.Event()
+        self._terminate_sent = False
+
+    @property
+    def closed(self):
+        return self.process.poll() is not None
+
+    def close(self):
+        self._closing.set()
+
+        with self._close_lock:
+            if self.process.poll() is not None:
+                return
+
+            if self._terminate_sent:
+                return
+
+            try:
+                self.process.terminate()
+            except ProcessLookupError:
+                pass
+            else:
+                self._terminate_sent = True
+
+    def recv(self, size):
+        """Read proxy output, treating subprocess EOF as socket EOF.
+
+        Paramiko's ProxyCommand.recv() continues looping when os.read()
+        returns b'' at subprocess EOF. During shutdown that leaves the
+        Transport thread inside recv() until another thread closes stdout,
+        at which point stdout.fileno() raises ValueError and Paramiko logs an
+        "Unknown exception" traceback. A socket-style recv must return b''
+        at EOF instead.
+        """
+        buffer = b""
+        start = time.time()
+
+        try:
+            while len(buffer) < size:
+                select_timeout = None
+
+                if self.timeout is not None:
+                    elapsed = time.time() - start
+                    if elapsed >= self.timeout:
+                        raise socket.timeout()
+                    select_timeout = self.timeout - elapsed
+
+                readable, _, _ = select(
+                    [self.process.stdout],
+                    [],
+                    [],
+                    select_timeout,
+                )
+
+                if readable:
+                    chunk = os.read(
+                        self.process.stdout.fileno(),
+                        size - len(buffer),
+                    )
+
+                    if not chunk:
+                        return buffer
+
+                    buffer += chunk
+
+            return buffer
+
+        except socket.timeout:
+            if buffer:
+                return buffer
+            raise
+        except ValueError:
+            stdout = getattr(self.process, 'stdout', None)
+            process_stopped = self.process.poll() is not None
+
+            if (
+                self._closing.is_set()
+                or process_stopped
+                or stdout is None
+                or stdout.closed
+            ):
+                return buffer
+
+            raise
+        except OSError as exc:
+            if self._closing.is_set() or self.process.poll() is not None:
+                return buffer
+
+            raise paramiko.ProxyCommandFailure(
+                " ".join(self.cmd),
+                exc.strerror or str(exc),
+            )
 
 class ConsoleWrapper:
     """
@@ -142,19 +245,20 @@ class ConsoleWrapper:
         if self.parentWrapper is None:
             self.channel.__exit__(exc_type, exc_value, _traceback)
             self.channel.close()
-            if self.channel.interaction_thread:
-                self.channel.interaction_loop.call_soon_threadsafe(self.channel.interaction_loop.stop) 
-                self.channel.interaction_thread.join()
+            #if self.channel.interaction_thread:
+            #    self.channel.interaction_loop.call_soon_threadsafe(self.channel.interaction_loop.stop) 
+            #    self.channel.interaction_thread.join()
 
             ## close event loop
-            tasks = asyncio.all_tasks(self.channel.owner.event_loop)
-            if tasks:          
-                for task in tasks:
-                    task.cancel()
-                time.sleep(0.2)
-            self.channel.owner.event_loop.call_soon_threadsafe(self.channel.owner.event_loop.stop) 
+            #event_loop = self.channel.owner.event_loop
+            #tasks = asyncio.all_tasks(event_loop)
+            #if tasks:          
+            #    for task in tasks:
+            #        task.cancel()
+            #    event_loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+            #if event_loop.is_running():
+            #    event_loop.call_soon_threadsafe(event_loop.stop) 
             self.channel.owner.call_thread.join()
-            #if not self.channel.closed: 
         else:
             return self.parentWrapper.__exit__(exc_type, exc_value, _traceback)
 
@@ -169,7 +273,6 @@ class ConsoleWrapper:
     ##  $.exitcode <<==== this statement would request the properties of stdout, stderr and exitcode
     @property
     def exitcode(self):
-        print(self.channel.closed,'<<<<<<<')
         return self.channel.exitcode
     @property
     def stdout(self):
@@ -358,14 +461,15 @@ class Session(object):
         return s
     '''
 
-    @export2Dollar
-    def close_session(self):
-        return self.close()
+    #@export2Dollar
+    #def close_session(self):
+    #    return self.close()
 
     def _append_to_thread_stack(self,the_thread=None):
         """ make this session to be the attached session in given thread."""
         if the_thread is None:
             the_thread = threading.current_thread()
+        
         self._thread_appened_to = the_thread
         the_thread.sshscriptstack.append(self)
         '''
@@ -377,10 +481,16 @@ class Session(object):
             the_thread.sshscriptstack = patching.SshscriptStack(the_thread,[self])
         '''
         return the_thread
+    
     def _pop_from_thread_stack(self):
         """ make this session to be the attached session in given thread. """
         #if aThread is None: aThread = threading.current_thread()
-        return self._thread_appened_to.sshscriptstack.pop(self)
+
+        if self._thread_appened_to is None: return None
+        result = self._thread_appened_to.sshscriptstack.pop(self)
+        self._thread_appened_to = None
+        return result        
+        
 
     def __repr__(self):
         if self.connected:
@@ -424,125 +534,174 @@ class Session(object):
         return p
     @export2Dollar('break')
     def _break(self,code=0,message=''):
-        log_debug(f'break, message={message}')
+        logger.debug('Script requested break (exit_code=%s)', code)
         raise SSHScriptBreak(message,code)
 
     @export2Dollar
     def exit(self,code=0,message=''):
-        log_debug(f'exit, message={message}')
+        logger.debug('Script requested exit (exit_code=%s)', code)
         raise SSHScriptExit(message,code)
 
     @export2Dollar
     def connect(self,host,username=None,password=None,port=22,policy=None,**kw):
         """
-        v2: 
+        create a sub Session() and call SSHClient.connect() to connect to remote host.
+        the connection has a default keep alive interval of 60 seconds, for customizing, please
+        set os.environ['KEEPALIVE_INTERVAL'] to your favorite value. value '0' would disable this setting.
+        
+        host:
             when host is in format of "username@host", then the second parameter would set to password, 
-            which means user can call this function like:
-            $.connect('user@host',password) instead of $.connect('user@host',password=password)
+            which means user can call this function like below:
+                $.connect('user@host',password) instead of $.connect('user@host',password=password)
+        policy:
+            args for paramiko's SSHClient.set_missing_host_key_policy()
+            when policy is None, its default is AutoAddPolicy
+        kw:dict
+            kw['proxyCommand']: 
+                setting proxyCommand. If presented, the next arguments were set:
+                    kw['banner_timeout'] = 200000
+                    kw['timeout'] = 200000
+                    kw['auth_timeout' ] = 200000
+            kw['pkey_path']: 
+                the path to get private key. The value was set to 'pkey' for SSHClient.connect()
+
+            other args which should directly pass into paramiko's SSHClient.connect()
+        Return:
+            An instance of Session(), the connected subsession. 
+        Throws:
+            paramiko's exceptions of SSHClient.connect() 
         """
+        
+        if self.closed:
+            raise RuntimeError('cannot connect from a closed session')        
+        
         ## host might be in format of "username@hostname"
         if '@' in host:
             if username and password is None:
                 password = username
             username,host = host.split('@')
 
-        log_debug_8(f'{self} is going to connect {host}')
+        has_proxy = 'proxyCommand' in kw
+        is_nested = self._client is not None
+        logger.debug(
+            'Opening SSH connection (host=%s, port=%s, username=%s, nested=%s, proxy=%s)',
+            host,
+            port,
+            username,
+            is_nested,
+            has_proxy,
+        )
 
-        def connectClient(host,username,password,port,policy,**kw):
+        def connect_client(host,username,password,port,policy,**kw):
             client = paramiko.SSHClient()
-            ## client.load_system_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
-            if policy:
-                client.set_missing_host_key_policy(policy)
-            client.connect(host,username=username,password=password,port=port,**kw)
-            return client
-
-        ## if this top sshscript instance already has a connection, the return a new instance (aka clone a new instance)
-        ## to be the new parent session for this connection.
-        subsession = Session(self)
-
-        ## self.host was used in .spy to check if it is a remote connection or 
-        ## a local subprocess.
-        subsession._host = host
-        subsession._port = port
-        subsession._username = username
-        
+            try:
+                ## client.load_system_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
+                if policy: client.set_missing_host_key_policy(policy)
+                client.connect(host,username=username,password=password,port=port,**kw)
+                return client
+            except BaseException:
+                try:
+                    client.close()
+                except BaseException as cleanup_exc:
+                    logger.warning(
+                        'Unable to close SSH client after connection failure '
+                        '(host=%s, exception_type=%s)',
+                        host,
+                        type(cleanup_exc).__name__,
+                    )                
+                raise
         ## user can set policy=0 to disable client.set_missing_host_key_policy
         if policy is None:
             ## allow connect to host not which is in known_hosts
             policy = paramiko.AutoAddPolicy()
 
-        ## keep alive (added from v1.1.18);(todo: "implement" in sub-session)
-        inactive_callback = kw.get('inactive_callback')
-        if inactive_callback: del kw['inactive_callback']
-
-        ## convert pkey_path to pkey
-        if 'pkey_path' in kw and not 'pkey' in kw:
+        ## convert pkey_path to pkey, if "pkey" has existed, would raise ValueError
+        if 'pkey_path' in kw:
+            if 'pkey' in kw: raise ValueError(f'"pkey_path" was given when "pkey" has existed')
             kw['pkey'] = self.pkey(kw['pkey_path'])
             del kw['pkey_path']
 
-        if self._client:
-            ## a nested connection
-            if 'proxyCommand' in kw:
-                raise NotImplementedError('proxyCommand not support in a nested session')
+        if is_nested and has_proxy:
+            raise NotImplementedError(
+                'proxyCommand is not supported in a nested session'
+            )
+
+        ## If this session already has a connection, create a child Session
+        ## which uses it as the parent for the nested connection.
+        subsession = Session(self)
+        subsession._host = host
+        subsession._port = port
+        subsession._username = username
+        try:
+            if is_nested:
+                ## a nested connection
+                logger.debug(
+                    'Opening nested SSH transport (host=%s, port=%s, username=%s)',
+                    host,
+                    port,
+                    username,
+                )
+                ## REF: https://stackoverflow.com/questions/35304525/nested-ssh-using-python-paramiko
+                dest_addr = (host,port)
+                local_addr = (self.host,self.port)
+                subsession._sock = self._client.get_transport().open_channel("direct-tcpip", dest_addr, local_addr)
+                subsession._client = connect_client(host,username,password,port,policy,sock=subsession._sock,**kw)
+            elif has_proxy:
+                logger.debug(
+                    'Opening SSH connection through proxy command '
+                    '(host=%s, port=%s, username=%s)',
+                    host,
+                    port,
+                    username,
+                )
+                subsession._sock = subsession._socket_of_proxy_command(kw['proxyCommand'])
+                del kw['proxyCommand']
+                kw.setdefault('banner_timeout', 30)
+                kw.setdefault('timeout', 30)
+                kw.setdefault('auth_timeout', 30)                
+                subsession._client = connect_client(host,username,password,port,policy,sock=subsession._sock,**kw)
             else:
-                try:
-                    subsession.runLocker.acquire(timeout=60)
-                    log_debug_8(f'{self} is nestly connecting to {username}@{host}:{port}')
-                    ## REF: https://stackoverflow.com/questions/35304525/nested-ssh-using-python-paramiko
-                    dest_addr = (host,port)
-                    local_addr = (self.host,self.port)
-                    subsession._sock = self._client.get_transport().open_channel("direct-tcpip", dest_addr, local_addr)
-                    subsession._client = connectClient(host,username,password,port,policy,sock=subsession._sock,**kw)
-                    log_debug_8(f'{self} has connected to {username}@{host}:{port},(subsession={subsession})')
-                    self.subsessions.append(subsession)
-                except Exception as e:
-                    ## paramiko.ChannelException, paramiko.ssh_exception.SSHException 
-                    logger.warning(f'{self} failed to connect {username}@{host}:{port}, reason: {e}')
-                    log_debug(traceback.format_exc())  
-                    raise e
-                finally:
-                    subsession.runLocker.release()
-        else:
+                logger.debug(
+                    'Opening direct SSH transport (host=%s, port=%s, username=%s)',
+                    host,
+                    port,
+                    username,
+                )
+                subsession._client = connect_client(host,username,password,port,policy,**kw)
+            ## keep alive (added from v1.1.18)
+            keepAliveInterval = int(os.environ.get('KEEPALIVE_INTERVAL','60'))
+            if keepAliveInterval > 0:
+                subsession._client.get_transport().set_keepalive(
+                    keepAliveInterval
+                )
+                    
+            logger.debug(
+                'Configured SSH keepalive (host=%s, interval_seconds=%s)',
+                host,
+                keepAliveInterval,
+            )
+            logger.info(
+                'SSH connection opened (host=%s, port=%s, username=%s, nested=%s, proxy=%s)',
+                host,
+                port,
+                username,
+                is_nested,
+                has_proxy,
+            )
+            # 所有步驟成功後，正式交給 parent 管理。
+            self.subsessions.append(subsession)
+            return subsession
+        except BaseException:
             try:
-                subsession.runLocker.acquire(timeout=60)
-                if 'proxyCommand' in kw:
-                    log_debug_8(f"{self} is connecting to {username}@{host}:{port} by proxyCommand:{ kw['proxyCommand']}")
-                    subsession._sock = subsession._socket_of_proxy_command(kw['proxyCommand'])
-                    del kw['proxyCommand']
-                    kw['banner_timeout'] = 200000
-                    kw['timeout'] = 200000
-                    kw['auth_timeout' ] = 200000
-                    subsession._client = connectClient(host,username,password,port,policy,sock=subsession._sock,**kw)
-                else:
-                    log_debug_8(f'{self} is connecting to {username}@{host}:{port}')
-                    subsession._client = connectClient(host,username,password,port,policy,**kw)
-            except TimeoutError as e:
-                log_debug(f'{subsession} failed to connect {username}@{host}:{port}, reason: {e}')
-
-            except Exception as e:
-                ## eg.
-                ## paramiko.ChannelException, paramiko.ssh_exception.SSHException 
-                ## paramiko.ssh_exception.SSHException: Error reading SSH protocol banner
-                log_debug(f'{subsession} error on connecting {username}@{host}:{port}, reason: {e}')
-                log_debug(traceback.format_exc())
-                raise e
-            else:
-                log_debug_8(f'{self} has connected to {username}@{host}:{port},(subsession={subsession})')
-                self.subsessions.append(subsession)
-            finally:
-                subsession.runLocker.release()  
-
-        ## keep alive (added from v1.1.18)
-        keepAliveInterval = int(os.environ.get('KEEPALIVE_INTERVAL','60'))
-        if keepAliveInterval:
-            subsession._client.get_transport().set_keepalive(keepAliveInterval)
-
-        log_debug_8(f'{subsession} keep alive interval={keepAliveInterval} seconds')
-
-        ## auto bind to current thread
-        #subsession._bind_to_thread()
-
-        return subsession
+                subsession.close()
+            except BaseException as cleanup_exc:
+                logger.warning(
+                    'Unable to clean up failed SSH connection '
+                    '(host=%s, exception_type=%s)',
+                    host,
+                    type(cleanup_exc).__name__,
+                )
+            raise
 
     ## alias of connect, would be removed later
     @export2Dollar
@@ -588,7 +747,12 @@ class Session(object):
         dst = os.path.normpath(dst)
         
        
-        log_debug(f'upload {src} to {os.path.join(remoteCwd,dst)}')
+        logger.info(
+            'Starting upload (host=%s, source=%s, destination=%s)',
+            self.host,
+            src,
+            os.path.join(remoteCwd,dst),
+        )
         
         ## check exists of dst folders
         srcbasename = os.path.basename(src)
@@ -623,20 +787,18 @@ class Session(object):
                     except FileNotFoundError:
                         foldersToMake.append(dstDir)
                         return checking(dstDir,foldersToMake)
-                    except:
-                        return traceback.format_exc()
                 return foldersToMake
 
             ## check un-existing folder(from down to top; suppose last one is a file)
             foldersToMake = checking(dst,[])
-            if isinstance(foldersToMake,str):
-                log_debug_8(f'{foldersToMake}')
-                return (None,None)
-    
             if len(foldersToMake):
                 foldersToMake.reverse()
                 for folder in foldersToMake:
-                    log_debug(f'making folder: {folder}')
+                    logger.debug(
+                        'Creating remote upload directory (host=%s, path=%s)',
+                        self.host,
+                        folder,
+                    )
                     self.sftp.mkdir(folder)
         else:
             ## cases:
@@ -671,7 +833,12 @@ class Session(object):
                             raise FileExistsError(f'{dst} already exists')
         
         self.sftp.put(src,dst)
-        
+        logger.info(
+            'Upload completed (host=%s, source=%s, destination=%s)',
+            self.host,
+            src,
+            dst,
+        )
         return (src,dst)
 
     @export2Dollar
@@ -693,91 +860,53 @@ class Session(object):
         if os.path.isdir(dst):
             dst = os.path.join(dst,os.path.basename(src))
 
-        log_debug(f'downaloading from {src} to {dst}')            
+        logger.info(
+            'Starting download (host=%s, source=%s, destination=%s)',
+            self.host,
+            src,
+            dst,
+        )
         
         self.sftp.get(src,dst)
         
-        log_debug_8(f'downaloaded from {src} to {dst}')            
+        logger.info(
+            'Download completed (host=%s, source=%s, destination=%s)',
+            self.host,
+            src,
+            dst,
+        )
         return (src,dst)
 
-    def _socket_of_proxy_command(self,argsOfProxyCommand):
-        return paramiko.ProxyCommand(argsOfProxyCommand)        
+    def _socket_of_proxy_command(self, argsOfProxyCommand):
+        return _IdempotentProxyCommand(argsOfProxyCommand)
 
-    
-    ## v3.0 no more globals() and locals()
-    ## v3.1, run a asyncio event loop
-    def async_run(self,script,vars=None,showScript=False,timeout=None):
-        ## setup the event loop for running the script, and run the script in the event loop
-
-        if timeout is not None:
-            raise NotImplementedError('sshscript.run() timeout is not implemented yet')
-
-        ## run in current thread.
-        loop = asyncio.get_event_loop()
-        if not loop or loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        ## v2.0 default running locals and globals to caller function's locals() and globals() 
+    def run(self,script,vars=None,showScript=False):
         if vars is None:
             vars = sys._getframe(1).f_locals
-        try:
-            return loop.run_until_complete(self.run_in_eventloop(script,vars,showScript,timeout))
-        except Exception as e:
-            traceback.print_exc()
-            raise
-        finally:
-            ## miso
-            ## close event loop
-            # 1. 取得當前所有還在運行的任務 (排除自己)
-            tasks =  asyncio.all_tasks(loop)
-            if tasks:          
-                # 2. 對所有任務發送取消訊號
-                for task in tasks:
-                    task.cancel()
-                ## 3. 給任務一點時間處理 CancelledError (這步最關鍵)
-                ## 使用 return_exceptions=True 確保即使任務報錯也不會中斷 gather
-                #await asyncio.gather(*tasks, return_exceptions=True)            
-                time.sleep(0.2)                
-            loop.call_soon_threadsafe(loop.stop) 
-            loop.close()
+        return self.run_in_eventloop(script,vars,showScript)
 
-    def run(self,script,vars=None,showScript=False,timeout=None):
-        if vars is None:
-            vars = sys._getframe(1).f_locals
-        try:
-            return self.run_in_eventloop(script,vars,showScript,timeout)
-        except Exception as e:
-            traceback.print_exc()
-            raise
-    def run_in_eventloop(self,script,vars=None,showScript=False,timeout=None):
-        ## timeout:int, in seconds
+    def run_in_eventloop(self,script,vars=None,showScript=False):
+        
         def executeScript(script,_vars,showScript=False):
             filepath = _vars.get('__file__')
             ## v2.0 auto detecting script types
+            is_dollar_script = False
             try:
                 ## testing if this is a regular python script
                 ast.parse(script)
             except SyntaxError:
-                scriptChunk = 'import sys,threading\n' + dollarparser.convert(filepath or '<str>',script)
-            else:
-                ## saved content of --script output
-                scriptChunk = script
+                is_dollar_script = True
             
             if showScript:
+                scriptChunk = (
+                    dollarparser.convert(filepath or '<str>', script)
+                    if is_dollar_script else script
+                )
                 dumpScript(scriptChunk)
                 return {}
 
 
-            ## write a tempory file for correctly report error in traceback infomation
-            if filepath:
-                if not os.path.exists(os.path.join(os.path.dirname(filepath),'__pycache__')):
-                    os.mkdir(os.path.join(os.path.dirname(filepath),'__pycache__'))
-                modified_path = os.path.join(os.path.dirname(filepath),'__pycache__',os.path.basename(filepath))
-                with open(modified_path,'w') as fd:
-                    fd.write(scriptChunk)
-            else:
-                modified_path = '<str>'
+            source_path = filepath or '<str>'
             
 
             ## v2.0.3 merge locals to globals
@@ -794,10 +923,15 @@ class Session(object):
             threading.current_thread().sshscriptstack = _sshscriptstacks_ or patching.SshscriptStack(threading.current_thread(),[self])
 
             exec_vars['threading']= threading
+            exec_vars['sys']= sys
             exec_vars['types']= types
             exec_vars['Dollar'] = Dollar
 
-            code = compile(scriptChunk, modified_path, 'exec')
+            if is_dollar_script:
+                code = dollarparser.compile_spy(source_path, script)
+            else:
+                dollarparser._cache_source(source_path, script)
+                code = compile(script, source_path, 'exec')
             try:
                 exec(code, exec_vars)  # Run the modified code inside the module's namespace
             except SSHScriptBreak:
@@ -806,71 +940,61 @@ class Session(object):
             except SSHScriptExit as e:
                 ## v2.0.3, same as SSHScriptExit
                 raise SystemExit(e.errno)
-            except SyntaxError as e:
-                raise
-            except SystemExit:
-                raise
-            except SSHScriptException:
-                raise
-            except Exception as e:
-                traceback.print_exc()
-                raise
             else:
                 return exec_vars
-            finally:
-                pass
             
         ## v.1.18
-        self.runLocker.acquire(timeout=60)
-        if not self.runLocker.locked():
-            raise TimeoutError('sshscript.run() require locker timeout')
+        if not self.runLocker.acquire(timeout=60):
+            raise TimeoutError('Timed out waiting for the script execution lock')
         
         
         def runner(*args):
             runSession = f"{self.host}:{threading.current_thread().native_id}"
-            log_debug(f"{runSession}: sshscript.run() starts")
+            started_at = time.monotonic()
+            outcome = 'completed'
+            exit_code = None
+            exception_type = None
             ret = {}
             try:
                 ret['value'] = executeScript(*args)
             except SystemExit as e:
                 ret['system_exit'] = e
-                log_debug(f"{runSession}: sshscript.run() exits, code={e.code}")
-            except SSHScriptExit as e:
-                ret['exception'] = e
-                ret['exitcode'] = e.errno
-                log_debug(f"{runSession}: sshscript.run() exits by SSHScriptExit")
-                raise
+                outcome = 'system_exit'
+                exit_code = e.code
             except SSHScriptException as e:
                 ret['exception'] = e
                 ret['exitcode'] = e.errno
-                ## 不要raise,如果raise會自動產生 traceback.print_exc()
-                #raise
-                sys.stderr.write(f'{type(e.message)}:{str(e.message)}')
+                outcome = 'sshscript_error'
+                exit_code = e.errno
+                exception_type = type(e).__name__
             except Exception as e:
                 ret['exception'] = e
-                ## 這個讓畫面很難看,暫時取消(sshscript.py那裡也會traceback.print_exc())
-                #traceback.print_exc()
-                #ret['error'] = e
-                log_debug(f"{runSession}: sshscript.run() error, error={e}")
-            else:
-                pass
+                outcome = 'error'
+                exception_type = type(e).__name__
             finally:
-                log_debug(f"{runSession}: sshscript.run() completed")
+                logger.debug(
+                    'Script execution finished '
+                    '(session=%s, outcome=%s, exit_code=%s, exception_type=%s, duration_ms=%d)',
+                    runSession,
+                    outcome,
+                    exit_code,
+                    exception_type,
+                    int((time.monotonic() - started_at) * 1000),
+                )
             return ret
 
-        ret = runner(script,vars,showScript)
-
-
-        ## self.runLocker might be already released by caller because of timeout
-        if self.runLocker.locked(): self.runLocker.release()
-        log_debug_8(f'{self} run() release lock, locked= {self.runLocker.locked()}')
+        try:
+            ret = runner(script,vars,showScript)
+        finally:
+            ## self.runLocker might be already released by caller because of timeout
+            if self.runLocker.locked():
+                self.runLocker.release()
         
         if ret.get('exception'):
             raise ret['exception']
         elif ret.get('system_exit'):
             sys.exit(ret['system_exit'].code)
         else:
-            log_debug(f'{self} run() complete')
             ## what is for, for next spy script?
             ret['value']['_sshscriptstacks_'] = threading.current_thread().sshscriptstack
             return ret['value']
@@ -1003,17 +1127,7 @@ class Session(object):
             self._lastDollar = ConsoleWrapper(dollar,'sudo',username=username,password=password,expect=expect,initials=initials,login=login,command=False)
 
         return self._lastDollar
-        '''
-            self.shell('bash',get_pty=get_pty)
-            ## command=None is passed to SudoConsole()
-            command = None
-        else:
-            self.shell(command,base_shell_for='sudo',get_pty=get_pty)
-            ## command=False is passed to SudoConsole(); it is "False", not "None"
-            command = False
-        return self._lastDollar
-        #return ConsoleWrapper(self._lastDollar,'sudo',password=password,expect=expect,initials=initials,command=command,login=login,username=username)
-        '''
+
     ## $.enter
     def enter(self,command,expect=None,password=None,exit=None,shell:bool=True,get_pty=True,prompt=None):
         ## when base_shell is True, self.shell would assign value of self._lastDollar
@@ -1029,16 +1143,7 @@ class Session(object):
             command = False
             self._lastDollar = ConsoleWrapper(dollar,'enter',command,expect=expect,password=password,exit=exit,prompt=prompt)
         return self._lastDollar
-        '''
-            self.shell('bash',base_shell_for='enter',get_pty=get_pty)
-        else:
-            self.shell(command,base_shell_for='enter',get_pty=get_pty)
-            command = False
-        
-        return self._lastDollar
-        ## arguments after "enter", aka, command, expect ... are submitted to SessionWrapper.enter()
-        #return ConsoleWrapper(self._lastDollar,'enter',command,expect=expect,password=password,exit=exit,prompt=prompt)
-        '''
+
     ## delegates to self._lastDollar
     ## eg. 1st level $.wait
     @property
@@ -1048,18 +1153,12 @@ class Session(object):
     def stdout(self):
         if self._lastDollar is None: raise ValueError('no execution result yet')
         return self._lastDollar.stdout
-    #@property
-    #def rawstdout(self):
-    #    if self._lastDollar is None: raise ValueError('no execution result yet')
-    #    return self._lastDollar.rawstdout
+
     @property
     def stderr(self):
         if self._lastDollar is None: raise ValueError('no execution result yet')
         return self._lastDollar.stderr
-    #@property
-    #def rawstderr(self):
-    #    if self._lastDollar is None: raise ValueError('no execution result yet')
-    #    return self._lastDollar.rawstderr    
+
     @property
     def exitcode(self):
         if self._lastDollar is None: raise ValueError('no execution result yet')
@@ -1076,56 +1175,233 @@ class Session(object):
         ## don't allow to be called multiple times
         if self.closed: return 
 
-        for subsession in reversed(self.subsessions):
+        cleanup_errors = []
+        transport = None
+        
+        for subsession in reversed(tuple(self.subsessions)):
             subsession.close()
 
-        log_debug_8(f'{self} was closed')
-        log_debug_8(f'{self} is closing {self.username}@{self.host}:{self.port}')
-        self.closed = True
-        ## auto unbind to current thread
-        self._pop_from_thread_stack()
+        if self._client is not None:
+
+            try:
+                transport = self._client.get_transport()
+            except Exception as exc:
+                cleanup_errors.append(('get SSH transport', exc))
+
+            if self._sftp:
+                self._sftp.close()
+                self._sftp = None
+
+            logger.info(
+                'Closing SSH connection (host=%s, port=%s, username=%s)',
+                self.host,
+                self.port,
+                self.username,
+            )
+            try:
+                self._client.close()
+            except Exception as exc:
+                logger.debug(
+                    'Unable to close SSH client cleanly '
+                    '(host=%s, exception_type=%s)',
+                    self.host,
+                    type(exc).__name__,
+                )
+            finally:
+                self._client = None
 
         ## don't acquire self.runLocker, since this might be called by self.run()
         ##self.runLocker.acquire(timeout=60)
+                 
+        ## close the socket of proxyCommand, if any
+        if self._sock is not None:
+            try:
+                if isinstance(self._sock,paramiko.proxy.ProxyCommand):
+                    complete, forced_kill, errors = (
+                        self._cleanup_proxy_command(
+                            self._sock,
+                            transport=transport,
+                        )
+                    )
+                    cleanup_errors.extend(errors)
+
+                    if forced_kill:
+                        logger.warning(
+                            'Proxy command required forced termination '
+                            '(host=%s, pid=%s)',
+                            self.host,
+                            self._sock.process.pid,
+                        )
+
+                    if complete:
+                        self._sock = None                    
+                else:
+                    try:
+                        self._sock.close()
+                    except Exception as exc:
+                        cleanup_errors.append(('close SSH socket', exc))
+                    else:
+                        self._sock = None                
+            except Exception as exc:
+                logger.debug(
+                    'Unable to close SSH socket cleanly '
+                    '(host=%s, exception_type=%s)',
+                    self.host,
+                    type(exc).__name__,
+                )
+            finally:
+                self._sock = None
+
+
+        if self.host is not None:
+            logger.debug(
+                'SSH connection closed (host=%s, port=%s, username=%s)',
+                self.host,
+                self.port,
+                self.username,
+            )
+        
+        self._host = None
+        self._port = None
+        self._username = None
+
+        self.closed = True
 
         ## remove self from parent session        
         if self.parent:
             try:
                 self.parent.subsessions.remove(self)
             except ValueError:
-                log_debug( f"{self} is not in parent {self.parent}'s subsessions, called twice?")
+                logger.debug(
+                    'Session is not registered with its parent '
+                    '(session=%s, parent=%s)',
+                    self,
+                    self.parent,
+                )
             else:
-                log_debug_8( f"{self} is removed from parent {self.parent}'s subsessions")
-          
-        if self._sftp:
-            self._sftp.close()
-            self._sftp = None
-           
-        if self._client:
-            self._client.close()
-            self._client = None
-            if isinstance(self._sock,paramiko.proxy.ProxyCommand):
-                ## wait for the openssl process to finish, important for proxyCommand not become a zombie
-                while (not self._sock.closed) and (self._sock.process.poll() is None):
-                    time.sleep(0.1)
-                try:
-                    self._sock.process.stdout.close()
-                    self._sock.process.stderr.close()
-                    self._sock.process.stdin.close()
-                except:
-                    ## maybe the bug has fixed (still existing on paramiko v3.5.0)
-                    pass
-            #elif self._sock:
-            #    ## 1st connecting target might have no self._sock
-            #    self._sock.close()
-            self._sock = None
+                logger.debug(
+                    'Removed session from its parent session (session=%s, parent=%s)',
+                    self,
+                    self.parent,
+                )
+        ## auto unbind to current thread
+        self._pop_from_thread_stack()
 
-        log_debug(f'{self} has closed {self.username}@{self.host}:{self.port}')
-        self._host = None
-        self._port = None
-        self._username = None
-        
     ## alias
     disconnect = close    
     def __del__(self):
         self.close()
+
+    def _cleanup_proxy_command(self, proxy, transport=None):
+        process = proxy.process
+        errors = []
+        forced_kill = False
+
+        # 若 SSHClient.close() 沒有碰到 supplied socket，
+        # 這裡補送一次 SIGTERM。
+        try:
+            proxy.close()
+        except ProcessLookupError:
+            pass
+        except Exception as exc:
+            errors.append(('terminate proxy', exc))
+
+        try:
+            process.wait(timeout=_PROXY_TERMINATE_TIMEOUT)
+
+        except subprocess.TimeoutExpired:
+            forced_kill = True
+
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            except BaseException as exc:
+                errors.append(('kill proxy', exc))
+
+            try:
+                # kill 後仍然必須 wait，否則可能留下 zombie。
+                process.wait(timeout=_PROXY_KILL_TIMEOUT)
+            except subprocess.TimeoutExpired as exc:
+                errors.append((
+                    'wait for proxy after kill',
+                    TimeoutError(
+                        'proxy process did not exit after terminate and kill '
+                        f'(pid={process.pid})'
+                    ),
+                ))
+            except BaseException as exc:
+                errors.append(('wait for proxy after kill', exc))
+
+        except BaseException as exc:
+            errors.append(('wait for proxy after terminate', exc))
+
+        transport_stopped = True
+
+        if (
+            transport is not None
+            and transport is not threading.current_thread()
+        ):
+            try:
+                if transport.is_alive():
+                    transport.join(_TRANSPORT_JOIN_TIMEOUT)
+                transport_stopped = not transport.is_alive()
+            except BaseException as exc:
+                errors.append(('wait for SSH transport', exc))
+                transport_stopped = False
+
+        # 每個 pipe 必須獨立關閉。
+        for stream_name in ('stdin', 'stdout', 'stderr'):
+            stream = getattr(process, stream_name, None)
+
+            if stream is None or stream.closed:
+                continue
+
+            try:
+                stream.close()
+            except BaseException as exc:
+                errors.append((f'close proxy {stream_name}', exc))
+
+        # A third-party ProxyCommand implementation may not return b'' at
+        # subprocess EOF. Closing its pipes above is the final wake-up; give
+        # the Transport one bounded chance to finish before Session.close()
+        # returns.
+        if (
+            not transport_stopped
+            and transport is not None
+            and transport is not threading.current_thread()
+        ):
+            try:
+                transport.join(_TRANSPORT_JOIN_TIMEOUT)
+                transport_stopped = not transport.is_alive()
+            except BaseException as exc:
+                errors.append(('wait for SSH transport after pipe close', exc))
+
+        if not transport_stopped:
+            errors.append((
+                'wait for SSH transport',
+                TimeoutError(
+                    'SSH transport thread did not stop during proxy cleanup'
+                ),
+            ))
+
+        try:
+            reaped = process.poll() is not None
+        except BaseException as exc:
+            errors.append(('poll proxy', exc))
+            reaped = False
+
+        streams_closed = all(
+            stream is None or stream.closed
+            for stream in (
+                getattr(process, 'stdin', None),
+                getattr(process, 'stdout', None),
+                getattr(process, 'stderr', None),
+            )
+        )
+
+        return (
+            reaped and streams_closed and transport_stopped,
+            forced_kill,
+            errors,
+        )

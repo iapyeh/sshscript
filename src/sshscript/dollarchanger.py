@@ -59,6 +59,15 @@ class DollarChanger(ast.NodeTransformer):
         self.containsSSHScriptStack = [False]
         self.currentConsole = []
         self.consoleSerialNo = 0
+
+    @staticmethod
+    def _template(template, origin):
+        """Clone generated syntax and anchor every generated node to origin."""
+        cloned = copy.deepcopy(template)
+        for child in ast.walk(cloned):
+            if hasattr(child, 'lineno'):
+                ast.copy_location(child, origin)
+        return cloned
         
     def _gen_console_name(self):
         """
@@ -133,7 +142,8 @@ class DollarChanger(ast.NodeTransformer):
         if isinstance(node, ast.Module):
             def module_callback(node):
                 if self.tmplLinesAtBeginning:
-                    node.body.insert(0,copy.deepcopy(self.tmplLinesAtBeginning))
+                    origin = node.body[0] if node.body else self.tmplLinesAtBeginning
+                    node.body.insert(0,self._template(self.tmplLinesAtBeginning, origin))
                 return node
             node._callback_ = module_callback
         elif isinstance(node, ast.With): 
@@ -146,7 +156,7 @@ class DollarChanger(ast.NodeTransformer):
                 ## eg. with _sshscript_in_context_.session as console1:
                 ## optional_vars is the variable name after "as"
                 if nodeitem.optional_vars is None:
-                    nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Load())
+                    nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Store())
                 self.currentConsole.append(nodeitem.optional_vars.id)
                 def callback(node):
                     self.currentConsole.pop()
@@ -165,12 +175,12 @@ class DollarChanger(ast.NodeTransformer):
                 if len(self.currentConsole):
                     ## conver to console.shell()
                     nodeitem.context_expr.func.id = 'shell'
-                    nodeitem.context_expr.func = ast.Attribute(value=ast.Name(id=self.currentConsole[-1],ctx=ast.Load()),attr='shell')
+                    nodeitem.context_expr.func = ast.Attribute(value=ast.Name(id=self.currentConsole[-1],ctx=ast.Load()),attr='shell',ctx=ast.Load())
                     ## only keep the 1st argument, which is the shell
                     del nodeitem.context_expr.args[1:]
                     ## optional_vars is the variable name after "as"
                     if nodeitem.optional_vars is None:
-                        nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Load())
+                        nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Store())
                     self.currentConsole.append(nodeitem.optional_vars.id)
                     def callback(node):
                         self.currentConsole.pop()
@@ -180,13 +190,13 @@ class DollarChanger(ast.NodeTransformer):
                     ## conver to _sshscriptstack_[-1].shell()
                     args = nodeitem.context_expr.args
                     keywords = nodeitem.context_expr.keywords
-                    nodeitem.context_expr = copy.deepcopy(self.tmplLineForSSHScriptInstanceShell.value)
+                    nodeitem.context_expr = self._template(self.tmplLineForSSHScriptInstanceShell.value, nodeitem.context_expr)
                     nodeitem.context_expr.args = args
                     nodeitem.context_expr.keywords = keywords
 
                     ## optional_vars is the variable name after "as"
                     if nodeitem.optional_vars is None:
-                        nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Load())
+                        nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Store())
                     self.currentConsole.append(nodeitem.optional_vars.id)
                     def callback(node):
                         self.currentConsole.pop()
@@ -211,9 +221,9 @@ class DollarChanger(ast.NodeTransformer):
                         return node
                     node._callback_ = callback
                 else:
-                    nodeitem.context_expr.func.value.value = copy.deepcopy(self.tmplLineForSSHScriptInstance.value)
+                    nodeitem.context_expr.func.value.value = self._template(self.tmplLineForSSHScriptInstance.value, nodeitem.context_expr)
                     if nodeitem.optional_vars is None:
-                        nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Load())
+                        nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Store())
                     self.currentConsole.append(nodeitem.optional_vars.id)
                     def callback(node):
                         self.currentConsole.pop()
@@ -234,7 +244,7 @@ class DollarChanger(ast.NodeTransformer):
                         nodeitem.context_expr.func.value.id = self.currentConsole[-1]
                         ## keep value of nodeitem.context_expr.func.attr 
                     else:
-                        nodeitem.context_expr.func.value = copy.deepcopy(self.tmplLineOfSshscriptstack.value)
+                        nodeitem.context_expr.func.value = self._template(self.tmplLineOfSshscriptstack.value, nodeitem.context_expr)
                         #nodeitem.context_expr.func.attr = 'connectAndAppend'
                         nodeitem.context_expr.func.attr = 'connect'
                     ## assign shellbody_visit = <as what>, for example "with $.connect(...) as hello", then
@@ -274,13 +284,13 @@ class DollarChanger(ast.NodeTransformer):
                         args = nodeitem.context_expr.args
                         keywords = nodeitem.context_expr.keywords
                         funcname = nodeitem.context_expr.func.attr
-                        nodeitem.context_expr = copy.deepcopy(self.tmplLineForSSHScriptInstanceShell.value)
+                        nodeitem.context_expr = self._template(self.tmplLineForSSHScriptInstanceShell.value, nodeitem.context_expr)
                         nodeitem.context_expr.args = args
                         nodeitem.context_expr.keywords = keywords
                         nodeitem.context_expr.func.attr = funcname
                         ## optional_vars is the variable name after "as"
                         if nodeitem.optional_vars is None:
-                            nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Load())
+                            nodeitem.optional_vars = ast.Name(id=self._gen_console_name(),ctx=ast.Store())
                         self.currentConsole.append(nodeitem.optional_vars.id)
                         def callback(node):
                             self.currentConsole.pop()
@@ -298,7 +308,7 @@ class DollarChanger(ast.NodeTransformer):
             ) and \
             node.func.attr in ('connect','open') and (not self.insideWith[-1]):           
             
-            nodeToInsert = copy.deepcopy(self.tmplLineForConnect)
+            nodeToInsert = self._template(self.tmplLineForConnect, node)
             nodeToInsert.value.args = node.args
             nodeToInsert.value.keywords = node.keywords
 
@@ -341,7 +351,8 @@ class DollarChanger(ast.NodeTransformer):
                                 return $.connect('user@host1','1234')
                         """                        
                         def _callback_(node):
-                            node.value = ast.Name(id='_new_sshcript')
+                            node.value = ast.Name(id='_new_sshcript', ctx=ast.Load())
+                            ast.copy_location(node.value, node)
                             return [nodeToInsert,node]
                         self.currentExpr._callback_ = _callback_
                     else:
@@ -354,7 +365,8 @@ class DollarChanger(ast.NodeTransformer):
                     ## def connect():
                     ##    return $.connect('user@host1','1234')
                     def _callback_(node):
-                        node.value = ast.Name(id='_new_sshcript')
+                        node.value = ast.Name(id='_new_sshcript', ctx=ast.Load())
+                        ast.copy_location(node.value, node)
                         return [nodeToInsert,node]
                     self.currentExpr._callback_ = _callback_                    
                 elif isinstance(self.currentExpr,ast.Assign):
@@ -383,7 +395,7 @@ class DollarChanger(ast.NodeTransformer):
             
             #self.containsSSHScriptStack[-1] = True
             ## rewrite __sshscript_in_context_.close to _sshscriptstack_.closeAndPop()
-            newnode = copy.deepcopy(self.tmplLineAfterClose)
+            newnode = self._template(self.tmplLineAfterClose, node)
             ## verify our idea about "parentNode"
             parentContent = ast.unparse(self.currentExpr)
             nodeContent = ast.unparse(node)
@@ -393,10 +405,10 @@ class DollarChanger(ast.NodeTransformer):
             isinstance(node.value, ast.Name) and \
             node.value.id in ('_sshscript_in_context_','_c'):
             if node.attr in ('connect','open'):
-                node.value = copy.deepcopy(self.tmplLineOfSshscriptstack.value)
+                node.value = self._template(self.tmplLineOfSshscriptstack.value, node)
                 node.attr = 'connect' ## normalize to "connect"
             elif node.attr in ('close','disconnect'):
-                node.value = copy.deepcopy(self.tmplLineOfSshscriptstack.value)
+                node.value = self._template(self.tmplLineOfSshscriptstack.value, node)
                 node.attr = 'close' ## normalize to "close"
             else:
                 if len(self.currentConsole) > 0 :
@@ -406,7 +418,7 @@ class DollarChanger(ast.NodeTransformer):
                         if len(self.currentConsole) > 1:
                             node.value.id = self.currentConsole[-2]
                         else:
-                            node.value = copy.deepcopy(self.tmplLineForSSHScriptInstance.value)
+                            node.value = self._template(self.tmplLineForSSHScriptInstance.value, node)
                     else:
                         node.value.id = self.currentConsole[-1]
                 ## v2.0.3 , 因為不再產生 _c ，所以_c.stdout, _c.stderr,_c.exitcode 都要改成 _sshscriptstack_[-1].xxx
@@ -414,7 +426,7 @@ class DollarChanger(ast.NodeTransformer):
                 #    pass
                 else:
                     ## eg. _c.stdout, _c.stderr,_c.exitcode keep _c, change to _sshscriptstack_[-1]
-                    node.value = copy.deepcopy(self.tmplLineForSSHScriptInstance.value)
+                    node.value = self._template(self.tmplLineForSSHScriptInstance.value, node)
         
         ## treatment for $.include (even it is inside with)
         ## if the arguments of include() is not a string, replace "include" with "runtimeInclude"
@@ -434,7 +446,8 @@ class DollarChanger(ast.NodeTransformer):
                     ## to:          shell.send_line(hostname)
                     consolename = self.currentConsole[-1]
                     if node.func.id in ('exec_command','onedollar','twodollars'):
-                        node.func = ast.Attribute(value=ast.Name(id=consolename,ctx=ast.Load()),attr='send_line')
+                        node.func = ast.Attribute(value=ast.Name(id=consolename,ctx=ast.Load()),attr='send_line',ctx=ast.Load())
+                        ast.copy_location(node.func, node)
                         
                         del node.args[1:]
                         ## eg. $hostname                        
@@ -462,7 +475,7 @@ class DollarChanger(ast.NodeTransformer):
                             if keyword.arg not in ('shell','shell_executable','_legacy_twodollars')
                         ]
                 elif node.func.id in ('exec_command','onedollar','twodollars'):
-                    newnode = copy.deepcopy(self.tmplLineForSSHScriptInstanceShell.value)
+                    newnode = self._template(self.tmplLineForSSHScriptInstanceShell.value, node)
                     newnode.func.attr = 'exec_command'
                     ## Preserve command arguments and execution overrides.
                     newnode.args = node.args[:]
@@ -509,7 +522,7 @@ class DollarChanger(ast.NodeTransformer):
                 if isinstance(originNode.value,ast.Try):
                     newnode = originNode.value  
                     ## eg. stdout,stderr = $hostname
-                    originNode.value = copy.deepcopy(self.tmplLineAssignAtBottom).value
+                    originNode.value = self._template(self.tmplLineAssignAtBottom.value, node)
                     ## append original assignment to last statement
                     newnode.finalbody.append(originNode)
 
@@ -526,7 +539,7 @@ class DollarChanger(ast.NodeTransformer):
             assert name == node.name            
             
             if containsSSHScript:
-                nodeToInsert = copy.deepcopy(self.tmplLinesBlowDef)
+                nodeToInsert = self._template(self.tmplLinesBlowDef, node)
                 ## append to scope beginning
                 node.body.insert(0,nodeToInsert)
                 

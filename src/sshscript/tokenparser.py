@@ -15,12 +15,7 @@
 #
 
 import tokenize,re,warnings
-from io import StringIO, BytesIO
-
-try:
-    from .errorutils import  SSHScriptException, dumpScript
-except ImportError:
-    from errorutils import SSHScriptException, dumpScript
+from io import StringIO
 
 
 ## before 3.12 , no tokenize.FSTRING_START
@@ -180,14 +175,9 @@ def convert(code):
         return i,endCol
     
     ## converting starts   
-    try:
-        tokens = list(tokenize.generate_tokens(StringIO(code).readline))
-        #tokens = list(tokenize.tokenize(BytesIO(code.encode()).readline))
-    except tokenize.TokenError as e:
-        ## eg.('unexpected EOF in multi-line statement', (77, 0))
-        lineno = e.args[1][0]
-        dumpScript(code,lineno)
-        raise SSHScriptException(e)
+    # Let TokenError retain its structured source position.  dollarparser maps
+    # it to the original .spy source and presents it as a normal SyntaxError.
+    tokens = list(tokenize.generate_tokens(StringIO(code).readline))
 
     i = 0
     output = []

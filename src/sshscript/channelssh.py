@@ -14,20 +14,20 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 import __main__
-import os, traceback
-import socket
+import errno
+import os
 import paramiko
 from paramiko.ssh_exception import SSHException
 import time
 #from select import select
 import selectors
 import asyncio
-try:
+if __package__:
     from .channelgeneric import GenericChannel
-    from .errorutils import log_debug_8,get_logger,EXITCODE_DEFAULT,logger
-except ImportError:
+    from .errorutils import get_logger
+else:
     from channelgeneric import GenericChannel
-    from errorutils import log_debug_8,get_logger,EXITCODE_DEFAULT,logger
+    from errorutils import get_logger
 logger = get_logger()
 class ParamikoChannel(object):
     """Helper class for SSHChannel to manage PTY and non-PTY SSH sessions.
@@ -69,7 +69,11 @@ class ParamikoChannel(object):
         
         ## two-dollars has no self.command
         if self.sshchannel.owner.command:
-            log_debug_8(f'[ParamikoChannel] runs {self.sshchannel.owner.command}')
+            logger.debug(
+                '[SSHChannel] Executing remote command (host=%s, pty=%s)',
+                self.sshchannel.owner.session.host,
+                self.get_pty,
+            )
             self.channel.exec_command(self.sshchannel.owner.command)
 
         ParamikoChannel.count += 1
@@ -105,14 +109,24 @@ class ParamikoChannel(object):
                                 await self.sshchannel._add_stdout_data(stdout._read(1024)) 
                             while self.channel.recv_stderr_ready():
                                 await self.sshchannel._add_stderr_data(stderr._read(1024))
-                        except (SSHException,ValueError) as e:
-                            self.sshchannel.log(f'{id(self)}, closed={self.sshchannel.closed}, Error on reading:{e}')
-                            break 
+                        except (SSHException,ValueError):
+                            if self.channel.closed or self.channel.exit_status_ready():
+                                break
+                            logger.exception(
+                                '[SSHChannel] SSH channel read failed (host=%s)',
+                                self.sshchannel.owner.session.host,
+                            )
+                            raise
                     await asyncio.sleep(0.1)
             except OSError as e:
-                log_debug_8(str(e))
-            except asyncio.exceptions.CancelledError as e:
-                log_debug_8(str(e))
+                if e.errno != errno.EIO and not self.channel.closed:
+                    logger.exception(
+                        '[SSHChannel] SSH channel reader failed (host=%s)',
+                        self.sshchannel.owner.session.host,
+                    )
+                    raise
+            except asyncio.exceptions.CancelledError:
+                raise
             finally:
                 sel.close()
             ## some command (eg. $.enter('mariadb -uroot -p myrpki < /tmp/test.sql')) would auto close the channel,
@@ -126,9 +140,10 @@ class ParamikoChannel(object):
         :s: string to send
         """
         if self.channel.closed:
-            logger.error(f'{self.sshchannel.owner.session.host} channel is closed, can not send "{s}"')
-            return
-        self.sshchannel.log8(f'[{self.sshchannel.owner.session.host}] ssh send=>{str([s])}')
+            raise BrokenPipeError(
+                errno.EPIPE,
+                f'SSH channel is closed (host={self.sshchannel.owner.session.host})',
+            )
         self.channel.sendall(s)
     
     def exit_status_ready(self):
@@ -152,21 +167,29 @@ class ParamikoChannel(object):
         """
         return self.channel.shutdown_write()
 
+
     def close(self):
         """Close SSH channel and cleanup.
         
         Sends exit command, waits for closure, handles errors.
         """
-        self.sshchannel.log(f'[{self.sshchannel.owner.session.host}] closing ssh channel')
+        host = self.sshchannel.owner.session.host
+        logger.debug('[SSHChannel] Closing SSH channel (host=%s)', host)
         ## automatically send exit to shell
         try:
             if not self.channel.exit_status_ready():
                 self.channel.shutdown_write()            
             ## wait for exit_status_ready()
-            timeout = time.time() + 20
+            timeout_seconds = 20
+            deadline = time.monotonic() + timeout_seconds
             while True:
-                if time.time() > timeout:
-                    self.sshchannel.log(f'[{self.sshchannel.owner.session.host}] forced to close, no exitcode received')
+                if time.monotonic() > deadline:
+                    logger.warning(
+                        '[SSHChannel] Exit status was not received before close timeout; '
+                        'forcing channel close (host=%s, timeout=%ss)',
+                        host,
+                        timeout_seconds,
+                    )
                     break
                 elif self.channel.exit_status_ready():
                     ## don't override _exitcode with channel's exitcode
@@ -175,15 +198,12 @@ class ParamikoChannel(object):
                     break
                 else:
                     time.sleep(0.1)
+        except (SSHException, OSError):
+            logger.exception('[SSHChannel] Failed to close SSH channel (host=%s)', host)
+            raise
+        finally:
             self.channel.close()
-        except paramiko.ssh_exception.SSHException as e:
-            self.sshchannel.log(f'[{self.sshchannel.owner.session.host}] error on closing:{e}')
-            raise
-        except OSError as e:
-            self.sshchannel.log(f'[{self.sshchannel.owner.session.host}] error on closing:{e}')
-            raise
-        return self.channel.close()
-
+    
 class SSHChannel(GenericChannel):
     """Channel implementation for SSH communication.
     
@@ -246,26 +266,44 @@ class SSHChannel(GenericChannel):
     async def _start_reading(self):
         await self.channel._start_reading()
 
+    '''
     def close(self):
         """Close SSH channel and cleanup.
         
         Closes main channel and any cached PTY/non-PTY channels.
         """
         ## close the i/o of remote server
-        while self.sending_queue.qsize() > 0:
-            time.sleep(0.1)
+        #while self.sending_queue.qsize() > 0:
+        #    time.sleep(0.1)
         if self.channel:
             if not self.channel.channel.closed:
-                #if self._exitcode == EXITCODE_DEFAULT:
-                #    ## The last command's exitcode not yet been retrieved.
-                #    ## We have to call it before closing the channel. In case like this:
-                #    ## with $.sudo():
-                #    ##       ... without calling getExitcode() ...
-                #    ## print($.exitcode) <== here, would raise "OSError: [Errno 9] Bad file descriptor", since file has closed
-                #    pass
                 self.channel.close()
             self._exitcode = self.channel.recv_exit_status()
         ## close the i/o of local buffers
         super().close()
+    '''
+    def close(self):
+        if not self._begin_close():
+            return
+
+        channel = self.channel
+
+        try:
+            if channel is not None:
+                try:
+                    if not channel.channel.closed:
+                        # ParamikoChannel.close() 已有 20 秒上限。
+                        channel.close()
+                finally:
+                    # recv_exit_status() 只能在 ready 時呼叫。
+                    if channel.exit_status_ready():
+                        self._exitcode = (
+                            channel.recv_exit_status()
+                        )
+        finally:
+            # 即使 Paramiko cleanup raise，也要關閉本地 buffer，
+            # 並讓其他 waiter 看到 closed。
+            self._finish_close()
+
 
 __main__.SSHChannel = SSHChannel

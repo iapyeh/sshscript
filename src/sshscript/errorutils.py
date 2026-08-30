@@ -13,8 +13,15 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
+import __main__
+import logging
+import os
 import re
 import shlex
+import sys
+import threading
+
+
 class SSHScriptException(Exception):
     """Base exception class for SSHScript errors.
     
@@ -224,11 +231,108 @@ def command_is_sudo(command)->bool:
     return name
 
 
-import logging, threading
-import os, sys,__main__
-from logging import DEBUG
-assert DEBUG == 10
-DEBUG8 = 8
+_SENSITIVE_KEY_PATTERN = (
+    r'password|passwd|pwd|passphrase|token|access[_-]?token|api[_-]?key|'
+    r'secret|client[_-]?secret|private[_-]?key'
+)
+_PRIVATE_KEY_BLOCK_RE = re.compile(
+    r'-----BEGIN [^-\r\n]*PRIVATE KEY-----.*?'
+    r'-----END [^-\r\n]*PRIVATE KEY-----',
+    re.IGNORECASE | re.DOTALL,
+)
+_URL_CREDENTIAL_RE = re.compile(
+    r'(?P<prefix>[a-z][a-z0-9+.-]*://[^\s/@:]+:)'
+    r'(?P<secret>[^\s/@]+)(?P<suffix>@)',
+    re.IGNORECASE,
+)
+_AUTHORIZATION_RE = re.compile(
+    r'(?P<prefix>\bauthorization\s*[:=]\s*(?:bearer|basic)?\s*)'
+    r'(?P<secret>"[^"]*"|\'[^\']*\'|[^\s,;]+)',
+    re.IGNORECASE,
+)
+_SENSITIVE_ASSIGNMENT_RE = re.compile(
+    rf'(?P<prefix>\b(?:{_SENSITIVE_KEY_PATTERN})\b\s*[:=]\s*)'
+    r'(?P<secret>"[^"]*"|\'[^\']*\'|[^\s,;]+)',
+    re.IGNORECASE,
+)
+_SENSITIVE_OPTION_RE = re.compile(
+    rf'(?P<prefix>--?(?:{_SENSITIVE_KEY_PATTERN})(?:\s+|=))'
+    r'(?P<secret>"[^"]*"|\'[^\']*\'|[^\s,;]+)',
+    re.IGNORECASE,
+)
+
+
+def redact_sensitive(value):
+    """Return *value* with common credentials replaced by ``<redacted>``.
+
+    The helper is intentionally conservative and is a final safety net rather
+    than permission to log arbitrary commands or input. Password input and
+    complete command text should still be omitted whenever possible.
+    """
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    text = _PRIVATE_KEY_BLOCK_RE.sub('<redacted-private-key>', text)
+    text = _URL_CREDENTIAL_RE.sub(
+        lambda match: (
+            f'{match.group("prefix")}<redacted>{match.group("suffix")}'
+        ),
+        text,
+    )
+    text = _AUTHORIZATION_RE.sub(
+        lambda match: f'{match.group("prefix")}<redacted>',
+        text,
+    )
+    text = _SENSITIVE_ASSIGNMENT_RE.sub(
+        lambda match: f'{match.group("prefix")}<redacted>',
+        text,
+    )
+    return _SENSITIVE_OPTION_RE.sub(
+        lambda match: f'{match.group("prefix")}<redacted>',
+        text,
+    )
+
+
+def command_summary(command):
+    """Return safe metadata about a command without returning its arguments."""
+    command_type = type(command).__name__
+    if isinstance(command, str):
+        char_count = len(command)
+        try:
+            argv = shlex.split(command, posix=True)
+        except ValueError:
+            argv = ()
+            arg_count = None
+        else:
+            arg_count = len(argv)
+    elif isinstance(command, (list, tuple)):
+        char_count = None
+        argv = command
+        arg_count = len(argv)
+    else:
+        return {
+            'type': command_type,
+            'executable': None,
+            'char_count': None,
+            'arg_count': None,
+        }
+
+    executable = None
+    if argv:
+        first = argv[0]
+        if isinstance(first, str):
+            safe_first = redact_sensitive(first)
+            executable = safe_first.rsplit('/', 1)[-1]
+            executable = re.sub(r'[\x00-\x1f\x7f]', '?', executable)[:128]
+
+    return {
+        'type': command_type,
+        'executable': executable,
+        'char_count': char_count,
+        'arg_count': arg_count,
+    }
+
+
 ## default logger
 
 
@@ -236,83 +340,133 @@ DEBUG8 = 8
 global logger
 logger = None
 try:
-    ## this moudle has been imported somewhere
+    ## this module has been imported somewhere
     logger = __main__._sshscript_logger
 except AttributeError:
     pass
+
+
 class WrappedLogger:
-    #handler.addFilter(thread_id_filter)
-    #handler.setFormatter(logging.Formatter('%(thread_id)d:%(asctime)s:%(message)s',"%Y-%m-%d %H:%M:%S")) 
-    formatter = logging.Formatter('%(asctime)s:%(message)s',"%Y-%m-%d %H:%M:%S")
-    private_attrs = ('_logger','reset_debug','add_handler','tty_handler','dump_to_tty','mute_tty','set_logger','reset_formatter')
+    """Proxy a logger while keeping SSHScript's configuration API compatible."""
+
+    formatter = logging.Formatter(
+        '%(asctime)s %(levelname)s %(name)s '
+        '%(message)s',
+        '%Y-%m-%d %H:%M:%S',
+    )
+
     def __init__(self, _logger):
         global logger
         if logger is not None:
-            raise RuntimeError('logger is a singleton, use errutils.get_logger() instead')
+            raise RuntimeError(
+                'logger is a singleton; use errorutils.get_logger() instead'
+            )
         self._logger = _logger
+        self.tty_handler = None
+        self._propagate_before_tty = None
+        self._configure_library_logger()
         self.reset_debug()
-        self.dump_to_tty()
-        ## make this instance be singleton when "import "
+        ## make this instance be singleton when imported by another module name
         __main__._sshscript_logger = self
 
-    def __getattribute__(self, name):
-        # Allow access to private attributes directly
-        if name in WrappedLogger.private_attrs:
-            return object.__getattribute__(self, name)
-        else:
-            return object.__getattribute__(self._logger, name)
-        
-    def reset_debug(self,level=logging.INFO):
-        if os.environ.get('DEBUG'):
-            try:
-                level = int(os.environ['DEBUG'])
-            except ValueError:
-                level = DEBUG ## default is 10 (logging.DEBUG)
-            self._logger.setLevel(level)
-        else:
-            self._logger.setLevel(level)
+    def __getattr__(self, name):
+        return getattr(self._logger, name)
 
-    def dump_to_tty(self):
-        if sys.stdout.isatty():
-            self.tty_handler = logging.StreamHandler(sys.stdout)
-            self.add_handler(self.tty_handler)
+    def _configure_library_logger(self):
+        """Keep library imports silent without blocking application handlers."""
+        if not self._logger.handlers:
+            self._logger.addHandler(logging.NullHandler())
+
+    def reset_debug(self, level=logging.INFO):
+        debug_level = os.environ.get('DEBUG')
+        if debug_level:
+            try:
+                level = int(debug_level)
+            except ValueError:
+                level = logging.DEBUG
+        if isinstance(level, int) and 0 < level < logging.DEBUG:
+            level = logging.DEBUG
+        self._logger.setLevel(level)
+
+    def add_console_handler(self, stream=None):
+        """Explicitly add one formatted console handler."""
+        if stream is None:
+            stream = sys.stderr
+        for handler in self._logger.handlers:
+            if (
+                isinstance(handler, logging.StreamHandler)
+                and getattr(handler, 'stream', None) is stream
+            ):
+                if getattr(handler, '_sshscript_console_handler', False):
+                    self.tty_handler = handler
+                    if self._propagate_before_tty is None:
+                        self._propagate_before_tty = self._logger.propagate
+                    self._logger.propagate = False
+                return handler
+
+        handler = logging.StreamHandler(stream)
+        handler._sshscript_console_handler = True
+        # Retain the old private marker for callers that inspect configured
+        # handlers, even when the explicit CLI stream is not a TTY.
+        handler._sshscript_tty_handler = True
+        self.add_handler(handler)
+        self.tty_handler = handler
+        if self._propagate_before_tty is None:
+            self._propagate_before_tty = self._logger.propagate
+        self._logger.propagate = False
+        return handler
+
+    def dump_to_tty(self, stream=None):
+        """Add one console handler only when the selected stream is a TTY."""
+        if stream is None:
+            stream = sys.stdout
+        if not getattr(stream, 'isatty', lambda: False)():
+            return None
+        return self.add_console_handler(stream)
 
     def mute_tty(self):
-        self._logger.removeHandler(self.tty_handler)
+        """Remove SSHScript's console handler; safe to call repeatedly."""
+        handler = self.tty_handler
+        if handler is None:
+            return
+        if handler in self._logger.handlers:
+            self._logger.removeHandler(handler)
+        handler.close()
+        self.tty_handler = None
+        if self._propagate_before_tty is not None:
+            self._logger.propagate = self._propagate_before_tty
+            self._propagate_before_tty = None
 
-    def set_logger(self,logger,keep_level=True):
+    def set_logger(self, logger, keep_level=True):
         current_logger = self._logger
+        current_level = current_logger.getEffectiveLevel()
+        self.mute_tty()
         self._logger = logger
+        self._propagate_before_tty = None
         if keep_level:
-            ## copy level
-            self._logger.setLevel(current_logger.getEffectiveLevel())
+            self._logger.setLevel(current_level)
 
-    def reset_formatter(self,formatter):
+    def reset_formatter(self, formatter):
+        if not isinstance(formatter, logging.Formatter):
+            raise TypeError('formatter must be an instance of logging.Formatter')
         WrappedLogger.formatter = formatter
-        for h in self._logger.handlers:
-            h.formatter = formatter
+        for handler in self._logger.handlers:
+            handler.setFormatter(formatter)
 
-    def add_handler(self,handler):
-        if handler.formatter is None: handler.formatter = WrappedLogger.formatter
-        self._logger.addHandler(handler)
+    def add_handler(self, handler):
+        if not isinstance(handler, logging.Handler):
+            raise TypeError('handler must be an instance of logging.Handler')
+        if handler.formatter is None:
+            handler.setFormatter(WrappedLogger.formatter)
+        if handler not in self._logger.handlers:
+            self._logger.addHandler(handler)
+        return handler
 
-def log_debug(mesg,*args):
-    """Log a debug message at DEBUG level.
-    
-    Args:
-        mesg (str): The message to log
-        *args: Additional arguments to format the message
-    """
-    logger.log(DEBUG,mesg, *args)
 
-def log_debug_8(mesg,*args):
-    """Log a debug message at DEBUG8 level (level 8).
-    
-    Args:
-        mesg (str): The message to log
-        *args: Additional arguments to format the message
-    """
-    logger.log(DEBUG8, mesg,*args)
+def log_debug(message, *args, **kwargs):
+    """Compatibility wrapper for lazy ``logger.debug`` calls."""
+    get_logger().debug(message, *args, **kwargs)
+
 
 def thread_id_filter(record):
     """Add thread ID to log records.
@@ -321,16 +475,19 @@ def thread_id_filter(record):
         record: The log record to modify
         
     Returns:
-        The modified log record with thread_id added
+        bool: True so logging continues processing the record.
     """
     record.thread_id = threading.get_native_id()
-    return record
+    return True
+
 
 def set_logger(userlogger=None,logname=None):
     """Configure the global logger with appropriate handlers and level.
     
     Args:
-        _logger (logging.Logger, optional): Logger to use instead of creating a new one. Defaults to None.
+        userlogger (logging.Logger, optional): Logger to use instead of
+            creating a new one. Defaults to None.
+        logname (str, optional): Name for a newly created default logger.
         
     Returns:
         logging.Logger: The configured logger instance
@@ -343,12 +500,16 @@ def set_logger(userlogger=None,logname=None):
     if logger is None:
         logger = WrappedLogger(logging.getLogger(logname or 'sshscript'))
     
-    if userlogger:
+    if userlogger is not None:
         logger.set_logger(userlogger,keep_level=False) ## use userlogger's level
+    else:
+        ## set_logger() is the explicit CLI/application console configuration
+        ## path. Merely importing SSHScript or calling get_logger() stays silent.
+        logger.add_console_handler()
 
     if os.environ.get('DEBUG'): logger.reset_debug()
 
-    return userlogger if userlogger else logger
+    return userlogger if userlogger is not None else logger
 
 def get_logger():
     """Get the global logger instance.

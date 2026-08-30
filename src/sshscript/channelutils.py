@@ -19,14 +19,14 @@ import __main__
 import time
 import os, signal
 
-try:
+if __package__:
     from .channelsubprocess import POpenChannel
     from .dollar import Dollar
-    from .errorutils import  log_debug, log_debug_8,get_logger,EXITCODE_DEFAULT
-except ImportError:
+    from .errorutils import get_logger, command_summary
+else:
     from channelsubprocess import POpenChannel
     from dollar import Dollar
-    from errorutils import log_debug, log_debug_8,get_logger,EXITCODE_DEFAULT
+    from errorutils import get_logger, command_summary
 logger = get_logger()
 
 class GenericConsole(object):
@@ -79,10 +79,8 @@ class InnerConsole(GenericConsole):
             username: The username to use for authentication
             password: Optional password for authentication
             expect: Keyword(s) to wait for when inputting password (locale-dependent)
-            initials: Commands to execute after successful login, can be:
-                - A shell command string
-                - A list of shell commands
-                - A callable function that takes the new console as argument
+            initials: command or list of commands to execute after successful login
+                - When it is a list, "newline" is not required at end of each command
             command: The command to execute
         """
         ## SessionWrapper
@@ -90,20 +88,21 @@ class InnerConsole(GenericConsole):
 
         ## instance of SSHScriptChannel
         self.channel = wcw.channel
-        '''
-        try:
-            ## wcw.channel.owner is SessionWrapper
-            self.session = wcw.channel.owner.wrapped_session
-        except:
-            ## wcw.channel.owner is Session
-            self.session = wcw.channel.owner
-        '''
         self.command = command
         self.exit_command = exit
         self.password = password
         self.loginExpect = expect
-        self.initials = initials
         self.prompt = prompt
+        
+        ## normalize self.initials (initial commands to input)
+        if initials is not None:
+            if isinstance(initials,str):
+                self.initials = [initials]
+            else:
+                self.initials = initials
+        else:
+            self.initials = None
+
         
 
     def enter(self):
@@ -135,8 +134,11 @@ class InnerConsole(GenericConsole):
                 ## test if we got a prompt asking for password
                 m = self.channel.expect(self.loginExpect,timeout=5,silent=True)
                 if m:
-                    log_debug_8(f'got {[m.group(0)]}, sending password')
-                    #self.channel.wait_for_silent(1)
+                    logger.debug(
+                        'Authentication prompt detected; sending password input '
+                        '(length=%d)',
+                        len(self.password),
+                    )
                     self.channel.clear()
                     self.channel.touchIO(True)
                     self.channel.send(self.password+'\n')
@@ -149,18 +151,23 @@ class InnerConsole(GenericConsole):
                         raise PermissionError(f'"{self.loginExpect}" prompted again')
                     login_success = True
                 else:
-                    log_debug_8(f'{self.loginExpect} not found, would not send password')
+                    logger.debug(
+                        'Authentication prompt was not detected; password was not sent'
+                    )
             else:                
                 ## has password, but no prompt have to wait
-                log_debug_8(f'no prompt was set, still sending password')
+                logger.debug(
+                    'No authentication prompt is configured; sending password input '
+                    '(length=%d)',
+                    len(self.password),
+                )
                 self.channel.touchIO(True)
                 ## when password = '', only a newline would be sent
                 self.channel.send(self.password+'\n')
-        if login_success:
-            log_debug_8(f'login succeeded')
-        else:
-            log_debug_8(f'login failed, would not execute initials, and exit immediately')
-            raise PermissionError('login failed')
+        if not login_success:
+            raise PermissionError(
+                'Authentication failed because the password prompt was not detected'
+            )
 
         ## Waiting for shell's greeting to stop, guesting the prompt
         ## But for "tcpdump", "wait_for_silent(1)" could become a blocking point.
@@ -168,14 +175,14 @@ class InnerConsole(GenericConsole):
         ##  and still have a chance to get the prompt if the greeting is not too long.
         try:
             self.channel.wait_for_silent(1,max_seconds=3)
-        except TimeoutError as e:
+        except TimeoutError:
             pass
         else:
             try:
-                user_prompt = self.channel._stdout.splitlines()[-1]
-                print(f'user_prompt================>',[user_prompt])
+                self.channel._stdout.splitlines()[-1]
+                logger.debug('Shell prompt detected')
             except IndexError:
-                print(f'user_prompt====no stdout========>',[str(self.channel._stdout)])
+                logger.debug('Shell prompt was not detected')
         
         if self.initials is None:
             ## shell, su, sudo
@@ -204,6 +211,9 @@ class InnerConsole(GenericConsole):
                 self.channel.on_generic_layer = False
             else:
                 self.channel.increase_layer(self.prompt)
+            for command in self.initials:
+                self.channel.input(command)
+                self.channel.wait_for_silent(1)
         
         ## don't call reset_buffer(), otherwise first-line expect() would failed
         #self.channel.reset_buffer()        
@@ -228,12 +238,19 @@ class InnerConsole(GenericConsole):
         """
         
         ## ensure all command has sent
-        while self.channel.sending_queue.qsize() > 0: time.sleep(0.01)
+        #while self.channel.sending_queue.qsize() > 0: time.sleep(0.01)
 
         ## before sending "exit", ensure the last command has completed is important.
         ## Otherwise the "exit" could be ignored by the shell
 
-        if self.exit_command is not None:
+        layer_lock = self.channel.executing_lock
+        exit_command = (
+            None
+            if self.channel._interactive_layer_exited(layer_lock)
+            else self.exit_command
+        )
+
+        if exit_command is not None:
             ## leaving the shell, sudo or su
             if self.channel.layer_count > 1:
                 ## the su,sudo layer (above shell layer)
@@ -243,33 +260,33 @@ class InnerConsole(GenericConsole):
                 if self.channel.hijacked:
                     ## enterConsole would hijack self.channel.send_command() to self.channel.input()
                     ## and when hijacked, self.channel.input would acquire lock by itself
-                    self.channel.send(self.exit_command+'\n')
+                    self.channel.send(exit_command+'\n')
                 else:
                     ## 這個command一送，shell會立刻把prompt送出來，但是，會跟上層的輸出混在一起，這是一個麻煩的問題
                     #self.channel.raw_send(self.exit_command+'\n')
                     self.channel._stdout.set_callback(None,None)
                     self.channel._stderr.set_callback(None,None)
                     ## 確保最後一個指令已經沒有輸出，有助於順利結束
-                    self.channel.send(self.exit_command+'\n')
+                    self.channel.send(exit_command+'\n')
 
                 self.channel.executing_lock.release()
                 self.channel.decrease_layer()
             else:
                 ## the 1-level $.shell layer, or $.enter
-                self.channel.on_generic_layour = True
+                self.channel.on_generic_layer = True
 
                 ## wait current execution to complete and release locking
                 self.channel.executing_lock.acquire()
                 if self.channel.hijacked:
                     ## enterConsole would hijack self.channel.send_command() to self.channel.input()
                     ## and when hijacked, self.channel.input would acquire lock by itself
-                    self.channel.send(self.exit_command+'\n')
+                    self.channel.send(exit_command+'\n')
                 else:
                     ## 這個command一送，shell會立刻把prompt送出來，但是，會跟上層的輸出混在一起，這是一個麻煩的問題
                     self.channel._stdout.set_callback(None,None)
                     self.channel._stderr.set_callback(None,None)
                     ## 確保最後一個指令已經沒有輸出，有助於順利結束
-                    self.channel.send(self.exit_command+'\n')
+                    self.channel.send(exit_command+'\n')
                 ## the 1-level $.shell layer, or $.enter
                 self.channel.executing_lock.release()
         else:
@@ -278,7 +295,7 @@ class InnerConsole(GenericConsole):
                 self.channel.decrease_layer()
             else:
                 ## would end this process later
-                self.channel.on_generic_layour = True
+                self.channel.on_generic_layer = True
         return False
     def __exit__(self,exc_type, exc_value, traceback):
         return self.exit(exc_type, exc_value, traceback)
@@ -305,13 +322,6 @@ class ShellConsole(InnerConsole):
         if isinstance(command,str):
             command = command.strip()
     
-        if 'initials' in kw:
-            kw['initials'] = kw.get('initials')
-            if isinstance(kw['initials'],str):
-                kw['initials'] = [kw['initials']]
-        else:
-            kw['initials'] = None 
-
         kw['exit'] = kw.get('exit','exit')
         
         super().__init__(wcw,command,*args,**kw)
@@ -416,7 +426,11 @@ class SudoConsole(InnerConsole):
             if login: cmd += ' -i'
             cmd += ' bash'
             if login: cmd += ' -i' ## for bash
-        logger.log(8,f'sudo command={cmd}')
+        logger.debug(
+            'Built sudo command (target_user=%s, login_shell=%s)',
+            username or 'root',
+            login,
+        )
         return cmd
 
     def __init__(self,wcw,password=None,username=None,expect=None,initials=None,command=None,login=True):
