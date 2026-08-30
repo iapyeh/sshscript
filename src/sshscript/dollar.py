@@ -15,17 +15,17 @@
 #
 
 import os, re, sys, time
-import subprocess, shlex, traceback
+import subprocess, shlex
 import __main__
 import asyncio
 import threading
 
-try:
-    from .errorutils import command_requires_shell, log_debug, log_debug_8,get_logger
+if __package__:
+    from .errorutils import command_requires_shell, command_summary, get_logger
     from .channelsubprocess import POpenChannel
     from .channelssh import SSHChannel    
-except ImportError:
-    from errorutils import command_requires_shell, log_debug, log_debug_8,get_logger
+else:
+    from errorutils import command_requires_shell, command_summary, get_logger
     from channelsubprocess import POpenChannel
     from channelssh import SSHChannel    
 logger = get_logger()
@@ -98,6 +98,7 @@ class Dollar(object):
         self._parameters_to_execute = kw
 
         self.call_thread = None
+        self._worker_exception = None
     @property
     @export2Dollar
     def stdout(self):
@@ -135,10 +136,14 @@ class Dollar(object):
         Clear the channel's buffer if a channel exists.
         """
         if self.channel: self.channel.reset_buffer()
+    #def __del__(self):
+    #    ## ensure to release memory
+    #    if self.call_thread and self.call_thread.is_alive():
+    #        self.call_thread.join()
     def __del__(self):
-        ## ensure to release memory
-        if self.call_thread and self.call_thread.is_alive():
-            self.call_thread.join()
+        thread = self.call_thread
+        if thread and thread.is_alive():
+            thread.join(timeout=2)
 
     def __call__(self,get_pty=None):
         def r():
@@ -158,32 +163,62 @@ class Dollar(object):
                 if tasks:          
                     for task in tasks:
                         task.cancel()
-                    #await asyncio.gather(*tasks, return_exceptions=True)            
-                    time.sleep(0.2)
+                    newloop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+                    #time.sleep(0.2)
                 if hasattr(asyncio, "get_child_watcher"):
                     ## get_child_watcher was depreciated after python v3.12
                     try:
                         watcher.attach_loop(None)
-                    except: pass 
-                newloop.stop()
+                    except Exception:
+                        pass
+                #newloop.stop()
                 if newloop.is_running() or not newloop.is_closed():
                     newloop.run_until_complete(newloop.shutdown_default_executor())
                     newloop.run_until_complete(newloop.shutdown_asyncgens())
                 newloop.close()
                 asyncio.set_event_loop(None)
-
+            '''
             def task_exception_handler(t):
                 try:
                     t.result()
-                except:
-                    ## internal error happened, such as AttributeError
-                    traceback.print_exc()
+                except asyncio.CancelledError:
+                    newloop.stop()
+                except Exception as exc:
+                    self._worker_exception = exc
+                    logger.debug(
+                        'Command worker failed (exception_type=%s)',
+                        type(exc).__name__,
+                    )
                     ## end of the run_forever
                     newloop.stop()
-            task= newloop.create_task(self.async_call_worker(get_pty))
-            task.add_done_callback(task_exception_handler)
-            newloop.run_forever()
-            cleanup()
+            '''
+            def task_exception_handler(task):
+                try:
+                    task.result()
+                except asyncio.CancelledError:
+                    if self.channel is not None and not self.channel.closed:
+                        self.channel.fail(
+                            EOFError('command worker was cancelled')
+                        )
+
+                except BaseException as exc:
+                    self._worker_exception = exc
+
+                    if self.channel is not None:
+                        self.channel.fail(exc)
+
+                    logger.debug(
+                        'Command worker failed (exception_type=%s)',
+                        type(exc).__name__,
+                    )
+                finally:
+                    newloop.stop()            
+            try:
+                task= newloop.create_task(self.async_call_worker(get_pty))
+                task.add_done_callback(task_exception_handler)
+                newloop.run_forever()
+            finally:
+                cleanup()
 
         t = threading.Thread(target=r,daemon=True,name='dollar.call')
         t.start()
@@ -194,13 +229,29 @@ class Dollar(object):
         
         #print('#'*100,self.channel,t.is_alive())
         self.call_thread = t
+        if self._worker_exception is not None:
+            raise self._worker_exception
+        if self.channel is None:
+            raise RuntimeError(
+                'Command worker exited before channel initialization'
+            )
 
         if self.for_with:
             return self.channel
         else:
             ## wait for onedollar and twodollar to complete
-            while not self.channel.closed:
+            while (
+                not self.channel.closed
+                and self._worker_exception is None
+                and t.is_alive()
+            ):
                 time.sleep(0.01)
+            if self._worker_exception is not None:
+                raise self._worker_exception
+            if not self.channel.closed:
+                raise RuntimeError(
+                    'Command worker exited before closing the channel'
+                )
             return self
 
     async def async_call_worker(self,get_pty=None):
@@ -268,42 +319,102 @@ class Dollar(object):
         if self.for_with:
             assert '\n' not in self.command
             cpargs = shlex.split(self.command)
+            summary = command_summary(cpargs)
             if get_pty:
-                logger.log(8,f'with pty for command: {cpargs}')
+                logger.debug(
+                    'Starting interactive subprocess '
+                    '(executable=%s, pty=%s, argc=%d)',
+                    summary['executable'],
+                    True,
+                    summary['arg_count'],
+                )
                 ## master for reading, slave for writing
                 masterFd,slaveFd = pty.openpty()
                 ## Should use this style of codes, otherwise in CKJ environment something would be wrong
                 ## Also, for sudo to prompt "password:", pty is required
-                cp = subprocess.Popen( cpargs,
-                    ## when shell=True, it was forced to use /bin/sh
-                    shell=False,
-                    stdin=slaveFd,
-                    stdout=slaveFd,
-                    stderr=slaveFd,
-                    
-                    ## recommanded by python's documentation, disable because it raise errors when enabled
-                    ## Note: preexec_fn=os.setsid and start_new_session=True are mutual exclusive
-                    start_new_session=True,
-                    ##  Run in a new process group to enable bash's job control.
-                    #preexec_fn=os.setsid,
-                    
-                    ## Note: even Text=True, stderr is still bytes
-                    text=False,
-                    ## bufsize 0 would be helpful for interactive shell, but
-                    ## not good for large and quick outputing process, such as tcpdump
-                    bufsize=1024,
-                    env=env,
+                try:
+                    cp = subprocess.Popen( cpargs,
+                        ## when shell=True, it was forced to use /bin/sh
+                        shell=False,
+                        stdin=slaveFd,
+                        stdout=slaveFd,
+                        stderr=slaveFd,
+                        
+                        ## recommanded by python's documentation, disable because it raise errors when enabled
+                        ## Note: preexec_fn=os.setsid and start_new_session=True are mutual exclusive
+                        start_new_session=True,
+                        ##  Run in a new process group to enable bash's job control.
+                        #preexec_fn=os.setsid,
+                        
+                        ## Note: even Text=True, stderr is still bytes
+                        text=False,
+                        ## bufsize 0 would be helpful for interactive shell, but
+                        ## not good for large and quick outputing process, such as tcpdump
+                        bufsize=1024,
+                        env=env,
+                    )
+                except BaseException:
+                    # Popen 失敗時，沒有人會接管 master。
+                    try:
+                        os.close(masterFd)
+                    except OSError:
+                        pass
+                    raise   
+                finally:
+                    # Child 已經取得 slave；parent 絕對不能繼續保留或讀取它。
+                    try:
+                        os.close(slaveFd)
+                    except OSError:
+                        pass           
+                                      
+                #if cp.poll() is None:
+                #    ## this command is still running, assign channel and start reading
+                #    self.channel = POpenChannel(self,cp,[masterFd,slaveFd],masterFd,[masterFd,slaveFd],get_pty) 
+                #    if not self.sendline2execute: self.channel.hijack(True)
+                #    asyncio.create_task(self.channel.async_start_interaction())
+                #else:
+                #    raise RuntimeError(
+                #        'Subprocess exited before channel initialization '
+                #        f'(exit_code={cp.poll()})'
+                #    )
+                if cp.poll() is not None:
+                    returncode = cp.wait()
+
+                    try:
+                        os.close(masterFd)
+                    except OSError:
+                        pass
+
+                    raise RuntimeError(
+                        'Subprocess exited before channel initialization '
+                        f'(exit_code={returncode})'
+                    )
+
+                # PTY 只有一個可讀取的 merged-output stream。
+                # stdin 與 stdout 都使用 masterFd。
+                self.channel = POpenChannel(
+                    self,
+                    cp,
+                    [masterFd],
+                    masterFd,
+                    [masterFd],
+                    get_pty=True,
                 )
                 
-                if cp.poll() is None:
-                    ## this command is still running, assign channel and start reading
-                    self.channel = POpenChannel(self,cp,[masterFd,slaveFd],masterFd,[masterFd,slaveFd],get_pty) 
-                    if not self.sendline2execute: self.channel.hijack(True)
-                    asyncio.create_task(self.channel.async_start_interaction())
-                else:
-                    raise RuntimeError(f'failure on {self.command}(exitcode={cp.poll()})')
+                if not self.sendline2execute:
+                    self.channel.hijack(True)
+
+                #asyncio.create_task(self.channel.async_start_interaction())                
+                await self.channel.async_start_interaction()
+
             elif 1:
-                log_debug_8(f'without pty for command=> {self.command}')
+                logger.debug(
+                    'Starting interactive subprocess '
+                    '(executable=%s, pty=%s, argc=%d)',
+                    summary['executable'],
+                    False,
+                    summary['arg_count'],
+                )
                 ## pros:
                 ##  su (get_pty=False) works and stderr does not mixed with stdout
                 ## cons:
@@ -329,16 +440,17 @@ class Dollar(object):
                     ## necessary for being interactive
                     os.set_blocking(cp.stdout.fileno(), False)
                     
-                    #asyncio.create_task(self.channel._start_reading())
-                    asyncio.create_task(self.channel.async_start_interaction())
-                    #self.channel.close()
-                    #return ret
+                    #asyncio.create_task(self.channel.async_start_interaction())
+                    await self.channel.async_start_interaction()
+
                 else:
-                    #asyncio.get_event_loop().stop()
-                    raise RuntimeError(f'failure on {self.command}(exitcode={cp.poll()})')                
+                    raise RuntimeError(
+                        'Subprocess exited before channel initialization '
+                        f'(exit_code={cp.poll()})'
+                    )
             '''
             else:
-                log_debug_8(f'without pty for command: {self.command}')
+                logger.debug('Starting interactive subprocess without a PTY')
                 ## pros:
                 ##  su (get_pty=False) works and stderr does not mixed with stdout
                 ## cons:
@@ -381,12 +493,21 @@ class Dollar(object):
                 cpargs = [shell_executable,'-c',self.command]
             else:
                 cpargs = shlex.split(self.command)
+            summary = command_summary(cpargs)
             kw['text'] = False
             ## with_pty is always False
             self.channel = POpenChannel(self,None,None,None,[],False)
             self.channel.increase_layer('')
-            log_debug(
-                f'[subprocess] shell={self.use_shell} reasons={self.shell_reasons}: {cpargs}'
+            logger.debug(
+                'Executing subprocess '
+                '(executable=%s, shell=%s, pty=%s, argc=%d, '
+                'shell_reasons=%s, command_length=%d)',
+                summary['executable'],
+                self.use_shell,
+                False,
+                summary['arg_count'],
+                self.shell_reasons,
+                len(self.command),
             )
             kw.update({'capture_output':True})
             ret = subprocess.run(cpargs,**kw)
@@ -423,10 +544,13 @@ class Dollar(object):
         if self.for_with:
             ## paramiko always not acquire pty to have stdout and stderr seperately
             self.channel = SSHChannel(self,client,get_pty=get_pty)
-            asyncio.create_task(self.channel.async_start_interaction())
-            #self.channel.start_interaction()
+
             if not self.sendline2execute:
                 self.channel.hijack(True)            
+
+            #asyncio.create_task(self.channel.async_start_interaction())
+            await self.channel.async_start_interaction()
+
         else:
             ## One-shot direct or shell command.
             if get_pty: kw['get_pty'] = True
@@ -445,13 +569,25 @@ class Dollar(object):
             if self.use_shell:
                 shell_executable = self.shell_executable or '/bin/sh'
                 command = f'{shlex.quote(shell_executable)} -c {shlex.quote(self.command)}'
+                summary = command_summary([shell_executable])
+                argc = None
             else:
                 argv = shlex.split(self.command)
                 command = 'exec ' + ' '.join(shlex.quote(str(arg)) for arg in argv)
+                summary = command_summary(argv)
+                argc = summary['arg_count']
 
-            log_debug(
-                f'[{host}] paramiko shell={self.use_shell} '
-                f'reasons={self.shell_reasons}: {command}'
+            logger.debug(
+                'Executing SSH command '
+                '(host=%s, executable=%s, shell=%s, pty=%s, argc=%s, '
+                'shell_reasons=%s, command_length=%d)',
+                host,
+                summary['executable'],
+                self.use_shell,
+                get_pty,
+                argc,
+                self.shell_reasons,
+                len(self.command),
             )
             self.channel = SSHChannel(self,None,get_pty)
             stdin, stdout,stderr = client.exec_command(command,**kw)
@@ -462,5 +598,9 @@ class Dollar(object):
             await self.channel._add_stderr_data(stderr.read())
             await self.channel._dump_stdout_err()
             self.channel._exitcode = stdout.channel.recv_exit_status()
-            log_debug(f'[{host}]exitcode={self.exitcode}')
+            logger.debug(
+                'SSH command completed (host=%s, exit_code=%s)',
+                host,
+                self.exitcode,
+            )
             self.channel.close()

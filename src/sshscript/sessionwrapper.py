@@ -16,10 +16,10 @@
 
 import __main__, threading
 
-try:
+if __package__:
     from .errorutils import  command_is_shell
     from .channelutils import SuConsole, SudoConsole,ShellConsole,EnterConsole 
-except ImportError:
+else:
     from errorutils import  command_is_shell
     from channelutils import SuConsole, SudoConsole,ShellConsole,EnterConsole
 
@@ -111,7 +111,7 @@ class SessionWrapper(object):
         Returns:
             Logger: The logger object.
         """
-        self.channel.owner.session.logger
+        return self.channel.owner.session.logger
     
     def clear(self):
         """Clear the channel's output buffers."""
@@ -130,16 +130,19 @@ class SessionWrapper(object):
         #result.result()
         return result
 
-    def input(self,s):
-        """Send input to the channel with a newline.
+    def input(self,s,timeout=60):
+        """Send input and wait for the prompt or console exit.
         
         Args:
             s (str): The input to send.
+            timeout (float): Maximum wait in seconds.
             
         Returns:
-            int: The number of bytes sent.
+            str: ``prompt``, ``exited``, or ``silent`` for an interactive
+                console. A non-interactive channel returns ``send()``'s
+                result.
         """
-        result = self.channel.input(s)
+        result = self.channel.input(s,timeout=timeout)
         #result.result()
         return result
 
@@ -308,15 +311,16 @@ class SessionWrapper(object):
     def set_prompt(self,prompt):
         self.channel.prompt = prompt
         self.channel._stdout.callback_pattern = prompt
-    def log(self, level, msg, *args):
+    def log(self, level, msg, *args, **kwargs):
         """Log a message at the specified level.
         
         Args:
             level (int): The logging level.
             msg (str): The message to log.
             *args: Additional arguments for message formatting.
+            **kwargs: Keyword arguments forwarded to the logger.
         """
-        return self.channel.log(level,msg, *args)
+        return self.channel.log(msg, *args, level=level, **kwargs)
 
     ## wrappers to sshscriptsession(only those seem to be called from a "console". eg.
     ## with $.sudo() as console:

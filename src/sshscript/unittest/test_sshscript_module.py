@@ -9,12 +9,106 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+import os
 import shlex
+import subprocess
 import sys
 import tempfile
 import unittest
 
 import sshscript
+
+
+class ImportLayoutTests(unittest.TestCase):
+    def test_flat_module_import_does_not_reenter_package_initializer(self):
+        source_root = Path(__file__).resolve().parents[1]
+        code = """
+import sys
+import sshscript
+
+assert hasattr(sshscript, "run_file")
+assert sshscript.sshscript_module is sshscript
+assert "__init__" not in sys.modules
+print(sshscript.__version__)
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=source_root,
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        self.assertEqual(result.stdout.strip(), sshscript.__version__)
+        self.assertEqual(result.stderr, "")
+
+    def test_package_import_uses_only_package_relative_modules(self):
+        source_root = Path(__file__).resolve().parents[1]
+        code = f"""
+import importlib.util
+import sys
+
+source_root = {str(source_root)!r}
+spec = importlib.util.spec_from_file_location(
+    "sshscript",
+    {str(source_root / "__init__.py")!r},
+    submodule_search_locations=[source_root],
+)
+package = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = package
+spec.loader.exec_module(package)
+
+assert hasattr(package, "run_file")
+assert package.run_file is package.sshscript.run_file
+assert package.Session is package.session.Session
+assert package.sshscript.sshscript_module is package
+assert not any(
+    name in sys.modules
+    for name in (
+        "channelgeneric",
+        "channelssh",
+        "channelsubprocess",
+        "channelutils",
+        "dollar",
+        "dollarchanger",
+        "dollarparser",
+        "errorutils",
+        "patching",
+        "session",
+        "sessionwrapper",
+        "spyimporter",
+        "stdio",
+        "tokenparser",
+    )
+)
+print(package.__version__)
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=source_root.parent,
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        self.assertEqual(result.stdout.strip(), sshscript.__version__)
+        self.assertEqual(result.stderr, "")
+
+    def test_cli_version_does_not_import_package_initializer(self):
+        source_root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            [sys.executable, str(source_root / "sshscript.py"), "--version"],
+            cwd=source_root,
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        self.assertEqual(result.stdout.strip(), sshscript.__version__)
+        self.assertEqual(result.stderr, "")
 
 
 class SessionModuleTests(unittest.TestCase):
@@ -157,6 +251,7 @@ class ScriptRunnerModuleTests(unittest.TestCase):
             )
             (folder_path / "02_verify.spy").write_text(
                 "from pathlib import Path\n"
+                "assert hasattr(sshscript, 'Session')\n"
                 "assert shared_value == 42\n"
                 "Path(marker_path).write_text('verified', encoding='utf-8')\n",
                 encoding="utf-8",
