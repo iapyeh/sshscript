@@ -18,7 +18,6 @@
 ## convert .spy token parsed results to valid python script
 import ast
 import copy
-import __main__
 
 class DollarChanger(ast.NodeTransformer):
     """
@@ -28,17 +27,15 @@ class DollarChanger(ast.NodeTransformer):
     into valid Python code that can be executed. It handles various SSH script constructs
     including connections, shell commands, and context managers.
     """
-    tmplLinesAtBeginning = ast.parse('_sshscriptstack_ = threading.current_thread().sshscriptstack').body[0]
+    tmplLinesAtBeginning = ast.parse('_sshscriptstack_ = patching.get_thread_stack(initial_session=_sshscript_session_)').body[0]
     ## with-exit would close the session, so, this is pop() not popAndClose()
-    tmplLineForConnect = ast.parse('_new_sshcript = _sshscriptstack_.connect("", password="")').body[0]
+    tmplLineForConnect = ast.parse('_new_sshcript = _sshscriptstack_.connect_and_activate("", password="")').body[0]
     tmplLineOfSshscriptstack = ast.parse('_sshscriptstack_').body[0]
     tmplLineForSSHScriptInstance = ast.parse('_sshscriptstack_[-1]').body[0]
     tmplLineForSSHScriptInstanceShell = ast.parse('_sshscriptstack_[-1].shell(arg)').body[0]
     tmplLineAfterClose = ast.parse('_sshscriptstack_.close()').body[0]
-    tmplLineForNewScope = ast.parse('_sshscriptstack_ = threading.current_thread().sshscriptstack').body[0]
-    #tmplLinesBlowDef = ast.parse("_sshscriptstack_ = sys._getframe(1).f_locals.get('_sshscriptstack_') or threading.current_thread().sshscriptstack").body[0]
-    #tmplLinesBlowDef = ast.parse("_sshscriptstack_ = threading.current_thread().sshscriptstack or sys._getframe(1).f_locals.get('_sshscriptstack_')").body[0]
-    tmplLinesBlowDef = ast.parse("_sshscriptstack_ = threading.current_thread().sshscriptstack").body[0]
+    tmplLineForNewScope = ast.parse('_sshscriptstack_ = patching.get_thread_stack(initial_session=_sshscript_session_)').body[0]
+    tmplLinesBlowDef = ast.parse("_sshscriptstack_ = patching.get_thread_stack(initial_session=_sshscript_session_)").body[0]
     tmplLineAssignAtBottom = ast.parse('a=_c.stdout, _c.stderr').body[0]
     
     def __init__(self):
@@ -59,6 +56,8 @@ class DollarChanger(ast.NodeTransformer):
         self.containsSSHScriptStack = [False]
         self.currentConsole = []
         self.consoleSerialNo = 0
+        self.threading_module_names = {'threading'}
+        self.thread_constructor_names = set()
 
     @staticmethod
     def _template(template, origin):
@@ -122,6 +121,19 @@ class DollarChanger(ast.NodeTransformer):
             self.currentExpr = node
         elif isinstance(node,ast.Return):
             self.currentExpr = node
+
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == 'threading':
+                    self.threading_module_names.add(
+                        alias.asname or alias.name
+                    )
+        elif isinstance(node, ast.ImportFrom) and node.module == 'threading':
+            for alias in node.names:
+                if alias.name == 'Thread':
+                    self.thread_constructor_names.add(
+                        alias.asname or alias.name
+                    )
         
 
         ## increase scopeDepth
@@ -422,8 +434,6 @@ class DollarChanger(ast.NodeTransformer):
                     else:
                         node.value.id = self.currentConsole[-1]
                 ## v2.0.3 , 因為不再產生 _c ，所以_c.stdout, _c.stderr,_c.exitcode 都要改成 _sshscriptstack_[-1].xxx
-                #elif 0 and node.attr in __main__.DollarExportedNames:
-                #    pass
                 else:
                     ## eg. _c.stdout, _c.stderr,_c.exitcode keep _c, change to _sshscriptstack_[-1]
                     node.value = self._template(self.tmplLineForSSHScriptInstance.value, node)
@@ -437,6 +447,28 @@ class DollarChanger(ast.NodeTransformer):
             node.func.attr == 'include':
             if not (len(node.args)==1 and isinstance(node.args[0],ast.Constant)):
                 node.func.attr = 'runtimeInclude'
+
+        elif isinstance(node, ast.Call) and \
+            isinstance(node.func, ast.Attribute) and \
+            isinstance(node.func.value, ast.Name) and \
+            node.func.value.id in self.threading_module_names and \
+            node.func.attr == 'Thread':
+            node.func = ast.Attribute(
+                value=ast.Name(id='patching', ctx=ast.Load()),
+                attr='context_thread',
+                ctx=ast.Load(),
+            )
+            ast.copy_location(node.func, node)
+
+        elif isinstance(node, ast.Call) and \
+            isinstance(node.func, ast.Name) and \
+            node.func.id in self.thread_constructor_names:
+            node.func = ast.Attribute(
+                value=ast.Name(id='patching', ctx=ast.Load()),
+                attr='context_thread',
+                ctx=ast.Load(),
+            )
+            ast.copy_location(node.func, node)
         
         elif isinstance(node,ast.Call):   
             if isinstance(node.func,ast.Name):

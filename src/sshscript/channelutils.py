@@ -13,9 +13,7 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
-import threading
 import re
-import __main__
 import time
 import os, signal
 
@@ -43,29 +41,6 @@ class GenericConsole(object):
         ## self.returnObjectWhenEnter should be assigned by subclasses
         self.returnObjectWhenEnter = None
 
-    '''
-    ## $.su, $.sudo should push into sshscriptstack,
-    ## so that $.enter() in another code block would work. eg.
-    ## def enter():
-    ##     with $.enter('python3'): <<== for here to work
-    ##          $print("hello")
-    ##  with $.sudo(..):
-    ##      enter()
-    def pushToStack(self):
-        """Push the current console wrapper to the thread's SSH script stack.
-        
-        This method is used to maintain the context of nested console operations,
-        allowing $.enter() to work in nested code blocks.
-        """
-        threading.current_thread().sshscriptstack.append(self.wcw)
-    def popFromStack(self):
-        """Remove the current console wrapper from the thread's SSH script stack.
-        
-        This method is called when exiting a console context to restore the previous
-        console state.
-        """
-        threading.current_thread().sshscriptstack.pop(self.wcw)
-    '''
 class InnerConsole(GenericConsole):
     """Console implementation for inner shell operations.
 
@@ -495,7 +470,10 @@ class EnterConsole(InnerConsole):
                 'quit': Send quit command (e.g., for Python interactive console)
             with_pty: check pty for underlying channel
         """
-        assert parentConsole.__class__.__name__ == __main__.SessionWrapper.__name__,f'parentConsole is {parentConsole}'
+        if not hasattr(parentConsole, 'channel'):
+            raise TypeError(
+                f'parentConsole must provide a channel, not {type(parentConsole).__name__}'
+            )
 
         self.parentConsole = parentConsole     
         ## self.channel is an instance of sshscriptchannel

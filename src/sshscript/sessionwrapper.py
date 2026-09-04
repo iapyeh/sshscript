@@ -14,7 +14,10 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
-import __main__, threading
+if __package__:
+    from . import patching
+else:
+    import patching
 
 if __package__:
     from .errorutils import  command_is_shell
@@ -384,16 +387,13 @@ class SessionWrapper(object):
     ##     with $.session: <== here calls __enter__()
     ##        ...
     def __enter__(self):
-        threading.current_thread().sshscriptstack.append(self)
+        patching.get_thread_stack().append(self)
         return self
     ## why below??
     #enter = __enter__
 
     def __exit__(self,*args):
-        threading.current_thread().sshscriptstack.pop(self)
+        patching.get_thread_stack().pop(self)
         return False
     def exit(self):
         return self.__exit__(None,None,None)
-
-## for SessionWrapper be accessible in channelutils.py (due to recursive importing)
-__main__.SessionWrapper = SessionWrapper

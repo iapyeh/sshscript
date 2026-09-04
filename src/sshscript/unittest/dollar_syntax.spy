@@ -12,6 +12,9 @@ import os
 import shlex
 import sys
 import tempfile
+import threading
+import threading as thread_alias
+from threading import Thread as ImportedThread
 
 
 passed = []
@@ -164,6 +167,41 @@ def test_function_scope():
     done(name)
 
 
+def test_thread_scope():
+    name = "dollar commands inside an ordinary Python thread"
+    case(name)
+    results = []
+    nested_session = sshscript.Session(parent=_sshscript_session_)
+    nested_session._host = "inherited-session.example"
+
+    def worker():
+        $printf thread-command
+        results.append(($.host, $.stdout, $.exitcode))
+
+    try:
+        with nested_session:
+            threads = (
+                threading.Thread(target=worker),
+                thread_alias.Thread(target=worker),
+                ImportedThread(target=worker),
+            )
+            for thread in threads:
+                thread.start()
+                thread.join(timeout=10)
+    finally:
+        nested_session.close()
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert all(type(thread) is threading.Thread for thread in threads)
+    assert results == [
+        ("inherited-session.example", "thread-command", 0),
+        ("inherited-session.example", "thread-command", 0),
+        ("inherited-session.example", "thread-command", 0),
+    ]
+    assert all(not hasattr(thread, "sshscriptstack") for thread in threads)
+    done(name)
+
+
 def test_session_context():
     name = "with-dollar persistent local shell"
     case(name)
@@ -198,6 +236,7 @@ TESTS = (
     test_redirection_in_temporary_directory,
     test_explicit_execution_options,
     test_function_scope,
+    test_thread_scope,
     test_session_context,
     test_spy_import,
 )

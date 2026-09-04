@@ -27,7 +27,6 @@ import stat
 import time
 import os
 import sys
-import __main__
 import copy
 from io import StringIO
 import types
@@ -42,9 +41,6 @@ if __package__:
     from .errorutils import get_logger, SSHScriptExit, SSHScriptBreak, SSHScriptException, dumpScript, listRightIndex
     ## v2.0.3 changes from sshscriptparserng to dollarparser
     from . import dollarparser
-    ## this is required for user to "import *.spy"  in a .py script
-    ## by onlye "import sshscriptsession" in the .py script
-    from . import spyimporter
 
 else:
     ## called directly from the same folder
@@ -53,16 +49,12 @@ else:
     from sessionwrapper import SessionWrapper,SudoConsole,SuConsole
     from errorutils import get_logger, SSHScriptException, SSHScriptExit, SSHScriptBreak, dumpScript, listRightIndex
     import dollarparser
-    import spyimporter
 
 ## setup logger
 logger = get_logger()
 SSHScriptExportedNames = set(['sftp','client','logger']) # default to exposed properties
 SSHScriptExportedNamesByAlias = {}
 
-## expose to __main__ for sshdollar.py
-__main__.SSHScriptExportedNames = SSHScriptExportedNames
-__main__.SSHScriptExportedNamesByAlias = SSHScriptExportedNamesByAlias
 def export2Dollar(nameOrFunc):    
     if callable(nameOrFunc):
         SSHScriptExportedNames.add(nameOrFunc.__name__)
@@ -281,8 +273,6 @@ class ConsoleWrapper:
     def stderr(self):
         return self.channel.stderr
 
-__main__.ConsoleWrapper = ConsoleWrapper
-
 class Session(object):
     counter = 0
     def __init__(self,parent=None):
@@ -309,6 +299,7 @@ class Session(object):
         self._client = None
         self._sock =  None
         self._sftp = None
+        self.close_errors = ()
 
         self.blocksOfScript = None
        
@@ -337,8 +328,7 @@ class Session(object):
         ## this value was stored, so user can access its stdout, stderr and exitcode
         ## by self.stdout and self.stderr, self.exitcode
         self._lastDollar = None
-
-        self._append_to_thread_stack()
+        self._attached_stack = None
     ## added in v2.0.3
     ## always return the session which is not connected to execute commands by subprocess at localhost
     @property
@@ -465,31 +455,25 @@ class Session(object):
     #def close_session(self):
     #    return self.close()
 
-    def _append_to_thread_stack(self,the_thread=None):
-        """ make this session to be the attached session in given thread."""
+    def _attach_to_thread_stack(self, stack=None, the_thread=None):
+        """Keep this session active until ``close()`` explicitly detaches it."""
         if the_thread is None:
             the_thread = threading.current_thread()
-        
-        self._thread_appened_to = the_thread
-        the_thread.sshscriptstack.append(self)
-        '''
-        if hasattr(the_thread,'sshscriptstack'):
-            ## has patched thread
-            the_thread.sshscriptstack.append(self)
-        else:                
-            ## not been patched thread
-            the_thread.sshscriptstack = patching.SshscriptStack(the_thread,[self])
-        '''
+        if stack is None:
+            stack = patching.get_thread_stack(the_thread)
+        if self._attached_stack is not None:
+            raise RuntimeError('session is already attached to a thread stack')
+        stack.append(self)
+        self._attached_stack = stack
         return the_thread
     
-    def _pop_from_thread_stack(self):
-        """ make this session to be the attached session in given thread. """
-        #if aThread is None: aThread = threading.current_thread()
-
-        if self._thread_appened_to is None: return None
-        result = self._thread_appened_to.sshscriptstack.pop(self)
-        self._thread_appened_to = None
-        return result        
+    def _detach_from_thread_stack(self):
+        """Undo an activation created by ``_attach_to_thread_stack()``."""
+        if self._attached_stack is None:
+            return False
+        removed = self._attached_stack.discard(self)
+        self._attached_stack = None
+        return removed
         
 
     def __repr__(self):
@@ -499,29 +483,25 @@ class Session(object):
             return f'<Session {self.id}>'
 
     def __enter__(self):
-        self.enteringThreadsLocker.acquire()
-        threading.current_thread().sshscriptstack.append(self)
-        #print(f'>>>>enteringThreads={threading.current_thread().sshscriptstack.stack}')
-        self.enteringThreads.append(threading.current_thread())
-        self.enteringThreadsLocker.release()
+        current_thread = threading.current_thread()
+        with self.enteringThreadsLocker:
+            patching.get_thread_stack(current_thread).append(self)
+            self.enteringThreads.append(current_thread)
         return self
 
     def __exit__(self,*args):
-        self.enteringThreadsLocker.acquire()
-        idx = listRightIndex(self.enteringThreads,threading.current_thread())
-        #print(f'idx= {idx}, enteringThreads={self.enteringThreads[idx].sshscriptstack.stack}')
-        self.enteringThreads[idx].sshscriptstack.pop(self)
-        del self.enteringThreads[idx]
-        self.enteringThreadsLocker.release()
-        if len(self.enteringThreads) == 0:
-            ## if this session is localhost, don't close it
-            ## since it's self.enteringThreads does not 
-            ## contains the thread which was added in __enter__.
-            ## Calls close() only when it is a remote connection.
-            ## because the 1st thread in enteringThreads is 
-            ## the thread which was added by parent session's connect()
-            if self._client is not None:
-                self.close()               
+        current_thread = threading.current_thread()
+        with self.enteringThreadsLocker:
+            idx = listRightIndex(self.enteringThreads, current_thread)
+            if idx < 0:
+                raise RuntimeError(
+                    'session context exited from a thread that did not enter it'
+                )
+            patching.get_thread_stack(current_thread).pop(self)
+            del self.enteringThreads[idx]
+            close_remote = not self.enteringThreads and self._client is not None
+        if close_remote:
+            self.close()
         return False
 
     @property    
@@ -555,7 +535,9 @@ class Session(object):
                 $.connect('user@host',password) instead of $.connect('user@host',password=password)
         policy:
             args for paramiko's SSHClient.set_missing_host_key_policy()
-            when policy is None, its default is AutoAddPolicy
+            when policy is None, unknown or changed host keys are rejected.
+            Pass paramiko.AutoAddPolicy() explicitly only for trusted bootstrap
+            environments where accepting a new key is intended.
         kw:dict
             kw['proxyCommand']: 
                 setting proxyCommand. If presented, the next arguments were set:
@@ -595,8 +577,9 @@ class Session(object):
         def connect_client(host,username,password,port,policy,**kw):
             client = paramiko.SSHClient()
             try:
-                ## client.load_system_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
-                if policy: client.set_missing_host_key_policy(policy)
+                client.load_system_host_keys()
+                if policy is not None:
+                    client.set_missing_host_key_policy(policy)
                 client.connect(host,username=username,password=password,port=port,**kw)
                 return client
             except BaseException:
@@ -610,10 +593,14 @@ class Session(object):
                         type(cleanup_exc).__name__,
                     )                
                 raise
-        ## user can set policy=0 to disable client.set_missing_host_key_policy
-        if policy is None:
-            ## allow connect to host not which is in known_hosts
-            policy = paramiko.AutoAddPolicy()
+        if policy == 0:
+            warnings.warn(
+                'policy=0 is deprecated; omit policy to use secure host-key '
+                'verification',
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            policy = None
 
         ## convert pkey_path to pkey, if "pkey" has existed, would raise ValueError
         if 'pkey_path' in kw:
@@ -713,14 +700,20 @@ class Session(object):
     @export2Dollar
     def pkey(self,pathOfRsaPrivate,password=None):
         if self.connected:
-            _,stdout,stderr = self._client.exec_command(f'cat "{pathOfRsaPrivate}"')
-            exitcode = stdout.channel.recv_exit_status()
-            if exitcode > 0:
-                raise SSHScriptException(f'failed to get pkey from {pathOfRsaPrivate}, exitcode = {exitcode}, stderr = {stderr}')
-            else:
-                keyfile = StringIO(stdout.read().decode('utf8'))
-                pkey = paramiko.RSAKey.from_private_key(keyfile,password)                
-            return pkey
+            # Read through SFTP instead of interpolating the path into a remote
+            # shell command.  Besides handling arbitrary valid filenames, this
+            # prevents a caller-controlled path from becoming command input.
+            try:
+                with self.sftp.open(pathOfRsaPrivate, 'rb') as remote_key:
+                    key_data = remote_key.read()
+            except FileNotFoundError:
+                raise SSHScriptException(
+                    f'{pathOfRsaPrivate} not found on {self.host}'
+                ) from None
+            if isinstance(key_data, bytes):
+                key_data = key_data.decode('utf-8')
+            keyfile = StringIO(key_data)
+            return paramiko.RSAKey.from_private_key(keyfile,password)
         else:
             # localhost
             try:
@@ -886,6 +879,14 @@ class Session(object):
         return self.run_in_eventloop(script,vars,showScript)
 
     def run_in_eventloop(self,script,vars=None,showScript=False):
+        execution_stack = patching.get_thread_stack()
+        execution_stack.append(self)
+        try:
+            return self._run_in_eventloop_active(script, vars, showScript)
+        finally:
+            execution_stack.discard(self)
+
+    def _run_in_eventloop_active(self,script,vars=None,showScript=False):
         
         def executeScript(script,_vars,showScript=False):
             filepath = _vars.get('__file__')
@@ -918,14 +919,12 @@ class Session(object):
             except KeyError:
                 exec_vars['__name__'] = '__main__'
 
-            ## setup the _sshscriptstacks_ for the session
-            _sshscriptstacks_ = exec_vars.get('_sshscriptstacks_')
-            threading.current_thread().sshscriptstack = _sshscriptstacks_ or patching.SshscriptStack(threading.current_thread(),[self])
-
             exec_vars['threading']= threading
             exec_vars['sys']= sys
             exec_vars['types']= types
             exec_vars['Dollar'] = Dollar
+            exec_vars['patching'] = patching
+            exec_vars['_sshscript_session_'] = self
 
             if is_dollar_script:
                 code = dollarparser.compile_spy(source_path, script)
@@ -934,12 +933,10 @@ class Session(object):
                 code = compile(script, source_path, 'exec')
             try:
                 exec(code, exec_vars)  # Run the modified code inside the module's namespace
-            except SSHScriptBreak:
-                ## ignore this exception
-                return exec_vars
-            except SSHScriptExit as e:
-                ## v2.0.3, same as SSHScriptExit
-                raise SystemExit(e.errno)
+            except (SSHScriptBreak, SSHScriptExit):
+                # Preserve the control-flow exception until run_file()/the CLI
+                # can translate it into the documented process exit status.
+                raise
             else:
                 return exec_vars
             
@@ -995,8 +992,6 @@ class Session(object):
         elif ret.get('system_exit'):
             sys.exit(ret['system_exit'].code)
         else:
-            ## what is for, for next spy script?
-            ret['value']['_sshscriptstacks_'] = threading.current_thread().sshscriptstack
             return ret['value']
 
     ## v2.0.3 added feature
@@ -1170,16 +1165,31 @@ class Session(object):
         return self._lastDollar.wait_for_output(timeout,silent)
 
     @export2Dollar
-    def close(self):
+    def close(self, strict=False):
+        """Close this session and report whether every cleanup step succeeded.
+
+        Cleanup remains best-effort by default so it does not mask an exception
+        already leaving a ``with`` block.  Callers that require a hard resource
+        guarantee may pass ``strict=True``.  In either mode, details are retained
+        in ``close_errors`` as ``(operation, exception)`` tuples.
+        """
 
         ## don't allow to be called multiple times
-        if self.closed: return 
+        if self.closed:
+            close_errors = getattr(self, 'close_errors', ())
+            if strict and close_errors:
+                raise RuntimeError(self._close_error_summary())
+            return not close_errors
 
         cleanup_errors = []
         transport = None
         
         for subsession in reversed(tuple(self.subsessions)):
-            subsession.close()
+            if not subsession.close():
+                cleanup_errors.extend(
+                    (f'close child session: {operation}', exc)
+                    for operation, exc in subsession.close_errors
+                )
 
         if self._client is not None:
 
@@ -1189,8 +1199,12 @@ class Session(object):
                 cleanup_errors.append(('get SSH transport', exc))
 
             if self._sftp:
-                self._sftp.close()
-                self._sftp = None
+                try:
+                    self._sftp.close()
+                except Exception as exc:
+                    cleanup_errors.append(('close SFTP client', exc))
+                finally:
+                    self._sftp = None
 
             logger.info(
                 'Closing SSH connection (host=%s, port=%s, username=%s)',
@@ -1201,6 +1215,7 @@ class Session(object):
             try:
                 self._client.close()
             except Exception as exc:
+                cleanup_errors.append(('close SSH client', exc))
                 logger.debug(
                     'Unable to close SSH client cleanly '
                     '(host=%s, exception_type=%s)',
@@ -1224,6 +1239,14 @@ class Session(object):
                         )
                     )
                     cleanup_errors.extend(errors)
+                    if not complete and not errors:
+                        cleanup_errors.append((
+                            'complete proxy cleanup',
+                            RuntimeError(
+                                'proxy process, streams, or transport '
+                                'remained active'
+                            ),
+                        ))
 
                     if forced_kill:
                         logger.warning(
@@ -1243,6 +1266,7 @@ class Session(object):
                     else:
                         self._sock = None                
             except Exception as exc:
+                cleanup_errors.append(('clean up SSH socket', exc))
                 logger.debug(
                     'Unable to close SSH socket cleanly '
                     '(host=%s, exception_type=%s)',
@@ -1284,13 +1308,40 @@ class Session(object):
                     self,
                     self.parent,
                 )
-        ## auto unbind to current thread
-        self._pop_from_thread_stack()
+        self._detach_from_thread_stack()
+
+        self.close_errors = tuple(cleanup_errors)
+        for operation, exc in self.close_errors:
+            logger.warning(
+                'Session cleanup step failed '
+                '(operation=%s, exception_type=%s)',
+                operation,
+                type(exc).__name__,
+            )
+
+        if strict and self.close_errors:
+            raise RuntimeError(self._close_error_summary())
+        return not self.close_errors
+
+    def _close_error_summary(self):
+        operations = ', '.join(
+            operation for operation, _ in self.close_errors
+        )
+        return (
+            f'session cleanup failed in {len(self.close_errors)} step(s): '
+            f'{operations}'
+        )
 
     ## alias
     disconnect = close    
     def __del__(self):
-        self.close()
+        try:
+            self.close()
+        except Exception:
+            # Destructors cannot provide a reliable error channel.  Explicit
+            # close() retains and reports failures; garbage collection must not
+            # emit an unraisable exception during interpreter shutdown.
+            pass
 
     def _cleanup_proxy_command(self, proxy, transport=None):
         process = proxy.process

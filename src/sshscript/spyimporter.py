@@ -18,14 +18,18 @@
 ## v2.0.3 feature: import *.spy file directly
 import importlib.abc
 import importlib.util
-import sys,os
+import os
+import sys
 import threading
+from contextlib import contextmanager
 
 if __package__:
     from . import dollarparser
+    from . import patching
     from .dollar import Dollar
 else:
     import dollarparser
+    import patching
     from dollar import Dollar
 
 class SpyLoader(importlib.abc.Loader):
@@ -55,49 +59,98 @@ class SpyLoader(importlib.abc.Loader):
             "Dollar": Dollar,
             "sys": sys,
             "threading": threading,
+            "patching": patching,
+            "_sshscript_session_": None,
         }
+        stack = patching.peek_thread_stack()
+        if stack is not None and len(stack):
+            g["_sshscript_session_"] = stack[-1]
         module.__dict__.update(g)
         code = dollarparser.compile_spy(self.path, original_code)
         exec(code, module.__dict__)  # Run the modified code inside the module's namespace
-## hook the loader 
-import importlib.machinery
-package_path = {}
-class SpyFileFinder(importlib.machinery.FileFinder):
+
+
+class SpyFileFinder(importlib.abc.MetaPathFinder):
     """Custom file finder for .spy files."""
 
-    @classmethod
-    def find_spec(cls, fullname, path=None, target=None):
+    def find_spec(self, fullname, path=None, target=None):
         """Find the module spec for a .spy file."""
         if path is None:
             path = sys.path  # Search in sys.path        
-        if '.' in fullname:
-            ## remove 1st item from fullname, if it is in format of "A.B"
-            fullname_file = fullname.split('.')[-1]
-        else:
-            fullname_file = fullname
-        #print('   >> fullname=',fullname)
+        fullname_file = fullname.rsplit('.', 1)[-1]
         for entry in path:
-            if not os.path.isdir(entry): continue
-            spy_init_file = os.path.join(entry,fullname_file,'__init__.spy')
-            if os.path.exists(spy_init_file):
+            if not os.path.isdir(entry):
+                continue
+            spy_init_file = os.path.join(
+                entry,
+                fullname_file,
+                '__init__.spy',
+            )
+            if os.path.isfile(spy_init_file):
                 package = fullname
-                with open(spy_init_file, "r"): 
-                    loader = SpyLoader(spy_init_file,package)
-                    m = importlib.util.spec_from_loader(fullname, loader,origin=spy_init_file,is_package=package)
-                    m.submodule_search_locations = [os.path.join(entry,fullname_file)]
-                    return m
+                loader = SpyLoader(spy_init_file, package)
+                spec = importlib.util.spec_from_loader(
+                    fullname,
+                    loader,
+                    origin=spy_init_file,
+                    is_package=True,
+                )
+                spec.submodule_search_locations = [
+                    os.path.join(entry, fullname_file)
+                ]
+                return spec
             else:
-                spy_file = os.path.join(entry,fullname_file+'.spy')
-                if os.path.exists(spy_file):
-                    with open(spy_file, "r"):
-                        package = '.'.join(fullname.split('.')[:-1])
-                        loader = SpyLoader(spy_file,package)
-                        return importlib.util.spec_from_loader(fullname, loader,origin=spy_file)
+                spy_file = os.path.join(entry, fullname_file + '.spy')
+                if os.path.isfile(spy_file):
+                    package = fullname.rpartition('.')[0]
+                    loader = SpyLoader(spy_file, package)
+                    return importlib.util.spec_from_loader(
+                        fullname,
+                        loader,
+                        origin=spy_file,
+                    )
         return None  # Module not found
 
-def register_spy_importer():
-    """Register the .spy importer."""
-    sys.meta_path.insert(0, SpyFileFinder)  # Insert at the beginning to check .spy first
+_spy_finder = SpyFileFinder()
+_registration_lock = threading.RLock()
+_registration_count = 0
+_remove_when_unused = False
 
-# Call this function once at the start of your program
-register_spy_importer()
+
+def register_spy_importer():
+    """Register the ``.spy`` finder once and return it."""
+    global _registration_count, _remove_when_unused
+    with _registration_lock:
+        if _registration_count == 0:
+            _remove_when_unused = _spy_finder not in sys.meta_path
+        if _remove_when_unused and _spy_finder not in sys.meta_path:
+            sys.meta_path.insert(0, _spy_finder)
+        _registration_count += 1
+    return _spy_finder
+
+
+def unregister_spy_importer():
+    """Release one registration and remove the finder when no user remains."""
+    global _registration_count, _remove_when_unused
+    with _registration_lock:
+        if _registration_count == 0:
+            return
+        _registration_count -= 1
+        if _registration_count == 0 and _remove_when_unused:
+            while _spy_finder in sys.meta_path:
+                sys.meta_path.remove(_spy_finder)
+            _remove_when_unused = False
+
+
+@contextmanager
+def spy_imports():
+    """Temporarily enable ordinary Python imports of ``.spy`` modules.
+
+    The registration is reference-counted, so nested and overlapping contexts
+    leave the process import state exactly as they found it.
+    """
+    register_spy_importer()
+    try:
+        yield
+    finally:
+        unregister_spy_importer()

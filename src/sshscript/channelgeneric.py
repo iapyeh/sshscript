@@ -14,7 +14,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
-import __main__
 import threading, os, sys, re
 import time
 import logging
@@ -62,7 +61,10 @@ class GenericChannel(object):
         self.lastIOAtTime = [time.time(),time.time()] ## input(send), output(stderr,stdout)
 
         ## this is for onedollar and twodollar
-        self._dumpCondition = asyncio.Condition()
+        # asyncio primitives must be created while their owning loop is
+        # running.  Constructing this during a synchronous import/API call can
+        # create a process-default loop that is never closed.
+        self._dumpCondition = None
         self._dumpBuf = []
         self._stdoutDumpBuf = b''
         self._stderrDumpBuf = b''
@@ -1362,6 +1364,7 @@ class GenericChannel(object):
     async def async_start_interaction(self):
         self.interaction_loop = asyncio.get_running_loop()
         self._async_send_lock = asyncio.Lock()
+        self._dumpCondition = asyncio.Condition()
         self._set_open()
 
         reader_task = asyncio.create_task(
@@ -1890,7 +1893,7 @@ class GenericChannel(object):
             executing_lock.release()    
 
 
-    '''
+    r'''
     def send_command(self,command,**expections):
         """Send a command to the channel.       
         :command: Command to execute
@@ -1977,7 +1980,7 @@ class GenericChannel(object):
         
         :sig: Signal to send
         """
-        if isinstance(self,__main__.SSHChannel):
+        if getattr(self, 'is_ssh_channel', False):
             message = paramiko.Message()
             message.add_byte(paramiko.common.cMSG_CHANNEL_REQUEST)
             message.add_int(self.channel.channel.remote_chanid)
@@ -2003,6 +2006,8 @@ class GenericChannel(object):
             except UnicodeDecodeError:
                 self._stdout.append(newbytes.decode('utf8','replace'),True)
         if self.dump2sys[0]:
+            if self._dumpCondition is None:
+                self._dumpCondition = asyncio.Condition()
             async with self._dumpCondition:
                 self._dumpBuf.append((0,newbytes))
                 self._dumpCondition.notify()
@@ -2021,6 +2026,8 @@ class GenericChannel(object):
             except UnicodeDecodeError:
                 self._stderr.append(newbytes.decode('utf8','replace'),True)
         if self.dump2sys[1]:
+            if self._dumpCondition is None:
+                self._dumpCondition = asyncio.Condition()
             async with self._dumpCondition:
                 self._dumpBuf.append((1,newbytes))
                 self._dumpCondition.notify()

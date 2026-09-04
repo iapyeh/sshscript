@@ -13,7 +13,6 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
-import __main__
 import logging
 import os
 import re
@@ -337,13 +336,7 @@ def command_summary(command):
 
 
 ## ensure this logger is singleton
-global logger
 logger = None
-try:
-    ## this module has been imported somewhere
-    logger = __main__._sshscript_logger
-except AttributeError:
-    pass
 
 
 class WrappedLogger:
@@ -351,7 +344,7 @@ class WrappedLogger:
 
     formatter = logging.Formatter(
         '%(asctime)s %(levelname)s %(name)s '
-        '%(message)s',
+        '[thread=%(thread)d] %(message)s',
         '%Y-%m-%d %H:%M:%S',
     )
 
@@ -366,8 +359,6 @@ class WrappedLogger:
         self._propagate_before_tty = None
         self._configure_library_logger()
         self.reset_debug()
-        ## make this instance be singleton when imported by another module name
-        __main__._sshscript_logger = self
 
     def __getattr__(self, name):
         return getattr(self._logger, name)

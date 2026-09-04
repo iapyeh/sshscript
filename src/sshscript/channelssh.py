@@ -13,7 +13,6 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
-import __main__
 import errno
 import os
 import paramiko
@@ -50,7 +49,23 @@ class ParamikoChannel(object):
             self.channel = sshchannel.client.get_transport().open_session()
             ## Note: for environment variable to work,
             ##      /etc/ssh/sshd_config should permit "LC*" environment to be set
-            self.channel.update_environment(dict(os.environ,TERM='dumb',LC_ALL='en_US.UTF-8',LANG='en_US.UTF-8'))
+            # Never forward the caller's complete process environment.  It may
+            # contain API tokens, cloud credentials, or CI secrets.  Interactive
+            # SSH sessions receive only terminal/locale defaults plus values the
+            # caller explicitly supplied through ``env=``.
+            environment = {
+                'TERM': 'dumb',
+                'LC_ALL': 'en_US.UTF-8',
+                'LANG': 'en_US.UTF-8',
+            }
+            requested_environment = getattr(
+                sshchannel.owner,
+                '_parameters_to_execute',
+                {},
+            ).get('environment', {})
+            if requested_environment:
+                environment.update(requested_environment)
+            self.channel.update_environment(environment)
             if self.get_pty:
                 ## should enable pty, because without it, interactive python, mysql client won't work.
                 ## but it also produce "prompt" into stdout. that is a problem.
@@ -209,6 +224,8 @@ class SSHChannel(GenericChannel):
     
     Manages SSH sessions with PTY and non-PTY modes.
     """
+    is_ssh_channel = True
+
     def __init__(self,owner,client,get_pty=False):
         """Initialize SSHChannel.
         
@@ -304,6 +321,3 @@ class SSHChannel(GenericChannel):
             # 即使 Paramiko cleanup raise，也要關閉本地 buffer，
             # 並讓其他 waiter 看到 closed。
             self._finish_close()
-
-
-__main__.SSHChannel = SSHChannel
