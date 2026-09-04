@@ -15,8 +15,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 import os
 import sys
-import glob
-import __main__
 import time
 import traceback
 ## starts from 3.1, asyncio is introduced.
@@ -26,8 +24,6 @@ __version__ = "3.1.0"
 import warnings
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
     return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
-warnings.formatwarning = warning_on_one_line
-
 if __package__:
     from .session import Session
     from .errorutils import SSHScriptExit, SSHScriptBreak, get_logger, set_logger, SSHScriptException,command_summary
@@ -49,96 +45,97 @@ sshscript_module = sys.modules[__package__ or __name__]
 
 ## initial logger
 logger = get_logger()
+spy_imports = spyimporter.spy_imports
 
-def run_file(script_path,
-        vars=None,
-        showScript=False)->int:
-    ## starts from v3.1, this routine runs one file only.
-   
-    ## starts the executions of every script
-    _vars = locals().copy()
-    if vars: _vars.update(vars)
-    #_globals = globals().copy()
+def run_file(
+    script_path,
+    vars=None,
+    showScript=False,
+) -> int:
+    """Execute one Python or ``.spy`` script file in a new local session.
 
-    the_session = Session()
+    ``script_path`` must identify one existing regular file; directories,
+    globs, and iterables of paths are not accepted.  Scripts that need code
+    from other files should use SSHScript include syntax or Python imports.
+
+    Args:
+        script_path: A string or ``os.PathLike`` path to one script file.
+        vars: Optional initial names exposed to the script.
+        showScript: Convert and display the script without executing it.
+
+    Returns:
+        ``0`` after normal completion, or the status supplied to
+        ``$.break(status)``.
+
+    Raises:
+        TypeError: If ``script_path`` is not a string or path-like object.
+        RuntimeError: If the path is missing or is not a regular file.
+        SSHScriptExit: If the script calls ``$.exit(status)``.
+    """
+    if not isinstance(script_path, (str, os.PathLike)):
+        raise TypeError('script_path must be str or os.PathLike')
+    absfile = os.path.abspath(os.fspath(script_path))
+    if not os.path.exists(absfile):
+        raise RuntimeError(f'{absfile} not found')
+    if not os.path.isfile(absfile):
+        raise RuntimeError(f'{absfile} is not a file')
+
+    script_vars = dict(vars or {})
+    script_vars['sshscript'] = sshscript_module
+    session = Session()
     exitcode = 0
-    absfile = os.path.abspath(script_path)
     started_at = time.monotonic()
     outcome = 'failed'
     script_exitcode = None
     exception_type = None
+    script_folder = os.path.dirname(absfile)
+    inserted_path = False
     logger.debug('Starting script file (path=%s)', absfile)
 
-    scriptFolder = os.path.dirname(absfile)
-    scriptFolderInsertedToSysPath = False
     try:
-        ## maybe strange, but probably also works on windows
-        with open(absfile,'rb') as fd:
-            script = fd.read().decode('utf-8','replace')
+        with open(absfile, 'rb') as fd:
+            script = fd.read().decode('utf-8', 'replace')
 
-        ## add folder to sys.path,so "import <module in the same folder of __file__>" works
-        if not scriptFolder in sys.path:
-            scriptFolderInsertedToSysPath = True
-            sys.path.insert(0,scriptFolder)
+        if script_folder not in sys.path:
+            inserted_path = True
+            sys.path.insert(0, script_folder)
 
-        _vars['__name__'] = '__main__'
-        _vars['__file__'] = absfile
-        _vars['sshscript'] = sshscript_module
-        ## parse the file only if it is .spy
-        ## v2.0.3 changes the order from locals,globals to globals,locals
-        newvars = the_session.run(script,_vars,showScript=showScript)
-    except SSHScriptBreak as e:
-        exitcode = e.errno
-        script_exitcode = e.errno
+        script_vars['__name__'] = '__main__'
+        script_vars['__file__'] = absfile
+        with spyimporter.spy_imports():
+            session.run(
+                script,
+                script_vars,
+                showScript=showScript,
+            )
+    except SSHScriptBreak as exc:
+        exitcode = exc.errno
+        script_exitcode = exc.errno
         outcome = 'break'
-    except SSHScriptExit as e:
-        exitcode = e.errno
-        script_exitcode = e.errno
+    except SSHScriptExit as exc:
+        script_exitcode = exc.errno
         outcome = 'exit'
         raise
-    except SSHScriptException as e:
-        exitcode = e.errno
-        script_exitcode = e.errno
+    except SSHScriptException as exc:
+        script_exitcode = exc.errno
         outcome = 'sshscript_error'
-        exception_type = type(e).__name__
+        exception_type = type(exc).__name__
         raise
-    except SystemExit as e:
-        script_exitcode = e.code
-        outcome = 'system_exit'
-        exception_type = type(e).__name__
-        raise
-    except Exception as e:
+    except BaseException as exc:
         outcome = 'error'
-        exception_type = type(e).__name__
+        exception_type = type(exc).__name__
         raise
     else:
-        exported = newvars.get('__export__')        
-        if exported:
-            ## __export__ = '*' will export all
-            if '*' == exported:
-                _vars.update(newvars)
-                export_count = len(newvars)
-            else:
-                for key in exported:
-                    _vars[key] = newvars[key]
-                export_count = len(exported)
-            logger.debug(
-                'Exported script variables (path=%s, count=%d)',
-                absfile,
-                export_count,
-            )
-        _vars['_sshscriptstacks_'] = newvars['_sshscriptstacks_']
         outcome = 'completed'
         script_exitcode = 0
     finally:
-        ## restore sys.path
-        if scriptFolderInsertedToSysPath:
-            sys.path.remove(scriptFolder)
-        the_session.close()
-        del the_session
+        if inserted_path:
+            sys.path.remove(script_folder)
+        session.close()
         logger.debug(
             'Script file finished '
-            '(path=%s, outcome=%s, exit_code=%s, exception_type=%s, duration_ms=%d)',
+            '(path=%s, outcome=%s, exit_code=%s, '
+            'exception_type=%s, duration_ms=%d)',
             absfile,
             outcome,
             script_exitcode,
@@ -174,25 +171,19 @@ def run_script(script,varGlobals=None,showScript=False):
         )
 
 def main():
-    ## v2.0.3, only one .spy file is allowed, this makes no sense
-    ## --run-order, 
-    #parser.add_argument('--run-order', dest='showRunOrder', action='store_true',
-    #                    default=False,
-    #                    help='show the files to run in order, no execution.')
-
     ## Console logging is a CLI concern; importing sshscript remains silent.
     set_logger()
+    warnings.formatwarning = warning_on_one_line
 
     import argparse
 
-    ## REF: https://stackoverflow.com/questions/15753701/how-can-i-pass-a-list-as-a-command-line-argument-with-argparse
     parser = argparse.ArgumentParser(description='SSHScript: automation tools for Subprocess and SSH')
 
 
     parser.add_argument('--script','-s', dest='showScript', action='store_true',
                         default=False,
                         help='show the converted python script only, no execution.')
-    
+
     parser.add_argument('--verbose','-v', dest='verbose', action='store_true',
                         default=False,
                         help='dump stdout,stderr to console.')   
@@ -207,7 +198,7 @@ def main():
 
 
     parser.add_argument('path', action='store', nargs='?', default='_',
-                        help='path of .spy files or folders')
+                        help='path of one Python or .spy script file')
 
 
     ## new on v1.1.17
@@ -238,7 +229,7 @@ def main():
     def get_current_version():
         return __version__
 
-    ## handle the contradiction between args.debug and args.paths
+    ## handle the contradiction between args.debug and args.path
     if args.path == '_':
         if args.debug and len(args.debug) == 1:
             ## sshscript.py  --debug unittest-v2.0.3/A01onedollar.spy 
@@ -295,16 +286,11 @@ def main():
         elif args.verbose_stderr:
             os.environ['VERBOSE_STDERR'] = '1'
 
-        ## v3, only one .spy file is allowed, this makes no sense
-        #if args.folder:
-        #    paths = [os.path.join(args.folder,x) for x in args.paths]
-        #else:
-        #    paths = args.paths
-
         try:
-            run_file(args.path,
-                showScript=args.showScript
-                )
+            exitcode = run_file(
+                args.path,
+                showScript=args.showScript,
+            )
         except SSHScriptExit as e:
             sys.exit(e.errno)
         except SSHScriptException as e:
@@ -355,7 +341,7 @@ def main():
                 )
             sys.exit(1)
         else:
-            sys.exit(0)
+            sys.exit(exitcode)
     elif sys.stdout.isatty():
         # check new version, new from 1.1.13
         current_version = get_current_version()

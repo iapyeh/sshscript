@@ -14,29 +14,16 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
-import ast
-import traceback
-
-try:
-    ast.unparse
-except AttributeError:
-    try:
-        import astunparse
-    except ImportError:
-        traceback.print_exc()
-        print('Python version less than 3.9 require "astunparse" to be installed. Please install it by "pip install astunparse"')
-        raise
-    else:
-        setattr(ast,'unparse', astunparse.unparse)
-
 if __package__:
     from . import sshscript
     from . import session
     from . import errorutils
+    from .spyimporter import spy_imports
 else:
     import sshscript
     import session
     import errorutils
+    from spyimporter import spy_imports
 
 __version__ = sshscript.__version__
 run_file = sshscript.run_file
@@ -62,4 +49,12 @@ SSHScriptException = errorutils.SSHScriptException
 #    else:
 #        return _global['____sshscript____'][0]
 
-__all__ = ['run_file', 'run_script', 'Session','get_logger','set_logger','SSHScriptException']
+__all__ = [
+    'run_file',
+    'run_script',
+    'Session',
+    'get_logger',
+    'set_logger',
+    'spy_imports',
+    'SSHScriptException',
+]

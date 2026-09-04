@@ -16,7 +16,6 @@
 
 import os, re, sys, time
 import subprocess, shlex
-import __main__
 import asyncio
 import threading
 
@@ -33,7 +32,7 @@ import pty
 from io import BufferedWriter,TextIOWrapper
 ## ['stdout','stderr','exitcode','channel'] are basic members, exitcode and channel are properties
 ## v1.1.14: add "exitcode", "channel", v2.0: remove "stdin", because "stdin" is useless
-__main__.DollarExportedNames = set(['stdout','stderr','exitcode','channel'])
+DollarExportedNames = set(['stdout','stderr','exitcode','channel'])
 
 def export2Dollar(func):    
     """
@@ -46,7 +45,7 @@ def export2Dollar(func):
         The original function.
     """
     assert callable(func)
-    __main__.DollarExportedNames.add(func.__name__)
+    DollarExportedNames.add(func.__name__)
     return func
 
 class Dollar(object):
@@ -218,7 +217,12 @@ class Dollar(object):
                 task.add_done_callback(task_exception_handler)
                 newloop.run_forever()
             finally:
-                cleanup()
+                try:
+                    cleanup()
+                except BaseException as exc:
+                    self._worker_exception = exc
+                    if self.channel is not None:
+                        self.channel.fail(exc)
 
         t = threading.Thread(target=r,daemon=True,name='dollar.call')
         t.start()
@@ -241,8 +245,7 @@ class Dollar(object):
         else:
             ## wait for onedollar and twodollar to complete
             while (
-                not self.channel.closed
-                and self._worker_exception is None
+                self._worker_exception is None
                 and t.is_alive()
             ):
                 time.sleep(0.01)
@@ -273,7 +276,6 @@ class Dollar(object):
                 return self.channel
             else:
                 await self.exec_by_ssh(get_pty)
-                self.event_loop.stop()
                 return self
         else:
             if self.for_with:
@@ -282,7 +284,6 @@ class Dollar(object):
             else:
                 ## A one-shot command waits for completion and returns self.
                 await self.exec_by_subprocess(get_pty)
-                self.event_loop.stop()
                 return self
     async def exec_by_subprocess(self,get_pty:bool):
         """
@@ -591,11 +592,30 @@ class Dollar(object):
             )
             self.channel = SSHChannel(self,None,get_pty)
             stdin, stdout,stderr = client.exec_command(command,**kw)
-            if kw_input:
-                stdin.write(kw_input+'\n')
+            if kw_input is not None:
+                input_payload = kw_input
+                if isinstance(input_payload, str) and not input_payload.endswith('\n'):
+                    input_payload += '\n'
+                stdin.write(input_payload)
                 stdin.flush()
-            await self.channel._add_stdout_data(stdout.read())
-            await self.channel._add_stderr_data(stderr.read())
+
+            # Programs such as ``cat`` wait for EOF before producing their
+            # result.  Closing only the write side also lets stdout/stderr
+            # remain available for collection.
+            stdin.channel.shutdown_write()
+
+            # stdout and stderr share an SSH channel window.  Reading either
+            # stream to EOF before draining the other can deadlock when the
+            # unread stream fills that window, so drain them concurrently.
+            loop = asyncio.get_running_loop()
+            stdout_future = loop.run_in_executor(None, stdout.read)
+            stderr_future = loop.run_in_executor(None, stderr.read)
+            stdout_data, stderr_data = await asyncio.gather(
+                stdout_future,
+                stderr_future,
+            )
+            await self.channel._add_stdout_data(stdout_data)
+            await self.channel._add_stderr_data(stderr_data)
             await self.channel._dump_stdout_err()
             self.channel._exitcode = stdout.channel.recv_exit_status()
             logger.debug(

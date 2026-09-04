@@ -6,8 +6,7 @@ without SSH hosts, keys, usernames, or passwords.
 """
 
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import redirect_stdout
-from io import StringIO
+import importlib
 from pathlib import Path
 import os
 import shlex
@@ -17,9 +16,109 @@ import tempfile
 import unittest
 
 import sshscript
+import patching
 
 
 class ImportLayoutTests(unittest.TestCase):
+    def test_import_does_not_modify_process_hooks(self):
+        source_root = Path(__file__).resolve().parents[1]
+        code = """
+import __main__
+import asyncio
+import logging
+import os
+import sys
+import threading
+import warnings
+
+thread_init = threading.Thread.__init__
+thread_state = dict(threading.current_thread().__dict__)
+meta_path = tuple(sys.meta_path)
+warning_formatter = warnings.formatwarning
+root_logger = logging.getLogger()
+root_state = (root_logger.level, tuple(root_logger.handlers), tuple(root_logger.filters))
+environment = dict(os.environ)
+event_loop_policy = asyncio.get_event_loop_policy()
+def verify_import():
+    main_names = set(vars(__main__))
+    import sshscript
+
+    assert threading.Thread.__init__ is thread_init
+    assert threading.current_thread().__dict__ == thread_state
+    assert tuple(sys.meta_path) == meta_path
+    assert warnings.formatwarning is warning_formatter
+    assert (root_logger.level, tuple(root_logger.handlers), tuple(root_logger.filters)) == root_state
+    assert os.environ == environment
+    assert asyncio.get_event_loop_policy() is event_loop_policy
+    assert set(vars(__main__)) == main_names
+
+verify_import()
+"""
+        subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=source_root,
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+    def test_spy_imports_is_explicit_nested_and_reversible(self):
+        with tempfile.TemporaryDirectory(
+            prefix="sshscript-explicit-import-"
+        ) as folder:
+            module_name = "explicit_spy_module"
+            Path(folder, f"{module_name}.spy").write_text(
+                "answer = 42\n",
+                encoding="utf-8",
+            )
+            original_meta_path = tuple(sys.meta_path)
+            sys.path.insert(0, folder)
+            self.addCleanup(sys.path.remove, folder)
+            self.addCleanup(sys.modules.pop, module_name, None)
+
+            with self.assertRaises(ModuleNotFoundError):
+                importlib.import_module(module_name)
+
+            with sshscript.spy_imports():
+                self.assertNotEqual(tuple(sys.meta_path), original_meta_path)
+                with sshscript.spy_imports():
+                    module = importlib.import_module(module_name)
+                self.assertEqual(module.answer, 42)
+                self.assertNotEqual(tuple(sys.meta_path), original_meta_path)
+
+            self.assertEqual(tuple(sys.meta_path), original_meta_path)
+
+            with self.assertRaisesRegex(RuntimeError, "context failed"):
+                with sshscript.spy_imports():
+                    raise RuntimeError("context failed")
+            self.assertEqual(tuple(sys.meta_path), original_meta_path)
+
+    def test_spy_imports_supports_packages_and_relative_imports(self):
+        with tempfile.TemporaryDirectory(
+            prefix="sshscript-explicit-package-"
+        ) as folder:
+            package_name = "explicit_spy_package"
+            package = Path(folder, package_name)
+            package.mkdir()
+            Path(package, "__init__.spy").write_text(
+                "from . import child\nanswer = child.answer\n",
+                encoding="utf-8",
+            )
+            Path(package, "child.spy").write_text(
+                "answer = 42\n",
+                encoding="utf-8",
+            )
+            sys.path.insert(0, folder)
+            self.addCleanup(sys.path.remove, folder)
+            self.addCleanup(sys.modules.pop, package_name, None)
+            self.addCleanup(sys.modules.pop, package_name + ".child", None)
+
+            with sshscript.spy_imports():
+                module = importlib.import_module(package_name)
+
+            self.assertEqual(module.answer, 42)
+
     def test_flat_module_import_does_not_reenter_package_initializer(self):
         source_root = Path(__file__).resolve().parents[1]
         code = """
@@ -60,6 +159,7 @@ sys.modules[spec.name] = package
 spec.loader.exec_module(package)
 
 assert hasattr(package, "run_file")
+assert hasattr(package, "spy_imports")
 assert package.run_file is package.sshscript.run_file
 assert package.Session is package.session.Session
 assert package.sshscript.sshscript_module is package
@@ -131,6 +231,31 @@ class SessionModuleTests(unittest.TestCase):
             _ = self.session.stderr
         with self.assertRaisesRegex(ValueError, "no execution result yet"):
             _ = self.session.exitcode
+
+    def test_constructor_and_close_do_not_change_execution_stack(self):
+        stack = patching.get_thread_stack()
+        before = stack.snapshot()
+
+        session = sshscript.Session()
+        self.assertEqual(stack.snapshot(), before)
+        session.close()
+        self.assertEqual(stack.snapshot(), before)
+
+    def test_run_and_context_manager_have_scoped_activation(self):
+        stack = patching.get_thread_stack()
+        before = stack.snapshot()
+        session = sshscript.Session()
+
+        namespace = session.run(
+            "active_session = patching.peek_thread_stack()[-1]"
+        )
+        self.assertIs(namespace["active_session"], session)
+        self.assertEqual(stack.snapshot(), before)
+
+        with session:
+            self.assertIs(stack[-1], session)
+        self.assertEqual(stack.snapshot(), before)
+        session.close()
 
     def test_direct_command_captures_output_and_exit_code(self):
         command = shlex.join(
@@ -240,54 +365,57 @@ class ScriptRunnerModuleTests(unittest.TestCase):
 
         self.assertEqual(namespace["answer"], 42)
 
-    def test_run_file_shares_explicit_exports_between_sorted_files(self):
-        with tempfile.TemporaryDirectory(prefix="sshscript-module-test-") as folder:
+    def test_run_file_accepts_exactly_one_regular_file(self):
+        with tempfile.TemporaryDirectory(
+            prefix="sshscript-module-single-file-"
+        ) as folder:
             folder_path = Path(folder)
+            script = folder_path / "single.spy"
             marker = folder_path / "verified.txt"
-            (folder_path / "01_export.spy").write_text(
-                "shared_value = seed + 2\n"
-                "__export__ = ['shared_value']\n",
-                encoding="utf-8",
-            )
-            (folder_path / "02_verify.spy").write_text(
+            script.write_text(
                 "from pathlib import Path\n"
-                "assert hasattr(sshscript, 'Session')\n"
-                "assert shared_value == 42\n"
+                "assert seed == 40\n"
                 "Path(marker_path).write_text('verified', encoding='utf-8')\n",
                 encoding="utf-8",
             )
 
             exitcode = sshscript.run_file(
-                folder,
+                script,
                 vars={"seed": 40, "marker_path": str(marker)},
             )
 
             self.assertEqual(exitcode, 0)
             self.assertEqual(marker.read_text(encoding="utf-8"), "verified")
 
-    def test_run_file_reports_sorted_order_without_execution(self):
-        with tempfile.TemporaryDirectory(prefix="sshscript-module-order-") as folder:
-            folder_path = Path(folder)
-            later = folder_path / "20_later.spy"
-            earlier = folder_path / "10_earlier.spy"
-            later.write_text("raise AssertionError('must not run')\n", encoding="utf-8")
-            earlier.write_text("raise AssertionError('must not run')\n", encoding="utf-8")
-
-            output = StringIO()
-            with redirect_stdout(output):
-                exitcode = sshscript.run_file(folder, showRunOrder=True)
-
-            self.assertEqual(exitcode, 0)
-            self.assertEqual(
-                output.getvalue().splitlines(),
-                [str(earlier.absolute()), str(later.absolute())],
-            )
+            with self.assertRaisesRegex(RuntimeError, "is not a file"):
+                sshscript.run_file(folder_path)
+            with self.assertRaisesRegex(TypeError, "script_path"):
+                sshscript.run_file([script])
+            with self.assertRaisesRegex(RuntimeError, "not found"):
+                sshscript.run_file(str(folder_path / "*.spy"))
 
     def test_missing_script_has_a_clear_error(self):
         with tempfile.TemporaryDirectory(prefix="sshscript-module-missing-") as folder:
             missing = Path(folder) / "missing.spy"
             with self.assertRaisesRegex(RuntimeError, "missing[.]spy not found"):
                 sshscript.run_file(str(missing))
+
+    def test_cli_preserves_break_exit_status(self):
+        source_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory(
+            prefix="sshscript-module-break-"
+        ) as folder:
+            script = Path(folder) / "break.spy"
+            script.write_text("$.break(37)\n", encoding="utf-8")
+            completed = subprocess.run(
+                [sys.executable, str(source_root / "sshscript.py"), str(script)],
+                cwd=source_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+        self.assertEqual(completed.returncode, 37)
 
 
 class ThreadedLocalModuleTests(unittest.TestCase):

@@ -13,11 +13,17 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
-# Define a new Thread class that has a parent attribute
+# Per-thread execution state owned by SSHScript, without patching Thread.
+import functools
 import threading
-import time
-import sys
+import weakref
 from collections import deque
+
+
+_thread_stacks = weakref.WeakKeyDictionary()
+_thread_stacks_lock = threading.RLock()
+
+
 class SshscriptStack(object):
     """
     A stack-like data structure that maintains a thread-safe collection of SSH session objects.
@@ -27,9 +33,8 @@ class SshscriptStack(object):
     sessions and allows for session management operations.
     
     Attributes:
-        instances (list): Class-level list tracking all instances of SshscriptStack
         stack (deque): The main storage container for session objects
-        owner (threading.Thread): The thread that owns this stack instance
+        owner_id (int): Identity of the thread that owns this stack instance
     """
     #instances = []
     def __init__(self,owner,initialitems=None):
@@ -42,8 +47,7 @@ class SshscriptStack(object):
         """
         self.stack = deque(initialitems,maxlen=300) if initialitems else deque(maxlen=300)
         assert isinstance(self.stack,deque),type(self.stack)
-        ## the thread which owns this stack
-        self.owner = owner
+        self.owner_id = id(owner)
         self.locker = threading.Lock()
         #SshscriptStack.instances.append(self)
     
@@ -65,6 +69,11 @@ class SshscriptStack(object):
         """
         return iter(self.stack) 
 
+    def snapshot(self):
+        """Return a stable copy suitable for inheritance by a new thread."""
+        with self.locker:
+            return list(self.stack)
+
     def __getitem__(self, val): 
         """
         Get an item from the stack by index.
@@ -83,27 +92,6 @@ class SshscriptStack(object):
             assert len(self.stack) >= abs(val) , f'len of stack:{len(self.stack)}, No item for "{val}"'
 
         return self.stack[val]
-
-    def getLastIndex(self,item):
-        """
-        Find the index of the last occurrence of an item in the stack.
-        
-        Args:
-            item: The item to search for
-            
-        Returns:
-            int: The index of the last occurrence, or -1 if not found
-        """
-        start = 0
-        idx = -1
-        while True:
-            try:
-                idx = self.stack.index(item,start)
-            except ValueError:
-                break
-            else:
-                start = idx + 1
-        return idx
 
     def append(self,x):
         """
@@ -131,33 +119,23 @@ class SshscriptStack(object):
         Raises:
             AssertionError: If the specified item is not at the top of the stack
         """
-        self.locker.acquire()
-        try:
-            if isinstance(self.stack,SshscriptStack):
-                assert self.stack[-1] == x
-                session = self.stack.remove(x)
-            elif x is None:
-                session = self.stack.pop()
-            else:
-                assert isinstance(self.stack,deque),f'{id(self.owner)}:{self.stack} is not deque({isinstance(self.stack,SshscriptStack)})'
-                ## find the index of last item of n (rindex)
-                idx = self.getLastIndex(x)
-                if 1:
-                    if not idx == len(self.stack) - 1:
-                        exc_info = sys.exc_info()
-                        if exc_info[0] is not None:
-                            raise exc_info[1]
-                        else:
-                            raise RuntimeError(f"{id(self.owner)}:{x} is not on top of ({self.stack})")
-                    self.stack.pop()
-                else:
-                    for i in range(idx,len(self.stack)):
-                        x = self.stack.pop()
-                ## instance of Session or wcw (channel wrapper)
-                session = x        
-            return session
-        finally:
-            self.locker.release()    
+        with self.locker:
+            if not self.stack:
+                raise IndexError('cannot pop an empty SSHScript stack')
+            if x is not None and self.stack[-1] is not x:
+                raise RuntimeError(
+                    f'{self.owner_id}:{x} is not on top of ({self.stack})'
+                )
+            return self.stack.pop()
+
+    def discard(self, item):
+        """Remove the most recent identical item, regardless of its position."""
+        with self.locker:
+            for index in range(len(self.stack) - 1, -1, -1):
+                if self.stack[index] is item:
+                    del self.stack[index]
+                    return True
+        return False
     ## v2.0.3, divert to session's __enter__() 
     def connect(self,*args, **kwargs):
         """
@@ -172,6 +150,12 @@ class SshscriptStack(object):
         """
         return self[-1].connect(*args, **kwargs)
 
+    def connect_and_activate(self, *args, **kwargs):
+        """Connect and make the new session active until it is closed."""
+        session = self.connect(*args, **kwargs)
+        session._attach_to_thread_stack(self)
+        return session
+
     def close(self):
         """
         Close the session at the top of the stack.
@@ -179,91 +163,88 @@ class SshscriptStack(object):
         Returns:
             The result of closing the session
         """
-        return self[-1].close()
-    def __del__(self):
-        #SshscriptStack.instances.remove(self)
-        pass
+        session = self[-1]
+        result = session.close()
+        if len(self) and self[-1] is session:
+            self.pop(session)
+        return result
+def get_thread_stack(thread=None, initial_session=None):
+    """Return SSHScript's stack for a thread, creating it on first use.
 
-'''
-2026/5/27: is maintening_job still required?
-maintening_threads = set()
-def maintening_job():
-    while True:
-        dropable_sessions = set()
-        for t in list(maintening_threads):
-            if t.is_alive(): continue
-            for s in t.sshscriptstack.stack:
-                if not s.connected:
-                    dropable_sessions.add((t,s))
-            maintening_threads.remove(t)
-            #print('live session in dead thread',t,'total=',len(dropable_sessions))
-        for t,s in dropable_sessions:
-            print('removing',s,'from',t)
-            try:
-                s.unbindThread(t)
-            except IndexError:
-                pass
-        time.sleep(3)
-'''
-
-def _monkey_patch_thread_init_():
+    SSHScript owns the weak registry; neither importing nor executing it adds
+    private attributes to application ``threading.Thread`` objects.
     """
-    Monkey patch the threading.Thread.__init__ method to add SSH script functionality.
-    
-    This function modifies the Thread class initialization to:
-    1. Add a parent thread reference
-    2. Add a creation time timestamp
-    3. Initialize an SSH script stack for the thread
-    
-    The patching enables SSH session management within threads and maintains
-    proper session context across thread creation.
-    """
-    originalThread_init = threading.Thread.__init__
-    def patched_init(self, *args, **kwargs):
-        """
-        Patched initialization method for Thread class.
-        ( .parent, .ctime and .sshscriptstack are added to an instance of Thread)
-        
-        Args:
-            *args: Original positional arguments
-            **kwargs: Original keyword arguments, may include _sshscript_session_
-        """
-        self.parent = threading.current_thread()
-        self.ctime = time.time()
-        
-        
-        if 'no_patch' in kwargs:
-            ## these are sshscript's thread
-            no_patch = kwargs['no_patch']
-            del kwargs['no_patch']
-        elif (self.__class__.__name__ in ('Transport','Timer')):
-            ## these are paramiko's thread
-            no_patch = True
-        else:
-            no_patch = False
-        
-        if not no_patch:
-            try:
-                ## called by ssshscripsession.thread()
-                self.sshscriptstack = SshscriptStack(self,[kwargs['_sshscript_session_']])
-                del kwargs['_sshscript_session_']
-            except KeyError:
-                ## called by threading.Thread
-                self.sshscriptstack = SshscriptStack(self)
-                ## pro: 
-                ## cons: not threads-safe, requires "with $.new_session()" 
-                ##   (2026/5/27: need more explaination, why not threads-safe? why need "with $.new_session()"?)
-                if len(self.parent.sshscriptstack):
-                    self.sshscriptstack.append(self.parent.sshscriptstack[-1])
-                
-        originalThread_init(self,*args, **kwargs)
-    threading.Thread.__init__ = patched_init   
+    thread = thread or threading.current_thread()
+    with _thread_stacks_lock:
+        stack = _thread_stacks.get(thread)
+        if stack is None:
+            initialitems = (
+                [initial_session] if initial_session is not None else None
+            )
+            stack = SshscriptStack(thread, initialitems)
+            _thread_stacks[thread] = stack
+        elif initial_session is not None and len(stack) == 0:
+            stack.append(initial_session)
+        return stack
 
-_monkey_patch_thread_init_()
-## v2.0.3 added
-## As for main_thread, it would enable a .py file can import *.spy by
-## adding one line "import sshscriptsession" only.
-## see unitest-v2.0.3/B03nametest.py for example
-for t in threading.enumerate():
-    if not hasattr(t,'sshscriptstack'):
-        t.sshscriptstack = SshscriptStack(t)
+
+def peek_thread_stack(thread=None):
+    """Return an existing stack without creating process-visible state."""
+    thread = thread or threading.current_thread()
+    with _thread_stacks_lock:
+        return _thread_stacks.get(thread)
+
+
+def set_thread_stack(stack, thread=None):
+    """Associate an existing stack with a thread for an explicit script run."""
+    thread = thread or threading.current_thread()
+    with _thread_stacks_lock:
+        _thread_stacks[thread] = stack
+    return stack
+
+
+def clear_thread_stack(thread=None):
+    """Forget a thread's execution stack after its target has finished."""
+    thread = thread or threading.current_thread()
+    with _thread_stacks_lock:
+        return _thread_stacks.pop(thread, None)
+
+
+def context_thread(
+    group=None,
+    target=None,
+    name=None,
+    args=(),
+    kwargs=None,
+    *,
+    daemon=None,
+):
+    """Construct a standard Thread that inherits the caller's SSHScript stack."""
+    parent_stack = peek_thread_stack()
+    initial_stack = (
+        parent_stack.snapshot() if parent_stack is not None else []
+    )
+
+    if target is None:
+        wrapped_target = None
+    else:
+        @functools.wraps(target)
+        def wrapped_target(*target_args, **target_kwargs):
+            stack = SshscriptStack(
+                threading.current_thread(),
+                initial_stack,
+            )
+            set_thread_stack(stack)
+            try:
+                return target(*target_args, **target_kwargs)
+            finally:
+                clear_thread_stack()
+
+    return threading.Thread(
+        group=group,
+        target=wrapped_target,
+        name=name,
+        args=args,
+        kwargs=kwargs,
+        daemon=daemon,
+    )

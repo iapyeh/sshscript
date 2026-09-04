@@ -15,14 +15,17 @@ The suite uses only Python's standard `unittest` framework in addition to
 SSHScript's normal runtime dependencies, so no separate test package is
 required. It covers:
 
+- import-time isolation for process hooks, warnings, logging, and threads;
+- explicit, reversible `.spy` imports through `sshscript.spy_imports()`;
 - importing and constructing the public `Session` class;
+- side-effect-free construction and scoped session-stack activation;
 - the initial state and lifecycle of a credential-free local session;
 - direct command strings assembled with `shlex.join()`, stdin, environment
   variables, stdout, stderr, and exit codes;
 - automatic and explicit shell selection through `Session.exec_command()`;
 - invalid command arguments and repeatable cleanup;
 - execution of ordinary Python through `run_script()`;
-- sorted multi-file execution and explicit exports through `run_file()`; and
+- single-file execution and input validation through `run_file()`; and
 - independent local sessions running concurrently in worker threads.
 
 The command exits with a nonzero status and prints the failing assertion if a
