@@ -6,25 +6,20 @@ has_children: true
 
 # SSHScript v3.1 Documentation
 
-SSHScript automates local and remote command-line work from Python. Version
-3.1 uses the regular `Session` API as its primary interface, making it easy to
-embed automation in applications, libraries, tests, and existing Python
-projects.
+This section is the technical reference for SSHScript v3.1. Use the sidebar
+to move directly between topics without returning to this page.
 
-The recommended learning path is the [Module API](module), followed by the
-[Module API Tutorial](tutorial). The Core and Advanced sections cover
-connections, privilege changes, interactive programs, transfers, streaming
-output, and threads. The [Dollar Syntax Add-on](Basic/dollar) is optional and
-is documented separately for concise `.spy` scripts.
+Start with the [Module API](module) and
+[Module API Tutorial](tutorial). Continue to Core Session API for
+connections and privilege contexts, then Advanced Session API for interactive
+programs, SFTP transfers, streaming output, and threads.
 
-SSHScript requires Python 3.9 or newer:
+The [Dollar Syntax Add-on](Basic/dollar) is optional and is documented
+separately for concise `.spy` scripts. Implementation contributors should
+also review [Development and Testing](development-and-testing) and the
+[SSHScript v3.1 Release Notes](release-notes-v3.1).
 
-```sh
-python3 -m pip install sshscript
-```
+Installation, the first runnable example, and project status are maintained
+on the [SSHScript v3.1 home page](../).
 
-Version 3.1 is currently beta. Its default release gate is credential-free;
-run real SSH scenarios only in an isolated environment with explicit local
-configuration.
-
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-15 09:40:34
