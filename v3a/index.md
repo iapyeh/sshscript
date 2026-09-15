@@ -5,31 +5,30 @@ nav_exclude: true
 
 # SSHScript v3.1
 
-SSHScript is a Python automation library and `.spy` script runner for
-executing commands locally or over SSH. Its primary interface is the regular
-Python `Session` API; the optional Dollar syntax provides a compact notation
-for standalone automation scripts.
+SSHScript brings local commands, SSH automation, and Python control flow into
+one programming model. Its primary interface is the regular Python `Session`
+API, while the optional Dollar syntax offers concise notation for standalone
+`.spy` scripts.
 
 ## Why SSHScript?
 
-SSHScript keeps command execution, SSH connections, privilege changes,
-interactive programs, file transfer, and Python control flow in one
-programming model. The same `Session` code can begin on localhost, enter a
-remote host, and return safely through nested context managers.
+Use the same Session model to run a command on localhost, connect to a remote
+host, enter a privileged or interactive context, transfer files, and return
+cleanly through nested context managers. Python remains available for data
+processing, branching, exceptions, testing, and integration with existing
+applications.
 
-Version 3.1 also makes automation behavior more explicit:
+SSHScript v3.1 emphasizes predictable and secure automation:
 
-- commands are non-empty strings, so dynamic argument lists can be quoted
-  deliberately with `shlex.join()`;
-- SSH host keys are verified by default;
-- script execution and `.spy` imports are scoped instead of changing
-  process-wide Python behavior; and
-- credential-free tests cover the public module API and optional Dollar
-  syntax.
+- commands are explicit non-empty strings;
+- dynamic argument lists can be safely assembled with `shlex.join()`;
+- SSH host keys are verified by default; and
+- imports, threads, and script execution remain scoped instead of changing
+  process-wide Python behavior.
 
 ## Installation
 
-SSHScript requires Python 3.9 or newer.
+SSHScript requires Python 3.9 or newer:
 
 ```sh
 python3 -m pip install sshscript
@@ -41,7 +40,7 @@ Upgrade an existing installation with:
 python3 -m pip install --upgrade sshscript
 ```
 
-## Quick start
+## First command
 
 ```python
 import shlex
@@ -60,23 +59,31 @@ finally:
 ```
 
 `Session.exec_command()` accepts one command string. Lists and tuples are not
-accepted; use `shlex.join()` when assembling a command from arguments.
+accepted; use `shlex.join()` when building a direct command from arguments.
 
-## Documentation
+## Continue learning
 
-Start with the [Module API tutorial](SSHScript%20v3%20Documents/tutorial/),
-then use the complete
-[SSHScript v3.1 documentation](SSHScript%20v3%20Documents/) as a reference.
-The [Dollar Syntax add-on](SSHScript%20v3%20Documents/Basic/dollar/) is
-available for teams that prefer `.spy` files.
+Begin with the
+[Module API Tutorial](SSHScript%20v3%20Documents/tutorial/), then use the
+[SSHScript v3.1 Documentation](SSHScript%20v3%20Documents/) sidebar as the
+technical reference.
 
+The [Core Session API](SSHScript%20v3%20Documents/Basic/) covers connections
+and privilege contexts. The
+[Advanced Session API](SSHScript%20v3%20Documents/Advanced/) covers
+interactive programs, transfers, streaming output, and threading. Use the
+[Dollar Syntax Add-on](SSHScript%20v3%20Documents/Basic/dollar/) only when its
+`.spy` notation suits the project.
+
+For installation problems, see
+[Installation Troubleshooting](SSHScript%20v3%20Documents/troubleshooting-installation/).
 Practical scenarios are collected in the
 [Example Gallery](Example%20Gallery/).
 
 ## Project status
 
 SSHScript v3.1 is beta software. Run the credential-free release gate before
-deployment and validate real SSH behavior in an isolated environment before
-production rollout. SSHScript is released under the MIT License.
+deployment and validate real SSH behavior in an isolated test environment
+before production rollout. SSHScript is released under the MIT License.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-15 09:40:34
