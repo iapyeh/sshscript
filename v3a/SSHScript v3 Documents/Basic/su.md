@@ -1,76 +1,89 @@
 ---
-title: "$.su"
-parent: "Basic"
+title: "Session.su()"
+parent: "Core Session API"
+grand_parent: "SSHScript v3.1 Documentation"
 nav_order: 2
 ---
 
-# $.su
+# Session.su()
 
-`$.su` starts an interactive `su` session and executes a `with` block as
-another Unix account. It works locally and inside [`$.connect`](connect).
+`Session.su()` opens an interactive `su` context as another Unix account. It
+works on localhost and on a connected child Session.
 
 ## Switch account for a block
 
 ```python
 from getpass import getpass
+from sshscript import Session
 
-deploy_password = getpass("Password for deploy: ")
-with $.su("deploy", password=deploy_password):
-    $whoami
-    assert $.stdout.strip() == "deploy"
-    $id
+password = getpass("Password for deploy: ")
+session = Session()
+try:
+    with session.su("deploy", password=password) as deploy:
+        deploy.exec_command("whoami")
+        deploy.expect("deploy")
+        print(str(deploy.stdout))
+finally:
+    session.close(strict=True)
 ```
 
 When the block ends, SSHScript leaves the `su` console and restores the
-previous identity. Use `$.su` rather than issuing a separate `su` command:
-it handles the interactive prompt and cleanup for the whole block.
+previous identity. Whether a password is required depends on the host's PAM
+and `su` configuration.
 
 ## Use it over SSH
 
 ```python
-with $.connect("ops@example.net"):
-    $whoami
-    with $.su("deploy", password=deploy_password):
-        $whoami
-        $cd /srv/deploy; ./maintenance.sh
-```
+from sshscript import Session
 
-Whether a password is needed depends on the remote host's PAM and `su`
-configuration.
+local = Session()
+try:
+    with local.connect("ops@example.net") as remote:
+        with remote.su("deploy", password=password) as deploy:
+            deploy.exec_command("whoami")
+            deploy.exec_command("cd /srv/deploy; ./maintenance.sh")
+finally:
+    local.close(strict=True)
+```
 
 ## Options
 
-`$.su(username, password=None, expect=None, initials=None, shell=True,
-login=True, get_pty=True)`
+`Session.su(username, password=None, expect=None, initials=None,
+shell=True, login=True, get_pty=True)`
 
 | Option | Purpose |
 | --- | --- |
+| `username` | Account to enter. |
 | `password` | Value sent when `su` prompts. |
-| `expect` | Prompt text for a non-standard environment. |
-| `initials` | Initial input to send after entering the console. |
+| `expect` | Prompt pattern for a non-standard environment. |
+| `initials` | A string or iterable of initial commands. |
 | `login` | Use login-style account switching; default `True`. |
-| `shell` | Use the normal interactive shell; default `True`. |
+| `shell` | Use the normal interactive base shell; default `True`. |
 | `get_pty` | Request a pseudo-terminal; default `True`. |
 
-The defaults are right for most systems. Keep or explicitly set
-`get_pty=True` when the host requires a TTY. Use `expect=` only if a
-customised prompt is not detected normally.
+Keep `get_pty=True` when the host requires a TTY. Set `expect=` only when the
+normal password prompt cannot be detected.
 
 ## Combine with sudo
 
 ```python
-with $.su("deploy", password=deploy_password):
-    $whoami
-    with $.sudo(password=deploy_password):
-        $whoami  # normally root
+with session.su("deploy", password=deploy_password) as deploy:
+    with deploy.sudo(password=deploy_password) as root:
+        root.exec_command("whoami")
 ```
 
 The sudo password, if required, belongs to the account currently running
-`sudo`. See [`$.sudo`](sudo) for target-account options.
+`sudo`.
 
-## Security
+## Optional Dollar syntax
 
-Never commit passwords to a `.spy` file. Use `getpass`, a secret manager,
-or policy- and key-based access, and grant only the privileges required.
+```python
+with $.su("deploy", password=deploy_password):
+    $whoami
+    $id
+```
 
-Last Updated: 2026-07-25 16:59:40
+Never hard-code passwords in Python or `.spy` files. Use `getpass`, a secret
+manager, or narrowly scoped policy-based access.
+
+Last Updated: 2026-09-14 18:02:02

@@ -1,10 +1,10 @@
 ---
-title: "SSHScript v3.0 Tutorial (zh-TW)"
-parent: "SSHScript v3 Documents"
-nav_order: 2
+title: "Dollar Syntax Tutorial (zh-TW)"
+parent: "SSHScript v3.1 Documentation"
+nav_order: 3
 ---
 
-# SSHScript v3.0 Tutorial (zh-TW)
+# Dollar Syntax Tutorial (zh-TW)
 
 SSHScript 讓你把熟悉的系統指令直接寫進 Python，並以同一套程式處理本機、遠端主機與巢狀 SSH 連線。
 
@@ -16,7 +16,7 @@ SSHScript 讓你把熟悉的系統指令直接寫進 Python，並以同一套程
 2. 從 `$.stdout`、`$.stderr`、`$.exitcode` 取得結果。
 3. 用 Python 判斷、整理資料，決定下一個動作。
 
-這份教學以 SSHScript v3.0 的 dollar syntax 為主，範例檔案使用慣例副檔名 `.spy`。
+這份教學介紹 SSHScript v3.1 選用的 Dollar syntax，範例檔案使用慣例副檔名 `.spy`。新專案建議先從正式的 [Module API Tutorial](tutorial) 開始；當精簡的命令寫法更適合團隊時，再使用本篇的 `.spy` 語法。
 
 ## 1. 安裝與執行
 
@@ -96,7 +96,7 @@ assert $.stderr == ""
 assert $.exitcode == 0
 ```
 
-### 3.1 v3.0 支援的指令形式
+### 3.1 v3.1 支援的指令形式
 
 可以直接寫指令：
 
@@ -240,9 +240,9 @@ $("printf '%s' \"$BASH_VERSION\"", shell="bash")
 
 舊版的 `$$command` 與 `$$(command)` 暫時仍可執行，但已在 v3 中 deprecated，並會強制使用 shell。新程式請分別改寫為 `$command` 與 `$(command)`，交由自動判斷處理。
 
-## 4. v3.0 的 Python 相容性
+## 4. v3.1 的 Python 相容性
 
-SSHScript v3.0 以 Python token 為基礎辨識 dollar syntax。一般 Python 字串、raw string、f-string 的文字區與註解中的 `$` 不會被當成指令：
+SSHScript v3.1 以 Python token 為基礎辨識 dollar syntax。一般 Python 字串、raw string、f-string 的文字區與註解中的 `$` 不會被當成指令：
 
 ```python
 literal = "$.stdout $echo $HOME"
@@ -324,10 +324,15 @@ with $.shell('bash') as shell:
 使用帳號與密碼：
 
 ```python
-with $.connect("user@host.example.net", password="secret") as remote:
+from getpass import getpass
+
+password = getpass("SSH password: ")
+with $.connect("user@host.example.net", password=password) as remote:
     $hostname
     print($.stdout.strip())
 ```
+
+SSHScript v3.1 預設載入系統 host keys，並拒絕未知或已變更的主機金鑰。正常連線前應先確認伺服器身分，將金鑰加入 `known_hosts`；只有受信任的初始建置環境才應明確選用自動接受政策。詳見 [`Session.connect()`](Basic/connect)。
 
 如果已設定 SSH key，通常不必提供密碼：
 
@@ -336,12 +341,14 @@ with $.connect("user@host.example.net"):
     $uptime
 ```
 
-指定 key 檔：
+指定本機 key 檔：
 
 ```python
+import os
+
 with $.connect(
     "user@host.example.net",
-    pkey_path="/absolute/path/to/id_rsa",
+    key_filename=os.path.expanduser("~/.ssh/id_ed25519"),
 ):
     $whoami
 ```
@@ -414,7 +421,10 @@ with $.sudo(password=password):
 切換使用者：
 
 ```python
-with $.su("service-user", password="secret"):
+from getpass import getpass
+
+service_password = getpass("service-user password: ")
+with $.su("service-user", password=service_password):
     $whoami
     assert $.stdout.strip() == "service-user"
 ```
@@ -440,7 +450,7 @@ with $.connect("user@host.example.net") as remote:
 
 ## 10. 直接匯入 `.spy` 模組
 
-SSHScript v3.0 可以像 Python 模組一樣匯入另一個 `.spy` 檔。這適合把可重用的檢查或操作拆成小函式。
+SSHScript v3.1 可以像 Python 模組一樣匯入另一個 `.spy` 檔。這適合把可重用的檢查或操作拆成小函式。
 
 建立 `server_checks.spy`：
 
@@ -467,7 +477,7 @@ with $.connect("ops@host.example.net"):
 
 ## 11. 多執行緒與有效 session
 
-每個執行緒都有自己的 session stack。新連線進入 stack 頂端，離開 `with` 區塊後回到上一層，所以不同執行緒可以同時在不同主機工作。
+每個執行緒都有自己的 session stack。v3.1 的 `.spy` source transformer 會讓它辨識出的 `threading.Thread(...)` 在建立時擷取目前有效的 Session，並只在 worker 執行期間安裝該 context；SSHScript 不會修改全域的 `threading.Thread` 類別。新連線進入 stack 頂端，離開 `with` 區塊後回到上一層，所以不同執行緒可以同時在不同主機工作。
 
 ```python
 import threading
@@ -501,44 +511,47 @@ for account, row in results.items():
 
 實務上請注意：
 
-- 每個工作執行緒自行建立或明確進入它要使用的 session。
+- 一般 `.py` 程式應讓每個 worker 自行建立或明確取得 Session；只有經過轉換的 `.spy` Thread 才有上述 context inheritance。
 - 多個執行緒共用 Python 容器時仍須使用 `Lock` 或其他同步機制。
 - worker 內的例外應收集並在主執行緒重新拋出，避免失敗只出現在背景輸出中。
 - 設定合理的連線與指令 timeout。
 
 ## 12. 在一般 Python 程式使用 SSHScript
 
-若專案不想使用 dollar syntax，也可以直接使用 v3 的 `Session` API：
+`Session` API 是 v3.1 建議優先使用的正式 Python 介面，適合整合既有應用程式、函式庫與測試：
 
 ```python
-import sshscript
 import shlex
+from sshscript import Session
 
-session = sshscript.Session()
+session = Session()
+try:
+    session.exec_command("hostname", shell=False)
+    print(session.stdout.strip())
 
-session("hostname")
-print(session.stdout.strip())
+    session.exec_command("printf 'a\\nb\\n' | tail -n 1")
+    print(session.stdout.strip())
 
-session("printf 'a\\nb\\n' | tail -n 1")
-print(session.stdout.strip())
+    arguments = ["printf", "%s", "direct"]
+    session.exec_command(shlex.join(arguments), shell=False)
 
-# 視需要覆寫自動判斷。
-session(shlex.join(["printf", "%s", "direct"]), shell=False)
-session("printf '%s' \"$BASH_VERSION\"", shell="bash")
-
-with session.connect("ops@host.example.net") as remote:
-    remote("uptime")
-    print(remote.stdout.strip())
+    with session.connect("ops@host.example.net") as remote:
+        remote.exec_command("uptime", shell=False)
+        print(remote.stdout.strip())
+finally:
+    session.close(strict=True)
 ```
 
-兩種寫法的概念相同：
+`exec_command()` 只接受一個非空字串；list、tuple 或其他型別會拋出 `TypeError`。若從參數陣列組合直接執行的命令，請先用 `shlex.join()` 安全地產生字串。
 
-- `$command` 對應 `session(command)`，兩者都會自動選擇直接或 shell 模式。
+兩種寫法使用相同的 Session 模型：
+
+- `$command` 是 `session.exec_command(command)` 的精簡語法。
 - `$(command, shell=False)` 可強制直接模式；`$(command, shell=True)` 或 `shell="bash"` 可強制 shell 模式。
 - `with $` 對應 `with session.shell()`。
 - `$.stdout` 對應 `session.stdout`，其餘結果屬性亦同。
 
-Dollar syntax 適合讓維運步驟一眼可讀；`Session` API 則適合整合既有 Python 專案。
+一般 Python 專案應優先使用 `Session` API；Dollar syntax 則是讓 `.spy` 維運步驟更精簡的選用附加語法。
 
 ## 13. 完整範例：找出磁碟使用率過高的主機
 
@@ -627,6 +640,14 @@ sshscript --debug example.spy
 sshscript --debug 8 example.spy
 ```
 
+需要完整 traceback 時可使用：
+
+```sh
+sshscript --traceback example.spy
+```
+
+完整 traceback 可能包含程式原始碼、命令、路徑或秘密，只應在安全的除錯環境啟用。
+
 撰寫程式時，建議特別留意：
 
 1. `$.stdout` 等結果會被下一個指令更新，需要時立即保存。
@@ -638,6 +659,6 @@ sshscript --debug 8 example.spy
 
 ## 結語
 
-SSHScript v3.0 把 shell 擅長的「直接操作系統」和 Python 擅長的「程式結構與資料處理」放在同一個檔案裡。你不必放棄既有指令，也不必先學一套新的任務描述語言；從一行 `$hostname` 開始，加上 `$.connect()`，同一段可讀的 Python 程式就能逐步成長為本機、遠端、巢狀連線與平行作業的自動化工具。
+SSHScript v3.1 把 shell 擅長的「直接操作系統」和 Python 擅長的「程式結構與資料處理」放在同一個檔案裡。你可以從 `Session` API 建立可重用的 Python 自動化，再於適合的 `.spy` 腳本中採用 Dollar syntax，逐步擴展到本機、遠端、巢狀連線與平行作業。
 
-Last Updated: 2026-07-28
+Last Updated: 2026-09-14 18:02:02

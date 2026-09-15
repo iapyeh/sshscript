@@ -1,189 +1,151 @@
 ---
-title: "$"
-parent: "Basic"
-nav_order: 1
+title: "Dollar Syntax Add-on"
+parent: "Core Session API"
+grand_parent: "SSHScript v3.1 Documentation"
+nav_order: 4
 ---
 
-# $
+# Dollar Syntax Add-on
 
-`$` is SSHScript's command syntax. It runs a command in the current session:
-locally by default, or on the host selected by [`$.connect`](connect).
+Dollar syntax is SSHScript v3.1's optional shorthand for `.spy` files. It
+uses the same Session implementation as the primary Python API, but lets an
+automation script place `$` before a command.
 
-SSHScript v3 uses one-dollar syntax for both ordinary commands and shell
-features. The former `$$` syntax remains only for compatibility and is
-deprecated.
+Use the [Module API](../module) for libraries, applications, and ordinary
+Python projects. Use Dollar syntax when concise, shell-like operational steps
+improve the readability of a standalone script.
 
-## Execute commands and read their result
+## Execute commands and read results
 
 ```python
 $hostname
 print($.stdout.strip())
 
 $python3 -c "import sys; sys.stderr.write('problem\\n'); sys.exit(7)"
-print($.exitcode)       # 7
-print($.stderr.strip()) # problem
+print($.exitcode)        # 7
+print($.stderr.strip())  # problem
 ```
 
-Each command updates these properties:
-
-| Property | Meaning |
-| --- | --- |
-| `$.stdout` | Standard output |
-| `$.stderr` | Standard error |
-| `$.exitcode` | Process exit status |
-
-Capture both output streams directly when useful:
+Each command updates `$.stdout`, `$.stderr`, and `$.exitcode`. Capture the
+two output streams when the values must survive a later command:
 
 ```python
 stdout, stderr = $python3 -c "import sys; print('out'); sys.stderr.write('err\\n')"
-assert stdout.strip() == "out"
-assert stderr.strip() == "err"
 ```
-
-The next command replaces `$.stdout`, `$.stderr`, and `$.exitcode`; keep
-anything needed later in a Python variable.
 
 ## Command forms
 
-Use the direct form for a literal command. Use `$()` for a variable command
-or command options:
-
 ```python
-command = "python3 -c \\"print('from a variable')\\""
+$hostname
+$'printf string-literal'
+$r'printf raw-string'
+
+command = "python3 -c \"print('from a variable')\""
 $(command, timeout=5)
 
 name = "SSHScript"
 $f'printf "Hello, %s\\n" {name}'
-
-$'printf string-literal'
-$r'printf raw-string'
 ```
+
+The value passed to `$(...)` must be a non-empty string. Lists and tuples
+raise `TypeError`, just as they do with `Session.exec_command()`.
 
 Quote dynamic values before inserting them into a shell command:
 
 ```python
 import shlex
+
 folder = "/tmp/a folder"
 $f'mkdir -p {shlex.quote(folder)}'
 ```
 
-## Automatic shell detection
+For direct execution, assemble an argument list with `shlex.join()` and use
+`shell=False`:
 
-V3 inspects string commands with quote awareness. Plain commands execute
-directly. Shell syntax automatically selects a shell, including pipelines,
-redirection, logical operators, environment-variable or tilde expansion,
-globs, assignments, and command substitution.
+```python
+arguments = ["printf", "%s\n", "hello world"]
+$(shlex.join(arguments), shell=False)
+```
+
+## Automatic shell selection
+
+V3.1 inspects the final command string with quote awareness. Plain commands
+execute directly. Pipelines, redirection, logical operators, assignments,
+globbing, expansion, and command substitution automatically select a shell.
 
 ```python
 $printf 'alpha\\nbeta\\n' | grep beta
-assert $.stdout.strip() == "beta"
-
 $VALUE=ready; printf '%s\\n' "$VALUE"
 $printf 'report\\n' > /tmp/sshscript-report.txt
 $printf 'host: %s\\n' "$(hostname)"
 ```
 
-Characters inside quotes remain literal, so this is direct execution and
-prints `$HOME` rather than expanding it:
+Shell operators inside quotes do not select shell mode. A dollar expression
+inside single quotes remains literal:
 
 ```python
 $echo '$HOME'
 assert $.stdout.strip() == "$HOME"
 ```
 
-Override automatic selection when required:
+Override selection when required:
 
 ```python
-# Quoted shell-looking characters remain ordinary arguments in direct mode.
 command = 'python3 -c "import sys; print(sys.argv[1:])" "|" "cat"'
 $(command, shell=False)
 
-$(command, shell=True)                    # force the POSIX shell
-$('printf bash-shell', shell='bash')      # select Bash
+$("printf 'POSIX shell\\n'", shell=True)
+bash_command = (
+    '[[ -n "$BASH_VERSION" ]] '
+    '&& printf "%s\\n" "$BASH_VERSION"'
+)
+$(bash_command, shell="bash")
+$(bash_command, shell=True, shell_executable="bash")
 ```
 
-`shell_executable='bash'` is equivalent to `shell='bash'`. The command passed
-to `$()` must be a string.
+`shell_executable=` chooses the executable used when shell mode is active; it
+does not by itself force a plain command into shell mode.
 
-## Migrating from `$$`
+## One `$` replaces former `$$`
 
-Older documents use `$$` for a shell command:
+Older documents use `$$` to force a shell:
 
 ```python
 $$ls -l | grep '^d'
 ```
 
-Write the v3 form with one dollar:
+Write new v3.1 scripts with one Dollar:
 
 ```python
 $ls -l | grep '^d'
 ```
 
-Use `$` for all new scripts. It chooses direct execution when possible and a
-shell only when the command needs one.
+The `$$` form remains temporarily compatible but is deprecated and forces
+shell mode.
 
-## Local and remote sessions
+## Session contexts
 
-The syntax is unchanged inside a connection block:
+The notation is unchanged inside remote and privileged contexts:
 
 ```python
-$hostname  # local host
+$hostname  # localhost
 
 with $.connect("ops@example.net"):
-    $hostname  # remote host
+    $hostname
+    with $.sudo(password=password):
+        $systemctl status nginx
 ```
 
-See [`$.connect`](connect) for authentication and nested connections.
+## Developer tests
 
-## Developer self-tests
-
-The SSHScript source checkout includes a credential-free smoke suite for
-dollar syntax:
-
-```text
-unittest/dollar_syntax.spy
-```
-
-It runs only local subprocesses. It does not load `localsecret.py` or
-`secret.py`, connect to an SSH server, use an SSH agent, or read a
-private key. Run it from the root of the SSHScript source checkout:
+The source checkout includes a localhost-only smoke suite:
 
 ```sh
 python3 sshscript.py unittest/dollar_syntax.spy
 ```
 
-The suite checks:
+It does not load credentials, connect to an SSH server, use an SSH agent, or
+read a private key. See [Development and Testing](../development-and-testing)
+for the unittest wrapper, full release gate, and language integration modes.
 
-- bare, string, raw-string, expression, and f-string command forms;
-- command assignment and `$.stdout`, `$.stderr`, and
-  `$.exitcode`;
-- automatic shell selection for pipelines, assignments, operators,
-  expansion, and redirection;
-- string commands plus explicit `shell=False` and `shell=True`;
-- dollar commands inside Python functions;
-- a persistent local shell created with `with $(...)`; and
-- importing another `.spy` module that contains dollar syntax.
-
-## Run through Python unittest
-
-A standard-library wrapper runs the same `.spy` suite in an isolated
-subprocess. It creates an empty temporary home directory and removes
-SSH-agent environment variables, ensuring that the test remains independent
-of the developer's SSH configuration:
-
-```sh
-python3 -m unittest discover -v -s unittest \
-  -p 'test_sshscript_dollar_syntax.py'
-```
-
-To run this suite together with the regular [Module](../module) API tests:
-
-```sh
-python3 -m unittest discover -v -s unittest -p 'test_sshscript_*.py'
-```
-
-The command returns a non-zero status if any check fails. These tests are a
-quick local regression check; SSH integration tests remain separate because
-they require explicit host credentials and configuration.
-
-Last Updated: 2026-07-26 16:53:25
+Last Updated: 2026-09-14 18:02:02
