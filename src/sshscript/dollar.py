@@ -14,6 +14,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
+"""Internal command dispatch for both Session calls and translated dollar syntax."""
+
 import os, re, sys, time
 import subprocess, shlex
 import asyncio
@@ -35,38 +37,21 @@ from io import BufferedWriter,TextIOWrapper
 DollarExportedNames = set(['stdout','stderr','exitcode','channel'])
 
 def export2Dollar(func):    
-    """
-    Decorator that adds a function's name to the DollarExportedNames set.
-    
-    Args:
-        func: A callable function to be exported.
-        
-    Returns:
-        The original function.
-    """
+    """Register a method name for use through $. in translated scripts."""
     assert callable(func)
     DollarExportedNames.add(func.__name__)
     return func
 
 class Dollar(object):
+    """Own one command execution and its stdout, stderr, and exit status.
+
+    Choose local or SSH execution from the Session. A one-shot call waits for
+    completion; a with-context call exposes a channel for ongoing console I/O.
+    Application code should use Session.exec_command()/shell()/enter().
+    """
     def __init__(self,session,command=None,for_with=False,use_shell=None,
                  shell_executable=None,**kw):
-        """
-        Initialize a Dollar object for command execution.
-        
-        Args:
-            session: The session context for command execution.
-            command: The command to execute.
-            globals: Global variables for command execution.
-            locals: Local variables for command execution.
-            for_with: Whether this Dollar object is used in a 'with' context.
-            use_shell: None for automatic detection, otherwise a boolean.
-            shell_executable: Shell used for shell mode; defaults to /bin/sh.
-            kw:
-                get_pty
-                input
-                env            
-        """
+        """Capture the command, session, shell selection, and backend execution options."""
         
         if not for_with and not isinstance(command,str):
             raise TypeError(f'command must be str, not {type(command).__name__}')
@@ -101,39 +86,22 @@ class Dollar(object):
     @property
     @export2Dollar
     def stdout(self):
-        """
-        Get the standard output from the command execution.
-        
-        Returns:
-            The standard output as a string.
-        """
+        """Return this execution's stdout buffer."""
         return self.channel.stdout
 
     @property
     @export2Dollar
     def stderr(self):
-        """
-        Get the standard error from the command execution.
-        
-        Returns:
-            The standard error as a string.
-        """
+        """Return this execution's stderr buffer."""
         return self.channel.stderr
 
     @property
     def exitcode(self):
-        """
-        Get the exit code from the command execution.
-        
-        Returns:
-            The exit code as an integer.
-        """
+        """Return this execution's recorded exit status."""
         return self.channel.exitcode
 
     def clear(self):
-        """
-        Clear the channel's buffer if a channel exists.
-        """
+        """Clear this execution's channel buffers, if present."""
         if self.channel: self.channel.reset_buffer()
     #def __del__(self):
     #    ## ensure to release memory
@@ -258,15 +226,7 @@ class Dollar(object):
             return self
 
     async def async_call_worker(self,get_pty=None):
-        """
-        Execute the command based on the session context.
-        
-        Args:
-            get_pty: Whether to use a pseudo-terminal.
-            
-        Returns:
-            The channel object if in a 'with' context, otherwise self.
-        """
+        """Dispatch execution to the session's local or SSH backend."""
         self.get_pty = get_pty
         if self.session.connected:
             ## necessary for this instance to be put in "with context"
@@ -286,12 +246,7 @@ class Dollar(object):
                 await self.exec_by_subprocess(get_pty)
                 return self
     async def exec_by_subprocess(self,get_pty:bool):
-        """
-        Execute a command using subprocess.
-        
-        Args:
-            require_pty: Whether to use a pseudo-terminal.
-        """
+        """Execute locally, using process pipes or a PTY for console contexts."""
         assert get_pty is None or isinstance(get_pty,bool)
         kw = self._parameters_to_execute
         if get_pty is None and 'get_pty' in kw:
@@ -524,13 +479,7 @@ class Dollar(object):
             raise ValueError(f'no command to execute')
 
     async def exec_by_ssh(self,get_pty:bool)->None:
-        """
-        Executes a command over SSH.
-
-        Args:
-            require_pty: Whether to use a pseudo-terminal.
-
-        """        
+        """Execute through the session's SSH connection, draining stdout and stderr."""
         host = self.session.host;
         client = self.session._client 
 

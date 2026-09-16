@@ -14,6 +14,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
+"""Shared channel state, output buffers, and synchronous access to background I/O."""
+
 import threading, os, sys, re
 import time
 import logging
@@ -30,14 +32,12 @@ else:
 logger = get_logger()
 
 class GenericChannel(object):
-    """Base class for channel implementations.
-    
-    This class provides common functionality for different channel types,
-    handling stdout/stderr buffering, exit code tracking, and I/O operations.
-    
-    References:
-    - VT100 escape sequences: https://stackoverflow.com/questions/7857352/python-regex-to-match-vt100-escape-sequences
-    - Win32 non-blocking read: https://stackoverflow.com/questions/34504970/non-blocking-read-on-os-pipe-on-windows
+    """Internal channel shared by local and SSH backends.
+
+    Each console layer owns output buffers and a command lock. Synchronous
+    operations wait for background I/O, command markers, or interactive prompts.
+    Failure/closure must wake waiters; callbacks must retain the buffers and locks
+    of their own layer. Application code should use Session and SessionWrapper.
     """
     
     ## ref: https://stackoverflow.com/questions/7857352/python-regex-to-match-vt100-escape-sequences
@@ -45,10 +45,6 @@ class GenericChannel(object):
     ## fish returns more complex control codes than other shells( "\n" \x0a is excluded from the following pattern)
         
     def __init__(self,owner):
-        """Initialize a GenericChannel instance.
-        
-        :owner: The owner of this channel (typically a Dollar instance)
-        """
         self._native_id = str(int(time.time()))
         ## initial exitcode can not be -1,
         ## because it would trigger a calling to get the exitcode
@@ -249,10 +245,7 @@ class GenericChannel(object):
 
 
     def _increase_exitcode_sno(self):
-        """Increment the exit code sequence number.
-        
-        :return: The new sequence number (0-29)
-        """
+        """Advance the exit-code marker sequence modulo 10."""
         self._exitcodeSno = (self._exitcodeSno + 1) % 10
         return self._exitcodeSno
 
@@ -265,18 +258,12 @@ class GenericChannel(object):
     
     @property
     def lastOutputTime(self):
-        """Get the timestamp of the last output.
-        
-        :return: Timestamp of the last output
-        """
+        """Return the output activity timestamp, also reset when input is sent."""
         return self.lastIOAtTime[1]
     
     
     def touchIO(self,isOutput):
-        """Update the I/O timestamps.
-        
-        :isOutput: True if this is an output operation, False for input
-        """
+        """Record output activity; input also resets the output-silence timer."""
         if isOutput:
             self.lastIOAtTime[1] = time.time()
         else:
@@ -285,17 +272,11 @@ class GenericChannel(object):
 
     ## v2.0.3 redefined
     def wait_for_output(self,timeout=0,silent=False)->bool:
-        """Block execution until stdout or stderr received or timeout reached.
-        
-        :timeout: (int)
-            0: waiting forever
-        :silent: (bool)
-            if True, return False when timeout reached
-        :return:
-            True: has output
-            False: timeout(silent=True)
-        :raise:
-            TimeoutError: timeout(silent=False)
+        """Wait for new I/O activity and return True; timeout=0 waits indefinitely.
+
+        On timeout, raise TimeoutError or return False when silent=True.
+        Channel closure/failure interrupts the wait. Activity is timestamp-based;
+        sending input also resets the output timestamp.
         """
         basetime = self.lastIOAtTime[:]
         timeouttime = (time.time() + timeout) if timeout else 0
@@ -336,14 +317,10 @@ class GenericChannel(object):
         return ret
     ## v2.0.3 redefined
     def wait_for_silent(self,seconds,max_seconds=0)->bool:
-        """Block execution until output is silent for the specified duration.
-        
-        If output continues (e.g., from tcpdump), it will block until output stops.
-        
-        :seconds: (int)
-            Wait this many seconds after the last output before returning
-        :max_seconds: (int)
-            If specified, will raise TimeoutError if output continues for this long
+        """Wait for seconds of I/O silence and return None.
+
+        max_seconds=0 leaves the wait unbounded; otherwise exceeding it raises
+        TimeoutError. Silence alone does not establish command completion.
         """
         timeouttime = (time.time() + max_seconds) if max_seconds else 0
         while True:
@@ -357,23 +334,12 @@ class GenericChannel(object):
 
     ## v3.0
     def wait_for_prompt(self,prompt,timeout=None)->bool:
-        """Block execution until output is silent for the specified duration.
-        
-        If output continues (e.g., from tcpdump), it will block until output stops.
-        
-        :seconds: (int)
-            Wait this many seconds after the last output before returning
-        """
+        """Wait for expect(prompt, timeout=timeout); return None."""
         self.expect(prompt,timeout=timeout)
 
     @property
     def stdout(self)->str:
-        """Get the stdout buffer contents.
-        
-        If not hijacked, ensures exit code is retrieved before returning.
-        
-        :return: Contents of stdout buffer
-        """
+        """Return the live stdout buffer, waiting for the command lock unless hijacked."""
         if self.hijacked:
             with self.executing_lock:
                 with self._lock:
@@ -388,12 +354,7 @@ class GenericChannel(object):
 
     @property
     def stderr(self)->str:
-        """Get the stderr buffer contents.
-        
-        If not hijacked, ensures exit code is retrieved before returning.
-        
-        :return: Contents of stderr buffer
-        """
+        """Return the live stderr buffer, waiting for the command lock unless hijacked."""
         if self.hijacked:
             with self.executing_lock:
                 return self._stderr
@@ -404,15 +365,9 @@ class GenericChannel(object):
                 return self._stderr
 
     def hijack(self,yes):
-        """
-        Called by EnterConsole.       
-        Hijack or release the channel's send_line method.
-        
-        When hijacked
-        1. send_line is replaced with input method.
-        2. no exitcode 
-        
-        :yes: True to hijack, False to release
+        """Redirect send_line to interactive input when yes, otherwise restore it.
+
+        EnterConsole owns this transition. exitcode returns -1 while hijacked.
         """
         if yes:
             assert not self.hijacked,'can not hijack twice'
@@ -436,12 +391,7 @@ class GenericChannel(object):
 
     @property
     def exitcode(self)->int:
-        """Get the exit code of the last command.
-        
-        If exit code is -1, it will be retrieved before returning.
-        
-        :return: Exit code of the last command
-        """
+        """Return the recorded status, fetching it if needed; -1 while interactive."""
         if self.hijacked:
             #raise ValueError('exitcode is not available in current state')
             logger.warning(
@@ -456,13 +406,7 @@ class GenericChannel(object):
             return self._exitcode
 
     def log(self,msg, *args, level=logging.DEBUG, **kwargs):
-        """Log a message with channel context.
-        
-        :msg: Message to log
-        :*args: Additional arguments for formatting
-        :level: Standard logging level; defaults to DEBUG
-        :**kwargs: Additional keyword arguments passed to the logger
-        """
+        """Log with channel context, preserving format arguments and logging keywords."""
         if isinstance(level, int) and 0 < level < logging.DEBUG:
             level = logging.DEBUG
         logger.log(level, f'{self.prefixOfLog} {msg}', *args, **kwargs)
@@ -475,14 +419,19 @@ class GenericChannel(object):
         stderr=True,
         silent=False,
     ):
-        """Wait until unconsumed stdout or stderr matches a pattern.
+        """Wait for a match in unconsumed stdout or stderr.
 
-        ``rawpat`` may be a str, a str-based compiled regular expression,
-        a callable accepting an unconsumed/newly appended str, a list/tuple
-        containing those forms, or a dict mapping patterns to response strings.
+        rawpat accepts a regex string, compiled str regex, callable receiving text,
+        a list/tuple of alternatives, or a dict of patterns to reply strings.
+        Alternatives complete on the first match; dialogs send replies and complete
+        when all entries match. A configured interactive prompt also gates dialog
+        completion. Matching advances search cursors without removing output text.
+        String patterns ignore case; compiled regexes retain their own flags.
 
-        Return a regex match, the successful callable, a dict mapping each
-        dialog pattern to its match, or None after a silent timeout.
+        Return a regex match, the successful callable, or a dict of dialog matches.
+        timeout=None or 0 waits indefinitely. On timeout, raise TimeoutError unless
+        silent=True, which returns None. stdout/stderr select the streams to search;
+        at least one must be enabled. Channel failures propagate.
         """
         if not stdout and not stderr:
             raise ValueError("stdout and stderr cannot both be False")
@@ -1098,41 +1047,7 @@ class GenericChannel(object):
                 self._expect_lock.release()
 
     def expect_old(self,rawpat,timeout=None,stdout=True,stderr=True,silent=False):
-        """Block until a pattern is matched in output or timeout reached.
-        
-        This is a blocking function that waits for a pattern to appear in
-        stdout or stderr. the searching target can not across lines.
-        
-        :rawpat:
-            - a str,re.Pattern or a list,tuple of them
-                if a list was given, one of list member matched, this expect() has completed.
-            - callable , eg:
-                def callback(item:str)->bool:
-                    ## items is a list of str, which are just been appeneded into stdout or stderr
-                    ## when True is returned, means the expect() has matched.
-                    return True
-            - dict, with str-keys
-                eg. {'a':'b','c':'d'}
-                if incoming stream (of stdout or stderr) matched 'a', then send 'b\n' to channel and 'a' is removed,
-                if incoming stream (of stdout or stderr) matched 'c', then send 'd\n' to channel and 'c' is removed,
-                when all keys were matched, this expect() has completed.
-        :timeout:
-            0 or None: waiting forever
-        :stdout: Whether to search in stdout
-        :stderr: Whether to search in stderr
-        :silent:
-            if False, raise TimeoutError when timeout 
-            if True, raise nothing, None was returnedwhen timeout
-        :return:
-            None if timeout and silent=True
-            when matched:
-                - the matching object, when the rawpat is a str,re.Pattern or list,tuple of them
-                - the callback which returns True, when the rawpat is a callback or list,tuple of callable
-                - a dict of the same key with its matching object, when the rawpat is a dict
-            
-        :raise:
-            TimeoutError: if timeout reached and silent=False
-        """
+        """Legacy line-oriented matcher; use expect() for current matching semantics."""
         ## prepare matching objects
         ret = None
         regularPats = []
@@ -1315,6 +1230,7 @@ class GenericChannel(object):
 
             self._raise_if_unusable()
     def send(self, raw_text, timeout=None):
+        """Write raw text through the I/O loop; timeout covers startup, locking, and writing."""
         if timeout is None:
             timeout = self.send_timeout
 
@@ -1670,10 +1586,7 @@ class GenericChannel(object):
             executing_lock.release()    
 
     def get_exit_code(self,timeout=60):
-        """Get the exit code of the last command.
-        
-        :timeout: Maximum time to wait for exit code
-        """
+        """Request and wait for a shell exit-code marker, bounded by timeout."""
         
         assert not self.closed
         assert not self.hijacked
@@ -1773,10 +1686,7 @@ class GenericChannel(object):
                 )
     ## run the commands    
     def send_line(self,line,**expections):
-        """Send a line or multiple lines to the channel.
-        
-        :line: String or list of strings to send
-        """
+        """Execute one command string via send_command(); unavailable while hijacked."""
         assert not self.hijacked, 'can not sendline when hijacked'
 
         return self.send_command(line,**expections)
@@ -1788,6 +1698,13 @@ class GenericChannel(object):
         command_timeout=60,
         **expections,
     ):
+        """Send a shell command and wait for its completion marker or configured prompt.
+
+        Return this command's (stdout, stderr) buffers. command_timeout bounds lock
+        acquisition, writing, dialogs, and completion together. Extra keyword names
+        are expected patterns mapped to reply strings. Cleanup must affect only this
+        command's callbacks and lock, even when an inner console changes the layer.
+        """
         deadline = time.monotonic() + command_timeout
         executing_lock = self.executing_lock
         self._acquire_until(
@@ -1976,10 +1893,7 @@ class GenericChannel(object):
     '''
 
     def send_signal(self,sig):
-        """Send a signal to the process.
-        
-        :sig: Signal to send
-        """
+        """Send a signal.Signals value to the local process or remote SSH channel."""
         if getattr(self, 'is_ssh_channel', False):
             message = paramiko.Message()
             message.add_byte(paramiko.common.cMSG_CHANNEL_REQUEST)
@@ -1993,10 +1907,7 @@ class GenericChannel(object):
             self.cp.send_signal(sig)
 
     async def _add_stdout_data(self,newbytes): 
-        """Add data to stdout buffer.
-        
-        :newbytes: Bytes to add to stdout
-        """
+        """Decode incoming stdout bytes and append them to the current buffer."""
         with self._lock:
             ## by checking self.closed, "exit" would not be put into stdout
             if self.closed: return
@@ -2013,10 +1924,7 @@ class GenericChannel(object):
                 self._dumpCondition.notify()
 
     async def _add_stderr_data(self,newbytes):
-        """Add data to stderr buffer.
-        
-        :newbytes: Bytes to add to stderr
-        """
+        """Decode incoming stderr bytes and append them to the current buffer."""
         with self._lock:         
             ## by checking self.closed, "exit" would not be put into stdout
             if self.closed: return
@@ -2046,7 +1954,7 @@ class GenericChannel(object):
             sys.stderr.buffer.flush()        
 
     async def _dump_stdout(self,newbytes):
-        ''' print to console line by line, no print if no new line'''
+        """Write newly available stdout, retaining an incomplete trailing line."""
         try:
             p = newbytes.rindex(b'\n')
         except ValueError:
@@ -2059,11 +1967,7 @@ class GenericChannel(object):
             sys.stdout.buffer.flush()
 
     async def _dump_stdout_err_job(self):
-        """Background thread function to dump stdout/stderr to console.
-        
-        This method runs in a separate thread and handles writing
-        stdout/stderr data to the console with appropriate prefixes.
-        """
+        """Drain buffered console output in the background I/O loop."""
         handler = [self._dump_stdout,self._dump_stderr]
         #while not (self.closed or self._dumpBuf.closed):
         while not self.closed:
@@ -2097,10 +2001,7 @@ class GenericChannel(object):
         self._dumpBuf.clear()
     
     def reset_buffer(self,reason=None):
-        """
-        Replace a pair of stdout,stderr to stdio_store,
-        aka. clear the self.stdout and self.stderr
-        """
+        """Replace the current stdout/stderr pair; return (new_pair, previous_pair)."""
         ## clean up console.stdout, console.stderr
         with self._lock: 
             self._raise_if_unusable()
@@ -2113,10 +2014,7 @@ class GenericChannel(object):
     clear = reset_buffer
 
     def close(self):        
-        """Close the channel and cleanup resources.
-        
-        Ensures exit code is retrieved before closing.
-        """
+        """Mark the channel closed and wake waiters; backends own transport cleanup."""
         if not self._begin_close():
             return
         self._finish_close()

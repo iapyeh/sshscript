@@ -14,6 +14,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
+"""Public console operations over a channel shared by shell and interactive contexts."""
+
 if __package__:
     from . import patching
 else:
@@ -27,20 +29,17 @@ else:
     from channelutils import SuConsole, SudoConsole,ShellConsole,EnterConsole
 
 class SessionWrapper(object):
-    """
-    A wrapper class for SSH channels that provides enhanced functionality and convenience methods.
-    
-    This class wraps a channel object and provides additional methods for interacting with
-    SSH sessions, including command execution, environment management, and file transfers.
-    
+    """Operate the current console returned by shell(), su(), sudo(), or enter().
+
+    In a shell, console(command) waits for completion and returns (stdout, stderr).
+    In an enter() context, the same call sends input and waits for the program's
+    prompt or exit. send() writes raw input; expect() matches buffered output.
+
+    Nested consoles share the underlying channel. upload()/download() delegate
+    to the SSH session and retain the connection account's permissions.
     """
     
     def __init__(self,console_wrapper):
-        """Initialize the channel wrapper.
-        
-        Args:
-            channel: The underlying channel object to wrap.
-        """
         self.channel = console_wrapper.channel
         self.console_wrapper = console_wrapper
     
@@ -54,40 +53,21 @@ class SessionWrapper(object):
 
     @property
     def stdout(self):
-        """Get the standard output from the channel.
-        
-        Returns:
-            str: The standard output content.
-        """
+        """Return the current console stdout buffer; see stdio.DequeString."""
         return self.channel.stdout
 
     @property
     def stderr(self):
-        """Get the standard error from the channel.
-        
-        Returns:
-            str: The standard error content.
-        """
+        """Return the current console stderr buffer; see stdio.DequeString."""
         return self.channel.stderr
 
     @property
     def closed(self):
-        """Check if the channel is closed.
-        
-        Returns:
-            bool: True if the channel is closed, False otherwise.
-        """
         return self.channel.closed
     
     @property
     def session(self):
-        """Get the underlying SSH session.
-            use case:
-                with $.session: <== here
-                    ...
-        Returns:
-            Session: The SSH session object.
-        """
+        """Return the owning Session; use with console.session to activate it in .spy."""
         return self
 
     @property
@@ -100,20 +80,12 @@ class SessionWrapper(object):
 
     @property
     def sftp(self):
-        """Get the SFTP client associated with the session.
-        
-        Returns:
-            SFTPClient: The SFTP client object.
-        """
+        """Return the connection account's SFTP client; prefer upload()/download() for files."""
         return self.channel.owner.session.sftp
     
     @property
     def logger(self):
-        """Get the logger associated with the session.
-        
-        Returns:
-            Logger: The logger object.
-        """
+        """Return the session logger."""
         return self.channel.owner.session.logger
     
     def clear(self):
@@ -121,42 +93,27 @@ class SessionWrapper(object):
         self.channel.clear()
 
     def send(self,s):
-        """Send data to the channel.
-        
-        Args:
-            s (str): The data to send.
-            
-        Returns:
-            int: The number of bytes sent.
-        """
+        """Send raw text without adding a newline; wait for the write, returning None."""
         result = self.channel.send(s)
         #result.result()
         return result
 
     def input(self,s,timeout=60):
-        """Send input and wait for the prompt or console exit.
-        
-        Args:
-            s (str): The input to send.
-            timeout (float): Maximum wait in seconds.
-            
-        Returns:
-            str: ``prompt``, ``exited``, or ``silent`` for an interactive
-                console. A non-interactive channel returns ``send()``'s
-                result.
+        """Send a line and wait for an interactive prompt, exit, or output silence.
+
+        Return "prompt", "exited", or "silent" in an interactive console; otherwise
+        return send()'s result (None). timeout bounds the wait in seconds.
         """
         result = self.channel.input(s,timeout=timeout)
         #result.result()
         return result
 
     def send_line(self,s,**expections):
-        """Send a line of text to the channel.
-        
-        Args:
-            s (str): The line to send.
-            
-        Returns:
-            int: The number of bytes sent.
+        """Execute a shell command and return (stdout, stderr); also console(command).
+
+        command_timeout bounds command completion (default 60 seconds). Other keyword
+        names are expected patterns and their values are reply strings.
+        In an enter() context this delegates to input() and returns its status.
         """
         return self.channel.send_line(s,**expections)
     ## alias for sendline
@@ -164,52 +121,34 @@ class SessionWrapper(object):
     exec_command = send_line
 
     def expect(self,rawpat,timeout=None,stdout=True,stderr=True,silent=False):
-        """Wait for a pattern to appear in the channel output.
-        
-        Args:
-            rawpat (str): The pattern to match.
-            timeout (int, optional): Timeout in seconds. Defaults to None.
-            stdout (bool, optional): Whether to check stdout. Defaults to True.
-            stderr (bool, optional): Whether to check stderr. Defaults to True.
-            silent (bool, optional): Whether to suppress output. Defaults to False.
-            
-        Returns:
-            tuple: A tuple containing (match_index, match_object, matched_text)
+        """Wait for an unconsumed output match; see GenericChannel.expect().
+
+        Accept a regex string, compiled regex, callable, a list/tuple of alternatives,
+        or a dict of patterns to reply strings. Return the match, successful callable,
+        or completed dialog dict. timeout=None or 0 waits indefinitely; silent=True
+        returns None on timeout instead of raising TimeoutError.
         """
         return self.channel.expect(rawpat,timeout,stdout,stderr,silent)
 
     def wait_for_silent(self,seconds,max_seconds=0):
-        """Wait for the channel to become silent for a specified duration.
-        
-        Args:
-            seconds (int): Number of seconds to wait for silence.
-            
-        Returns:
-            bool: True if the channel became silent, False otherwise.
+        """Wait for seconds of output silence; return None.
+
+        max_seconds bounds the overall wait and raises TimeoutError if exceeded;
+        0 leaves it unbounded. Silence does not establish command completion.
         """
         return self.channel.wait_for_silent(seconds,max_seconds)
     wait = wait_for_silent
     def wait_for_output(self,timeout=0,silent=False):
-        """Wait for output from the channel.
-        
-        Args:
-            timeout (int, optional): Timeout in seconds. Defaults to 0.
-            silent (bool, optional): Whether to suppress output. Defaults to False.
-            
-        Returns:
-            str: The output received.
+        """Wait for new I/O activity; return True when observed.
+
+        timeout=0 waits indefinitely. On timeout, raise TimeoutError or return False
+        when silent=True. No output is consumed; see GenericChannel.wait_for_output()
+        for the timestamp-based activity semantics.
         """
         return self.channel.wait_for_output(timeout,silent)
 
     def send_signal(self,s):
-        """Send a signal to the channel.
-        
-        Args:
-            s (str): The signal to send.
-            
-        Returns:
-            bool: True if the signal was sent successfully.
-        """
+        """Send a signal.Signals value (for example signal.SIGTERM); return None."""
         return self.channel.send_signal(s)
 
     def environ(self,key=None,value=None,**kw):
@@ -227,53 +166,28 @@ class SessionWrapper(object):
         self.channel.channel.update_environment(kw)
 
     def su(self,username,password=None,expect=None,initials=None,command=None,login=True,shell=None,get_pty=None):
-        """Switch to another user using su.
-        
-        Args:
-            username (str): The username to switch to.
-            password (str, optional): The user's password.
-            expect (str, optional): Pattern to expect after su prompt.
-            initials (str, optional): Initial characters to send.
+        """Enter a nested su console on the existing channel; see Session.su().
 
-            shell: placeholder, just for beening the same as $session.enter()
-            get_pty :placeholder, just for beening the same as $session.su()
-            
-        Returns:
-            SuConsole: A console object for su operations.
+        initials contains setup commands. shell/get_pty are compatibility placeholders;
+        they do not replace or reconfigure the existing channel.
         """
         ## when localhost is ubuntu, pty is required for su to send password
         return SuConsole(self,username,password,expect=expect,initials=initials,command=command,login=login)
     #sudo(self,password=None,expect=None,initials=None,shell:bool=True,login=True,username=None,get_pty=True):
     def sudo(self,password,username=None,expect=None,initials=None,command=None,login=True,shell=None,get_pty=None):
-        """Execute a command with sudo privileges.
-        
-        Args:
-            password (str, optional): The sudo password.
-            expect (str, optional): Pattern to expect after sudo prompt.
-            initials (str, optional): Initial characters to send.
+        """Enter a nested sudo console on the existing channel; see Session.sudo().
 
-            shell: placeholder, just for beening the same as $session.enter()
-            get_pty: placeholder, just for beening the same as $session.sudo()
-            
-        Returns:
-            SudoConsole: A console object for sudo operations.
+        initials contains setup commands. shell/get_pty are compatibility placeholders;
+        SFTP operations retain the SSH connection account's permissions.
         """
         return SudoConsole(self,password,username=username,expect=expect,initials=initials,command=command,login=login)
 
     def enter(self,command,expect=None,password=None,exit=None,shell=None,get_pty=None,prompt=None):
-        """Enter a command and handle its execution.
-                   
-        Args:
-            command (str): The command to execute.
-            expect (str, optional): Pattern to expect after command.
-            input (str, optional): Input to send after command.
-            exit (bool, optional): Whether to exit after command. Defaults to False.
-            
-            shell: placeholder, just for beening the same as $session.enter()
-            get_pty: placeholder, just for beening the same as $session.enter()
-            
-        Returns:
-            EnterConsole: A console object for command execution.
+        """Enter an interactive program on this channel; see Session.enter().
+
+        expect/password handle authentication; prompt marks readiness for input.
+        exit is text to send on leaving (None sends nothing). shell/get_pty are
+        compatibility placeholders for an already established channel.
         """
 
         return EnterConsole(self,command,expect=expect,password=password,exit=exit,prompt=prompt)
@@ -282,18 +196,7 @@ class SessionWrapper(object):
     ## $sudo    => with _sshscriptstack_[-1].shell(' sudo ') 
     ## $python3 => with _sshscriptstack_[-1].shell(' python3 ')
     def shell(self,*args,**kw):
-        """Start a shell session.
-        
-        Args:
-            *args: Command to execute in the shell.
-            **kw: Additional keyword arguments for shell configuration.
-            
-        Returns:
-            ShellConsole: A console object for shell operations.
-            
-        Raises:
-            ValueError: If the command is not a valid shell command.
-        """
+        """Enter a nested shell on the existing channel; return a ShellConsole context."""
         if len(args) == 0:
             command = ''
         else:
@@ -315,50 +218,22 @@ class SessionWrapper(object):
         self.channel.prompt = prompt
         self.channel._stdout.callback_pattern = prompt
     def log(self, level, msg, *args, **kwargs):
-        """Log a message at the specified level.
-        
-        Args:
-            level (int): The logging level.
-            msg (str): The message to log.
-            *args: Additional arguments for message formatting.
-            **kwargs: Keyword arguments forwarded to the logger.
-        """
+        """Log at a standard logging level, forwarding format arguments and keywords."""
         return self.channel.log(msg, *args, level=level, **kwargs)
 
     ## wrappers to sshscriptsession(only those seem to be called from a "console". eg.
     ## with $.sudo() as console:
     ##      $.upload() <<-- our wrappers would be called here    
     def upload(self,*args,**kw):
-        """Upload files to the remote system.
-        
-        Args:
-            *args: Arguments for the upload operation.
-            
-        Returns:
-            The result of the upload operation.
-        """
+        """Delegate to Session.upload(), using the SSH connection account's permissions."""
         return self.channel.owner.session.upload(*args,**kw)
 
     def download(self,*args,**kw):
-        """Download files from the remote system.
-        
-        Args:
-            *args: Arguments for the download operation.
-            
-        Returns:
-            The result of the download operation.
-        """
+        """Delegate to Session.download(), using the SSH connection account's permissions."""
         return self.channel.owner.session.download(*args,**kw)
 
     def pkey(self,*args,**kw):
-        """Get or set the private key for authentication.
-        
-        Args:
-            *args: Arguments for the private key operation.
-            
-        Returns:
-            The result of the private key operation.
-        """
+        """Load an RSA private key from the session host; see Session.pkey()."""
         return self.channel.owner.session.pkey(*args,**kw)
 
     def onedollar(self,command,**kw):
@@ -370,11 +245,6 @@ class SessionWrapper(object):
         return self.exec_command(command,**kw)
 
     def __repr__(self):
-        """Get a string representation of the wrapper.
-        
-        Returns:
-            str: A string describing the wrapper instance.
-        """
         return f'SessionWrapper(id:{id(self)}, hijacked:{self.channel.hijacked})'
 
     def _break(self,code=0,message=''):

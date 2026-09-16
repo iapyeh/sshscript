@@ -16,16 +16,17 @@
 
 ## 2025/3/2
 ## convert .spy token parsed results to valid python script
+"""Transform tokenparser placeholders into Session/console calls while preserving source locations."""
+
 import ast
 import copy
 
 class DollarChanger(ast.NodeTransformer):
-    """
-    A NodeTransformer that converts SSH script syntax with dollar signs ($) to valid Python code.
-    
-    This class transforms AST nodes that contain SSH script syntax (like $.connect, $hostname)
-    into valid Python code that can be executed. It handles various SSH script constructs
-    including connections, shell commands, and context managers.
+    """Lower the tokenized .spy AST into Python session and console operations.
+
+    Dollar syntax reaches this transformer as Python-compatible placeholders.
+    Generated nodes must retain the original source locations for tracebacks;
+    context stacks determine which session or console each operation targets.
     """
     tmplLinesAtBeginning = ast.parse('_sshscriptstack_ = patching.get_thread_stack(initial_session=_sshscript_session_)').body[0]
     ## with-exit would close the session, so, this is pop() not popAndClose()
@@ -39,12 +40,6 @@ class DollarChanger(ast.NodeTransformer):
     tmplLineAssignAtBottom = ast.parse('a=_c.stdout, _c.stderr').body[0]
     
     def __init__(self):
-        """
-        Initialize the DollarChanger transformer.
-        
-        Sets up internal state variables to track the transformation process,
-        including stacks for tracking scope, console names, and various flags.
-        """
         super().__init__()
         self.insideWith = [False]
         self.insideWithitem = False
@@ -69,28 +64,12 @@ class DollarChanger(ast.NodeTransformer):
         return cloned
         
     def _gen_console_name(self):
-        """
-        Generate a unique console name for SSH script contexts.
-        
-        Returns:
-            str: A unique console name in the format '_pesudoN' where N is an incrementing number.
-        """
+        """Allocate a unique temporary name for a generated console context."""
         self.consoleSerialNo += 1
         return f'_pesudo{self.consoleSerialNo}'
         
     def generic_visit(self, node):
-        """
-        Visit a node in the AST and transform it if necessary.
-        
-        This is the main transformation method that handles various AST node types
-        and converts SSH script syntax to valid Python code.
-        
-        Args:
-            node: The AST node to visit and potentially transform.
-            
-        Returns:
-            The transformed node or the original node if no transformation was needed.
-        """
+        """Lower placeholder nodes using the current session/console scope."""
         newnode = None
         if hasattr(node,'body') and isinstance(node.body,list):
             ## ast.IfExp (eg. if '$HOME\n' == _c.stdout else 0) has .body, but it is a ast.Constant

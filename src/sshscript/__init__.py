@@ -14,6 +14,27 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
+"""Run local and SSH commands through Session, or execute Python/.spy scripts.
+
+Use Session.exec_command() (also session(...)) for one command, shell() for
+commands sharing shell state, and enter() for an interactive program.
+Session.connect() creates a remote child; upload()/download() transfer files.
+In .spy scripts, $command and $.method(...) expose the same execution model.
+
+Example::
+
+    from sshscript import Session
+
+    with Session() as local:
+        stdout, stderr = local("hostname")
+        with local.connect("user@host") as remote:
+            stdout, stderr = remote("uname -s")
+            print(stdout.strip())
+
+Use run_file(path) for a script file, run_script(source) for source text,
+and spy_imports() to temporarily enable Python imports of .spy modules.
+"""
+
 if __package__:
     from . import sshscript
     from . import session

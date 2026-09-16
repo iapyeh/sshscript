@@ -13,6 +13,8 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
+"""Internal console contexts for nested shells, user switching, and interactive programs."""
+
 import re
 import time
 import os, signal
@@ -28,35 +30,18 @@ else:
 logger = get_logger()
 
 class GenericConsole(object):
-    """Base class for managing console contexts in SSH script.
-
-    Provides core functionality for console operations and context management.
-    """
+    """Base context with a subclass-defined returnObjectWhenEnter."""
     def __init__(self):
-        """Initialize GenericConsole instance.
-
-        Subclasses must assign returnObjectWhenEnter to specify the object
-        returned when entering the console context.
-        """
         ## self.returnObjectWhenEnter should be assigned by subclasses
         self.returnObjectWhenEnter = None
 
 class InnerConsole(GenericConsole):
-    """Console implementation for inner shell operations.
-
-    Handles shell authentication, command execution, and state management.
-    """
+    """Manage a nested console layer, authentication, setup commands, and exit handling."""
     def __init__(self,wcw,command,expect=None,password=None,initials=None,exit=None,prompt=None):
-        """Initialize InnerConsole instance.
+        """Bind a SessionWrapper to a command and its console protocol.
 
-        Args:
-            wcw: The WithChannelWrapper instance that provides the channel interface
-            username: The username to use for authentication
-            password: Optional password for authentication
-            expect: Keyword(s) to wait for when inputting password (locale-dependent)
-            initials: command or list of commands to execute after successful login
-                - When it is a list, "newline" is not required at end of each command
-            command: The command to execute
+        expect/password handle authentication; initials supplies setup commands.
+        prompt identifies readiness and exit supplies text sent on context exit.
         """
         ## SessionWrapper
         self.wcw = wcw
@@ -81,20 +66,7 @@ class InnerConsole(GenericConsole):
         
 
     def enter(self):
-        """Enter the console context.
-        
-        This method:
-        1. Sets up PTY if required
-        2. Handles authentication if password is provided
-        3. Executes initial commands if specified
-        4. Manages the console stack
-        
-        Returns:
-            The WithChannelWrapper instance (self.wcw)
-            
-        Raises:
-            PermissionError: If authentication fails
-        """
+        """Enter/authenticate the console, run setup commands, and return its SessionWrapper."""
         if self.command:
             ## send the command to the channel, and clear the buffer to avoid mixing outputs
             self.channel.clear()
@@ -198,19 +170,7 @@ class InnerConsole(GenericConsole):
     __enter__ = enter
 
     def exit(self,exc_type, exc_value, traceback):
-        """Exit the console context.
-        
-        This method:
-        1. Removes the console from the stack
-        2. Sends exit command
-        3. Restores PTY state if changed
-        4. Calls exit listener if set
-        
-        Args:
-            exc_type: The type of the exception if any
-            exc_value: The value of the exception if any
-            traceback: The traceback if any
-        """
+        """Leave the console and restore its parent layer, applying configured exit handling."""
         
         ## ensure all command has sent
         #while self.channel.sending_queue.qsize() > 0: time.sleep(0.01)
@@ -276,23 +236,9 @@ class InnerConsole(GenericConsole):
         return self.exit(exc_type, exc_value, traceback)
 ## with $bash, $.shell('bash')
 class ShellConsole(InnerConsole):
-    """Console implementation for shell commands with dollar sign syntax.
-
-    Extends InnerConsole for dollar sign syntax commands like $bash or $.shell('bash').
-    """
+    """Run a nested shell on the existing channel; constructed by SessionWrapper.shell()."""
     def __init__(self,wcw,command,*args,**kw):
-        """Initialize ShellConsole instance.
-
-        Args:
-            wcw: a SessionWrapper instance that provides the channel interface
-            command: The shell command to execute
-            *args: Additional positional arguments (username will be added if not provided)
-            **kw: Additional keyword arguments passed to InnerConsole
-            with_pty: check pty for underlying channel
-
-        Raises:
-            AssertionError: If command is not a string or starts with '#!'
-        """
+        """Bind a shell command and forward console options to InnerConsole."""
 
         if isinstance(command,str):
             command = command.strip()
@@ -305,16 +251,10 @@ class ShellConsole(InnerConsole):
 ## v2.0.3 : ensure we have english prompt for "password", add "--prompt=password"
 ##          but "su" has not this argument
 class SuConsole(InnerConsole):
-    """Console implementation for 'su' command operations.
-
-    This class extends InnerConsole to provide specific functionality for the 'su' command,
-    including proper locale settings and prompt handling.
-    """
+    """Build and manage a su console with platform-specific command and prompt handling."""
     @classmethod
     def get_command(cls,session,username,login,get_pty):
-        """
-        generate the 'su' command based on connection state and where the os is bsd based
-        """
+        """Build the su command for this host, login mode, and PTY setting."""
         if session.connected:
             su = r'\su' ## no alias
         else:
@@ -328,18 +268,10 @@ class SuConsole(InnerConsole):
         return command
 
     def __init__(self,wcw,username,password=None,expect=None,initials=None,command=None,login=True):
-        """Initialize SuConsole instance.
+        """Configure a su console; initials contains setup commands.
 
-        Args:
-            wcw: a SessionWrapper instance instance that provides the channel interface
-            username: The username to switch to
-            password: Optional password for authentication
-            expect: Keyword(s) to wait for when inputting password
-            initials: Commands to execute after successful login
-            command: The command to execute
-                None: defaults to 'LANG=en_US.UTF-8 su -l username'
-                False: no command to send (see "def su" in session.py for example)
-            with_pty: check pty for underlying channel
+        command=None builds the default su command; command=False skips sending it
+        when the underlying process was already started by Session.su().
         """
         if expect is None:
             ## matching there must be a line start with "Password"
@@ -375,11 +307,7 @@ class SuConsole(InnerConsole):
         return ret
 
 class SudoConsole(InnerConsole):
-    """Console implementation for 'sudo' command operations.
-
-    This class extends InnerConsole to provide specific functionality for the 'sudo' command,
-    including proper locale settings and prompt handling.
-    """
+    """Build and manage a sudo console with authentication and login handling."""
     @classmethod
     def get_command(cls,session,username,login):
         if session.connected:
@@ -409,16 +337,7 @@ class SudoConsole(InnerConsole):
         return cmd
 
     def __init__(self,wcw,password=None,username=None,expect=None,initials=None,command=None,login=True):
-        """Initialize SudoConsole instance.
-
-        Args:
-            wcw: a SessionWrapper instance instance that provides the channel interface
-            password: Optional password for sudo authentication
-            expect: Keyword(s) to wait for when inputting password
-            initials: Commands to execute after successful login
-            command: The command to execute (defaults to 'sudo -S su' with LANG=en_US.UTF-8)
-            with_pty: check pty for underlying channel
-        """
+        """Configure sudo authentication and setup commands; see Session.sudo()."""
         if command is None:
             command = SudoConsole.get_command(wcw.channel.owner.session,username,login)
 
@@ -451,24 +370,15 @@ class SudoConsole(InnerConsole):
         return ret
 ## $.enter
 class EnterConsole(InnerConsole):
-    """A console implementation for handling command entry operations.
-    
-    This class provides functionality for entering and managing command contexts,
-    including handling of input prompts and exit commands.
+    """Temporarily route console calls to interactive input instead of shell commands.
+
+    Entry/exit must restore the parent layer's lock and send_line binding.
     """
     def __init__(self,parentConsole,command,expect=None,password=None,exit=None,prompt=None):
-        """Initialize an EnterConsole instance.
-        
-        Args:
-            parentConsole: The parent console instance (WithChannelWrapper, InnerConsoleSu, or InnerConsoleSudo)
-            command: The command to execute
-            expect: Pattern to wait for before sending input (e.g., "password" prompt)
-            input: Value to send when expect pattern is matched (e.g., password)
-            exit: Command to send when exiting:
-                None: Do nothing (process will end by itself)
-                chr(3): Send Ctrl+C (e.g., for tcpdump)
-                'quit': Send quit command (e.g., for Python interactive console)
-            with_pty: check pty for underlying channel
+        """Bind an interactive command to its parent console.
+
+        expect/password handle authentication and prompt marks readiness. exit is
+        text sent on leaving, such as "quit()" or chr(3); None sends no exit text.
         """
         if not hasattr(parentConsole, 'channel'):
             raise TypeError(
@@ -485,21 +395,7 @@ class EnterConsole(InnerConsole):
                                         prompt=prompt)
         
     def __enter__(self):
-        """Enter the command context.
-        
-        This method:
-        1. Sets up PTY if required
-        2. Sends the command
-        3. Handles input prompts if specified
-        4. Manages the console state
-        
-        Returns:
-            The parent console instance
-            
-        Raises:
-            TimeoutError: If expect pattern is not found within timeout
-            ValueError: If command execution fails
-        """
+        """Enter the program, redirect send_line to input, and return the parent console."""
         ## wait a moment to let  self.channel._resetBuffer() really work
         ## that we can get a clear buffer
         
@@ -516,19 +412,7 @@ class EnterConsole(InnerConsole):
         return self.parentConsole
 
     def __exit__(self,exc_type, exc_value, traceback):
-        """Exit the command context.
-        
-        This method:
-        1. Sends exit command if specified
-        2. Restores console state
-        3. Restores PTY state if changed
-        4. Updates exit code
-        
-        Args:
-            exc_type: The type of the exception if any
-            exc_value: The value of the exception if any
-            traceback: The traceback if any
-        """
+        """Leave the program, restore command dispatch, and recover the parent shell status."""
 
         ret = super().__exit__(exc_type, exc_value, traceback)        
         

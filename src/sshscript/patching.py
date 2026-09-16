@@ -14,6 +14,12 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 # Per-thread execution state owned by SSHScript, without patching Thread.
+"""Maintain execution context without modifying application Thread objects.
+
+Translated .spy code uses context_thread() to inherit a snapshot of the active
+session stack. Ordinary Python threads do not implicitly inherit that context.
+"""
+
 import functools
 import threading
 import weakref
@@ -25,26 +31,14 @@ _thread_stacks_lock = threading.RLock()
 
 
 class SshscriptStack(object):
-    """
-    A stack-like data structure that maintains a thread-safe collection of SSH session objects.
-    
-    This class implements a stack with a maximum length limit and provides methods
-    for managing SSH sessions within a thread context. It maintains a history of
-    sessions and allows for session management operations.
-    
-    Attributes:
-        stack (deque): The main storage container for session objects
-        owner_id (int): Identity of the thread that owns this stack instance
+    """Track the active sessions/consoles for one thread.
+
+    Mutations and inheritance snapshots are protected by a lock. A child receives
+    a copy of the stack containing references to the same sessions, not new SSH
+    connections. The owner_id identifies the associated thread.
     """
     #instances = []
     def __init__(self,owner,initialitems=None):
-        """
-        Initialize a new SshscriptStack instance.
-        
-        Args:
-            owner (threading.Thread): The thread that owns this stack instance
-            initialitems (list, optional): Initial items to populate the stack with
-        """
         self.stack = deque(initialitems,maxlen=300) if initialitems else deque(maxlen=300)
         assert isinstance(self.stack,deque),type(self.stack)
         self.owner_id = id(owner)
@@ -52,21 +46,9 @@ class SshscriptStack(object):
         #SshscriptStack.instances.append(self)
     
     def __len__(self):
-        """
-        Get the current size of the stack.
-        
-        Returns:
-            int: The number of items in the stack
-        """
         return len(self.stack) 
 
     def __iter__(self):
-        """
-        Create an iterator for the stack.
-        
-        Returns:
-            iterator: An iterator over the stack's contents
-        """
         return iter(self.stack) 
 
     def snapshot(self):
@@ -75,15 +57,6 @@ class SshscriptStack(object):
             return list(self.stack)
 
     def __getitem__(self, val): 
-        """
-        Get an item from the stack by index.
-        
-        Args:
-            val: The index or slice to retrieve
-            
-        Returns:
-            The item at the specified index or slice
-        """
         if val > 0:
             assert len(self.stack) < val , f'len of stack:{len(self.stack)}, No item for "{val}"'
         elif val == 0:
@@ -94,12 +67,7 @@ class SshscriptStack(object):
         return self.stack[val]
 
     def append(self,x):
-        """
-        Add an item to the top of the stack.
-        
-        Args:
-            x: The item to append to the stack
-        """
+        """Push an execution context onto this thread's stack."""
         try:
             self.locker.acquire()
             self.stack.append(x)
@@ -107,18 +75,7 @@ class SshscriptStack(object):
             self.locker.release()
             pass
     def pop(self,x=None):
-        """
-        Remove and return an item from the stack.
-        
-        Args:
-            x (optional): The specific item to remove. If None, removes the top item.
-            
-        Returns:
-            The removed item
-            
-        Raises:
-            AssertionError: If the specified item is not at the top of the stack
-        """
+        """Pop the top context; if x is provided, assert that it is the top item."""
         with self.locker:
             if not self.stack:
                 raise IndexError('cannot pop an empty SSHScript stack')
@@ -138,16 +95,7 @@ class SshscriptStack(object):
         return False
     ## v2.0.3, divert to session's __enter__() 
     def connect(self,*args, **kwargs):
-        """
-        Connect using the session at the top of the stack.
-        
-        Args:
-            *args: Positional arguments for the connection
-            **kwargs: Keyword arguments for the connection
-            
-        Returns:
-            The connected session
-        """
+        """Connect through the top session and return the child without activating it."""
         return self[-1].connect(*args, **kwargs)
 
     def connect_and_activate(self, *args, **kwargs):
@@ -157,12 +105,7 @@ class SshscriptStack(object):
         return session
 
     def close(self):
-        """
-        Close the session at the top of the stack.
-        
-        Returns:
-            The result of closing the session
-        """
+        """Close the top session."""
         session = self[-1]
         result = session.close()
         if len(self) and self[-1] is session:
@@ -219,7 +162,12 @@ def context_thread(
     *,
     daemon=None,
 ):
-    """Construct a standard Thread that inherits the caller's SSHScript stack."""
+    """Construct a standard Thread with a snapshot of the caller's execution stack.
+
+    Sessions in that snapshot are shared references. The target's stack is
+    registered only for its run and discarded in finally; this does not patch
+    threading.Thread or close the inherited sessions.
+    """
     parent_stack = peek_thread_stack()
     initial_stack = (
         parent_stack.snapshot() if parent_stack is not None else []

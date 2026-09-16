@@ -13,6 +13,8 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
+"""SSHScript exceptions, command inspection, and logging configuration helpers."""
+
 import logging
 import os
 import re
@@ -22,12 +24,7 @@ import threading
 
 
 class SSHScriptException(Exception):
-    """Base exception class for SSHScript errors.
-    
-    Attributes:
-        message (str): Error message describing what went wrong
-        code (int): Error code associated with the error (default: 1)
-    """
+    """Base SSHScript error carrying message and errno (default status 1)."""
     def __init__(self, message,errno=1):
         super().__init__(message)
         self.message = message
@@ -36,21 +33,15 @@ class SSHScriptException(Exception):
         return f'{self.message}(#{self.errno})'
 
 class SSHScriptBreak(SSHScriptException):
-    """Exception raised when a break statement is encountered in SSHScript."""
+    """Control-flow signal for $.break(status), handled by the script runner."""
     pass
 
 class SSHScriptExit(SSHScriptException):
-    """Exception raised when an exit statement is encountered in SSHScript."""
+    """Control-flow signal for $.exit(status), propagated to the command-line runner."""
     pass
 
 def dumpScript(source,tb_lineno=None,linerange=10):
-    """Print a script with line numbers and error highlighting.
-    
-    Args:
-        source (str): The source code to display
-        tb_lineno (int, optional): Line number where the error occurred. Defaults to None.
-        linerange (int, optional): Number of lines to show before and after the error line. Defaults to 10.
-    """
+    """Print source with line numbers and optional error-line context."""
     lines = source.splitlines()
     for i,line in enumerate(lines):
         lineno = i + 1
@@ -60,13 +51,7 @@ def dumpScript(source,tb_lineno=None,linerange=10):
             print('     '+'^' * len(line))
 
 def command_is_shell(command)->bool:
-    """Check if a command is a shell command or 'script', which invoking an interactive process.
-    Args:
-        command (str): The command to check
-        
-    Returns:
-        bool: True if the command is a shell command (sh, bash, ash, csh, tcsh, fish, ksh, zsh)
-    """
+    """Recognize a supported shell command or the interactive script utility."""
     args = shlex.split(command)
     ## Note: only sh, bash, zsh were tested by the author
     shellnames = ('sh','bash','ash','csh','tcsh','fish','ksh','zsh','script')
@@ -210,14 +195,7 @@ def command_requires_shell(command:str):
 
 
 def command_is_sudo(command)->bool:
-    """Check if a command uses sudo or su.
-    
-    Args:
-        command (str): The command to check
-        
-    Returns:
-        bool: True if the command uses sudo or su
-    """
+    """Recognize a su/sudo command."""
     args = shlex.split(command)
     ## Note: only sh, bash, zsh were tested by the author
     names = ('su','sudo')
@@ -460,28 +438,18 @@ def log_debug(message, *args, **kwargs):
 
 
 def thread_id_filter(record):
-    """Add thread ID to log records.
-    
-    Args:
-        record: The log record to modify
-        
-    Returns:
-        bool: True so logging continues processing the record.
-    """
+    """Add thread identity to a log record and allow it through the filter."""
     record.thread_id = threading.get_native_id()
     return True
 
 
 def set_logger(userlogger=None,logname=None):
-    """Configure the global logger with appropriate handlers and level.
-    
-    Args:
-        userlogger (logging.Logger, optional): Logger to use instead of
-            creating a new one. Defaults to None.
-        logname (str, optional): Name for a newly created default logger.
-        
-    Returns:
-        logging.Logger: The configured logger instance
+    """Configure console logging or install an application logger.
+
+    With userlogger, return that logger and preserve its level. Otherwise add
+    SSHScript's console handler and return its WrappedLogger. A string first
+    argument is a log name; logname names a newly created library logger.
+    Importing the library or calling get_logger() does not add a console handler.
     """
     if isinstance(userlogger,str):
         logname = userlogger
@@ -503,11 +471,7 @@ def set_logger(userlogger=None,logname=None):
     return userlogger if userlogger is not None else logger
 
 def get_logger():
-    """Get the global logger instance.
-    
-    Returns:
-        logging.Logger: The global logger instance
-    """
+    """Return the shared WrappedLogger, creating it without a console handler if needed."""
     global logger
     if logger is None:
         logger = WrappedLogger(logging.getLogger('sshscript'))
@@ -515,15 +479,7 @@ def get_logger():
 
 ## v2.0.3 added (by https://stackoverflow.com/questions/9836425/equivelant-to-rindex-for-lists-in-python)
 def listRightIndex(alist, value):
-    """Find the rightmost index of a value in a list.
-    
-    Args:
-        alist (list): The list to search in
-        value: The value to find
-        
-    Returns:
-        int: The rightmost index of the value in the list, or -1 if not found
-    """
+    """Return the rightmost matching index; raise ValueError when value is absent."""
     return len(alist) - alist[-1::-1].index(value) -1
 
 ## constants. for detecting if "exitcode" has been retrieved
