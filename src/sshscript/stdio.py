@@ -17,6 +17,8 @@
 ##
 ## iteratable stdout, stderr objects
 ##
+"""Live command output buffers with string access and optional consuming iteration."""
+
 from collections import deque
 import time, threading,sys
 import os,random
@@ -28,17 +30,9 @@ else:
 logger = get_logger()
 
 class DequeStringIter:
-    """
-    iterating , keep item in deque
-    """
+    """Iterate buffered chunks and wait for new output without consuming chunks."""
     def __init__(self,ds,timeout=None,silent=False):
-        """
-        :ds:
-            instance of DequeString
-        :timeout:
-            None: wait forever(blocking)
-            n: wait for n seconds, then raise TimeoutError if not silent.
-        """
+        """Bind a buffer; timeout=None waits indefinitely, silent suppresses timeout errors."""
         assert isinstance(ds,DequeString)
         self.ds = ds
         self.sessionId = ds.sessionId
@@ -92,15 +86,9 @@ class DequeStringIter:
                     if self.timeout is not None:
                         endtime = time.time() + self.timeout
 class DequeStringPopleftIter:
-    """
-    iterating , popleft item from deque
-    """
+    """Iterate and consume buffered chunks, waiting for new output as configured."""
     def __init__(self,ds,timeout=None,silent=False):
-        """
-        :timeout:
-            None: wait forever(blocking)
-            n: wait for n seconds, then raise TimeoutError if not silent.
-        """
+        """Bind a buffer; timeout=None waits indefinitely, silent suppresses timeout errors."""
         assert isinstance(ds,DequeString)
         self.ds = ds
         self.timeout = timeout
@@ -137,6 +125,14 @@ class DequeStringPopleftIter:
                     endtime = time.time() + self.timeout
 
 class DequeString(str):
+    """Live output buffer with a string interface over stored text chunks.
+
+    str(buffer) takes a snapshot of the current text. Plain iteration visits
+    stored chunks without consuming them or waiting for future output;
+    buffer(timeout, silent, shift) creates an iterator that can wait for more.
+    Chunks are not guaranteed to be complete lines. len(buffer) counts chunks,
+    not characters. Use a string snapshot for ordinary immutable string behavior.
+    """
     maxlen = 10000
     sno = 0
     private_attrs = {
@@ -244,7 +240,7 @@ class DequeString(str):
             return object.__getattribute__(self, name)
 
     def set_callback(self,callback,pattern):
-        """ watching content for pattern, call callback() when the pattern shows up"""
+        """Watch for a pattern in appended output and invoke its callback when found."""
         assert pattern is None or isinstance(pattern,str), '"str" pattern supported only'
         with self._condition:
             self.callback = callback
@@ -269,12 +265,11 @@ class DequeString(str):
         self._deque.extend(retained)
 
     def append(self, item,splitlines=False):
-        """
-        Add an item into deque. item could be multiple lines.
-        Don't append multiple items, becase
-        the reason to put it into list (*items) is that 
-        when the listeners does not change the content,
-        there is no string-copy , it saves memory usage.
+        """Append incoming text and notify listeners.
+
+        A callback marker may span chunks: remove the matched marker and invoke
+        its callback once, outside the buffer lock. Notify the top listener and
+        waiting readers about the appended output.
         """
         assert isinstance(item,str),f'{[item]} is not str'
         #print('ooooo>>',[item])
@@ -351,11 +346,9 @@ class DequeString(str):
             pass
 
     def __add__(self, other):
-        """Handle ds + other"""
         return self._string + other
     
     def __radd__(self, other):
-        """Handle other + ds"""
         return other + self._string
             
     def __eq__(self,other):
@@ -363,27 +356,17 @@ class DequeString(str):
 
     
     def __call__(self,timeout=None,silent=False,shift=True):
-        '''
-        by calling this, deque always popleft
-        :timeout:
-            None: iterate deque and waiting for new item forever(blocking until next data)
-            n:int, iterate deque and waiting for new item until without data for n seconds
-        :silent:
-            True: do not raise TimeoutError 
-            False: raise TimeoutError
-        :shift:
-            True: popleft item from deque once yielded
-            False: keep item in deque
-        usage example:
-            for line in stdout(None):
-                ... return current item of deque , popleft item
-            for line in stdout():
-                ... blocking for ever, popleft item
-            for line in stdout(3):
-                ... return current item of deque,popleft item, then, wait for next itme in 3 seconds, if not reaise TimeoutEror
-            for line in stdout(3,silent=True):
-                ... return current item of deque,popleft item, then, wait for next itme in 3 seconds, if not exit the loop
-        '''
+        """Iterate chunks, waiting for new output until timeout or buffer closure/reset.
+
+        shift=True consumes yielded chunks; False retains them. timeout=None waits
+        indefinitely; a number limits idle waiting for new output. silent=True ends
+        iteration on timeout, otherwise TimeoutError is raised.
+
+        Example::
+
+            for chunk in stdout(3, silent=True):
+                print(chunk, end="")
+        """
         if shift:
             return DequeStringPopleftIter(self,timeout,silent)
         else:

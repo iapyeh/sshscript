@@ -13,9 +13,11 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
-'''
-2025/2/28   rewrite for working with tokenparser.py
-'''
+"""Translate .spy source through tokenparser and DollarChanger.
+
+Use compile_spy() for execution with original source locations. convert()
+unparses the transformed AST for display; its text layout is not a source map.
+"""
 import ast
 import builtins
 from io import StringIO
@@ -168,42 +170,11 @@ def compile_spy(script_path, spyscript):
 
 
 def convert(script_path, spyscript):
-    '''
-    Convert a spy script to a Python script.
-    
-    This function performs a two-step conversion process:
-    1. Converts the spy script to a token script using tokenparser
-    2. Converts the token script to a regular Python script using DollarChanger
-    
-    Args:
-        script_path (str): Path to the script file, used for error reporting
-        spyscript (str): The spy script content to be converted
-        
-    Returns:
-        str: The converted Python script
-        
-    Raises:
-        SyntaxError: If parsing or translation fails
-    '''
+    """Return generated Python text for inspection; use compile_spy() for execution."""
     return ast.unparse(parse(script_path, spyscript))
 
 def unittest():
-    '''
-    Run unit tests for the dollarparser module.
-    
-    This function tests the conversion process by:
-    1. Loading test cases from testingcase module
-    2. Converting each test case using the convert function
-    3. Comparing the converted output with expected results
-    
-    Command line options:
-        --no-lineno: Suppress line numbers in output
-        -f <filename>: Test a specific file
-        <numbers>: Test specific test cases by number (comma-separated)
-    
-    Returns:
-        None
-    '''
+    """Run the legacy parser conversion cases selected by command-line arguments."""
     import sys,os
     from errorutils import dumpScript
     sys.path.insert(0,'dev-parsebytoken')

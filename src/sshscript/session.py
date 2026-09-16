@@ -15,6 +15,8 @@
 #
 
 ## firstly patching threading.Thread
+"""Local/remote execution sessions and the outer lifetime of console contexts."""
+
 if __package__:
     from . import patching
 else:
@@ -24,6 +26,8 @@ import ast
 import threading
 import paramiko
 import stat
+import posixpath
+import errno
 import time
 import os
 import sys
@@ -169,24 +173,12 @@ class _IdempotentProxyCommand(paramiko.ProxyCommand):
             )
 
 class ConsoleWrapper:
-    """
-    This warp a channel to be conform the context-protocol of "with ... as"
-    For example:
-        $.sudo, $.su and $.enter 
-        to become
-        with $ as console: 
-            console.su(), console.sudo(), console.enter()
-    or like this:
-        with $.sudo(password) as console
-        to become
-        with $ as console:
-            with console.sudo(password) as sudoconsole:
-    or 
-        with $.sudo() as console:
-            with console.enter():
+    """Own the outer shell channel and expose a SessionWrapper in a with block.
+
+    Session.shell()/su()/sudo()/enter() construct this internal adapter. Nested
+    consoles share the channel; the outermost wrapper closes it on exit.
     """
     def __init__(self,dollar,funcname,*args,**kwargs):
-        """ construct the outer console """
         assert funcname in ('su','sudo','enter','shell')
         self.funcname = funcname
         
@@ -221,9 +213,7 @@ class ConsoleWrapper:
     enter = __enter__
 
     def __exit__(self,exc_type, exc_value, _traceback):
-        '''
-        Only 1st layer would call this __exit__
-        '''
+        """Exit this console; only the outermost wrapper closes the shared channel."""
         
         #if exc_value is not None:
         #    return self.wrapper.__exit__(exc_value, _traceback)
@@ -274,6 +264,30 @@ class ConsoleWrapper:
         return self.channel.stderr
 
 class Session(object):
+    """Execute commands locally or through an SSH connection.
+
+    A new Session is local. connect() returns a remote child session; connecting
+    from that child tunnels through its SSH connection. Use a with block to
+    activate a session for .spy syntax; leaving a remote session context closes
+    it when its last active context exits. A local session remains reusable.
+
+    session(command) aliases exec_command() and returns (stdout, stderr).
+    Read session.exitcode for the last command status. Use shell() when commands
+    must share a working directory or environment, enter() for interactive
+    programs, and sudo()/su() for a console under another user.
+
+    Example::
+
+        with Session() as local:
+            stdout, stderr = local("hostname")
+            with local.connect("user@host") as remote:
+                stdout, stderr = remote("uname -s")
+
+    In .spy files, $command executes in the active session or console, and
+    $.connect(), $.shell(), $.enter(), $.upload(), and $.download() provide the
+    corresponding operations. Prefer these public entry points to Dollar or
+    channel classes.
+    """
     counter = 0
     def __init__(self,parent=None):
         super(Session,self).__init__()
@@ -372,7 +386,8 @@ class Session(object):
 
     @property
     def connected(self):
-        return self._client and self._client.get_transport().is_active()
+        transport = self._client.get_transport() if self._client else None
+        return transport is not None and transport.is_active()
 
     @property
     def sftp(self):
@@ -524,34 +539,21 @@ class Session(object):
 
     @export2Dollar
     def connect(self,host,username=None,password=None,port=22,policy=None,**kw):
-        """
-        create a sub Session() and call SSHClient.connect() to connect to remote host.
-        the connection has a default keep alive interval of 60 seconds, for customizing, please
-        set os.environ['KEEPALIVE_INTERVAL'] to your favorite value. value '0' would disable this setting.
-        
-        host:
-            when host is in format of "username@host", then the second parameter would set to password, 
-            which means user can call this function like below:
-                $.connect('user@host',password) instead of $.connect('user@host',password=password)
-        policy:
-            args for paramiko's SSHClient.set_missing_host_key_policy()
-            when policy is None, unknown or changed host keys are rejected.
-            Pass paramiko.AutoAddPolicy() explicitly only for trusted bootstrap
-            environments where accepting a new key is intended.
-        kw:dict
-            kw['proxyCommand']: 
-                setting proxyCommand. If presented, the next arguments were set:
-                    kw['banner_timeout'] = 200000
-                    kw['timeout'] = 200000
-                    kw['auth_timeout' ] = 200000
-            kw['pkey_path']: 
-                the path to get private key. The value was set to 'pkey' for SSHClient.connect()
+        """Return a connected child session, optionally through this session's SSH link.
 
-            other args which should directly pass into paramiko's SSHClient.connect()
-        Return:
-            An instance of Session(), the connected subsession. 
-        Throws:
-            paramiko's exceptions of SSHClient.connect() 
+        Use with session.connect("user@host") as remote to scope the connection.
+        A nested connect() uses the parent as a jump host. In ordinary Python,
+        connect() alone does not activate the child for .spy execution; use with.
+
+        host may include the username; connect("user@host", password) is supported.
+        pkey_path loads an RSA key from this session's host (local for a new Session).
+        Other connection keywords are forwarded to SSHClient.connect().
+
+        Unknown and changed host keys are rejected by default. policy may explicitly
+        supply a missing-host-key policy. proxyCommand is supported only on a local
+        parent; its connect/banner/auth timeouts default to 30 seconds and may be
+        overridden. KEEPALIVE_INTERVAL sets keepalive seconds (default 60; 0 disables).
+        Connection failures propagate.
         """
         
         if self.closed:
@@ -699,6 +701,11 @@ class Session(object):
     ## v2.0.3 add password
     @export2Dollar
     def pkey(self,pathOfRsaPrivate,password=None):
+        """Load an RSA private key from this session's host; password decrypts it.
+
+        A connected session reads via SFTP; a local session reads a local file.
+        The returned key can be passed to connect(pkey=...), or use pkey_path there.
+        """
         if self.connected:
             # Read through SFTP instead of interpolating the path into a remote
             # shell command.  Besides handling arbitrary valid filenames, this
@@ -724,108 +731,84 @@ class Session(object):
     
     @export2Dollar
     def upload(self,src,dst,makedirs=False,overwrite=True):
-        """
-        if dst is in an non-existing directory, FileNotFoundError will be raised.
-        """        
-        assert self.connected, f'{self} is not connected, client={self._client}'
+        """Upload one file using the SSH connection account's SFTP permissions.
 
+        An active SSH connection is required.
+        Existing directories and paths ending in '/' receive the source basename.
+        Other destinations are filenames; makedirs only creates parent directories.
+        overwrite=False uses exclusive creation. Success returns (src, dst);
+        failures raise exceptions without changing command results such as exitcode.
+        """
+        if not self.connected:
+            raise SSHScriptException('upload() requires an active SSH connection')
         src = os.path.abspath(os.path.normpath(src))
         if not os.path.exists(src):
             raise FileNotFoundError(src)
         if not os.path.isfile(src):
             raise SSHScriptException(f'uploading src "{src}" must be a file',503)
-        
 
-        remoteCwd = self.sftp.getcwd() or ''
-        dst = os.path.normpath(dst)
-        
-       
-        logger.info(
-            'Starting upload (host=%s, source=%s, destination=%s)',
-            self.host,
-            src,
-            os.path.join(remoteCwd,dst),
-        )
-        
-        ## check exists of dst folders
-        srcbasename = os.path.basename(src)
-        dstbasename = os.path.basename(dst)
+        sftp = self.sftp
+        dst = os.fspath(dst)
+        directory_requested = dst.endswith('/')
+        dst = posixpath.normpath(dst)
+        try:
+            destination_stat = sftp.stat(dst)
+        except FileNotFoundError:
+            destination_stat = None
+        if directory_requested:
+            if destination_stat is not None and not stat.S_ISDIR(destination_stat.st_mode):
+                raise NotADirectoryError(errno.ENOTDIR, 'Not a directory', dst)
+        if directory_requested or (destination_stat is not None and
+                                   stat.S_ISDIR(destination_stat.st_mode)):
+            dst = posixpath.join(dst, os.path.basename(src))
+
+        logger.info('Starting upload (host=%s, source=%s, destination=%s)',
+                    self.host, src, dst)
         if makedirs:
-            ## v1.1.12
-            ## In this case, suppose given name is folder, not a file
-            ## If need to create folder, all given path would be created
-            ## ex. upload c0-test.txt
-            ## The next 3 lines are valid:
-            ##  dst is  '/home/iap/sshscriptuploadtest/nonexist1/nonexist2/nonexist3/c0-test.txt'
-            ##  dst is  '/home/iap/sshscriptuploadtest/nonexist1/nonexist2/nonexist3'
-            ##  dst is  '/home/iap/sshscriptuploadtest/nonexist1/nonexist2/nonexist3/'
-            ## The next line might not what we expect:
-            ##  dst is  '/home/iap/sshscriptuploadtest/nonexist1/nonexist2/nonexist3/test.txt'
-            ## because it results in:
-            ## '/home/iap/sshscriptuploadtest/nonexist1/nonexist2/nonexist3/test.txt/c0-test.txt'
-            ## after v1.1.13，if given path has same file extension, it was considered to be a file
-            # , not considered to be a folder. 
-            ## (see unittest/c0.spy)
-            if not dstbasename == srcbasename:
-                if not os.path.splitext(srcbasename)[1] == os.path.splitext(dstbasename)[1]:
-                    ## given dst is a folder
-                    dst = f'{dst}/{srcbasename}'
+            missing = []
+            parent = posixpath.dirname(dst)
+            while parent:
+                try:
+                    parent_stat = sftp.stat(parent)
+                except FileNotFoundError:
+                    missing.append(parent)
+                    next_parent = posixpath.dirname(parent)
+                    if next_parent == parent:
+                        raise
+                    parent = next_parent
+                else:
+                    if not stat.S_ISDIR(parent_stat.st_mode):
+                        raise NotADirectoryError(errno.ENOTDIR, 'Not a directory', parent)
+                    break
+            for folder in reversed(missing):
+                sftp.mkdir(folder)
 
-            def checking(dst,foldersToMake):
-                dstDir = os.path.dirname(dst)
-                ## fixed on v1.1.8 for relative-path to work with makedirs=1
-                if dstDir:
-                    try:
-                        stat = self.sftp.stat(dstDir)
-                    except FileNotFoundError:
-                        foldersToMake.append(dstDir)
-                        return checking(dstDir,foldersToMake)
-                return foldersToMake
-
-            ## check un-existing folder(from down to top; suppose last one is a file)
-            foldersToMake = checking(dst,[])
-            if len(foldersToMake):
-                foldersToMake.reverse()
-                for folder in foldersToMake:
-                    logger.debug(
-                        'Creating remote upload directory (host=%s, path=%s)',
-                        self.host,
-                        folder,
-                    )
-                    self.sftp.mkdir(folder)
+        if overwrite:
+            sftp.put(src, dst)
         else:
-            ## cases:
-            ## 1. basename are the same
-            ## 2. basename are not the same：
-            ##    2.1 dst is a folder： dst+= basename
-            ##    2.2 dst is a file
-            if dstbasename == srcbasename:
+            # Give existing destinations a useful error, including dangling
+            # symlinks. Exclusive open below also protects against creation races.
+            try:
+                sftp.lstat(dst)
+            except FileNotFoundError:
                 pass
             else:
-                try:
-                    dststat = self.sftp.stat(dst)
-                except FileNotFoundError:
-                    ## take dst as a file
-                    pass
-                else:
-                    ## REF: https://stackoverflow.com/questions/18205731/how-to-check-a-remote-path-is-a-file-or-a-directory
-                    if stat.S_ISDIR(dststat.st_mode):
-                        ## is folder，don't call os.path.join(), because in win32, it becomes "\" 
-                        ## that is not what we want for "ftp"
-                        dst = f'{dst}/{srcbasename}'
-                        try:
-                            dststat = self.sftp.stat(dst)
-                        except FileNotFoundError:
-                            pass
-                        else:
-                            if not overwrite:
-                                raise FileExistsError(f'{dst} already exists')
-                    else:
-                        # is file
-                        if not overwrite:
-                            raise FileExistsError(f'{dst} already exists')
-        
-        self.sftp.put(src,dst)
+                raise FileExistsError(errno.EEXIST, 'Destination already exists', dst)
+            with open(src, 'rb') as source:
+                # Paramiko needs 'w' for write access in addition to 'x'.
+                # Do not fall back to a truncating open if exclusive open fails.
+                with sftp.open(dst, 'wx') as destination:
+                    destination.set_pipelined(True)
+                    size = 0
+                    while True:
+                        data = source.read(32768)
+                        if not data:
+                            break
+                        destination.write(data)
+                        size += len(data)
+                remote_size = sftp.stat(dst).st_size
+                if remote_size != size:
+                    raise IOError(f'size mismatch in upload: {remote_size} != {size}')
         logger.info(
             'Upload completed (host=%s, source=%s, destination=%s)',
             self.host,
@@ -836,10 +819,16 @@ class Session(object):
 
     @export2Dollar
     def download(self,src,dst=None):
+        """Download one file via SFTP using the SSH connection account's permissions.
+
+        An active SSH connection is required. dst defaults to the local cwd; an
+        existing directory receives the source basename. Existing files are replaced.
+        Return (src, dst); failures raise without changing command results.
+        """
+        if not self.connected:
+            raise SSHScriptException('download() requires an active SSH connection')
         if dst is None:
             dst = os.getcwd()
-
-        assert self.connected
 
         ## after v1.1.13, no more down to self.subSession for getting "client"
 
@@ -874,6 +863,12 @@ class Session(object):
         return _IdempotentProxyCommand(argsOfProxyCommand)
 
     def run(self,script,vars=None,showScript=False):
+        """Execute Python or .spy source in this session and return its namespace.
+
+        vars supplies initial names (default: the caller's locals); execution uses
+        a copy. This session is active for the duration of the run. showScript=True
+        displays translated source and returns an empty dict without executing it.
+        """
         if vars is None:
             vars = sys._getframe(1).f_locals
         return self.run_in_eventloop(script,vars,showScript)
@@ -1002,12 +997,25 @@ class Session(object):
 
     def exec_command(self,cmd:str,*,shell=None,shell_executable=None,
                      _legacy_twodollars=False,**kw):
-        """Execute one command, automatically selecting direct or shell mode.
+        """Execute one command and return (stdout, stderr); also available as session(cmd).
 
-        ``shell=None`` (the default) performs quote-aware command inspection.
-        ``shell=False`` forces direct execution and ``shell=True``
-        forces POSIX shell execution.  ``shell='bash'`` selects and enables a
-        named shell.
+        Wait for completion on this session's host. stdout, stderr, and exitcode
+        remain available on the session as the latest command result. Check exitcode
+        for command failure; execution/transport errors propagate. Local execution
+        also accepts check=True to raise for a nonzero command status.
+
+        shell=None automatically detects shell syntax. shell=False forces direct
+        execution; shell=True uses a POSIX shell; shell="bash" selects a named shell.
+        Use shell() as a context manager when successive commands must share state.
+
+        input supplies stdin and env supplies explicit environment values. Remaining
+        keywords are backend-specific execution options. In .spy files, use $command;
+        $$ and onedollar()/twodollars() are legacy forms.
+
+        Example::
+
+            stdout, stderr = session("cat", input="hello")
+            status = session.exitcode
         """
         if not isinstance(cmd,str):
             raise TypeError(f'command must be str, not {type(cmd).__name__}')
@@ -1044,6 +1052,7 @@ class Session(object):
 
     ## Compatibility aliases for code generated by older parsers.
     def onedollar(self,cmd,**kw):
+        """Deprecated alias for exec_command(); use session(command) in Python."""
         warnings.warn(
             'onedollar() is deprecated; use exec_command()',
             DeprecationWarning,
@@ -1052,6 +1061,7 @@ class Session(object):
         return self.exec_command(cmd,**kw)
 
     def twodollars(self,cmd,**kw):
+        """Deprecated alias for exec_command(..., shell=True)."""
         warnings.warn(
             'twodollars() is deprecated; use exec_command(..., shell=True)',
             DeprecationWarning,
@@ -1067,13 +1077,16 @@ class Session(object):
     ## eg. "with $.shell('bash') as bash:"
     ## eg. "with $python3" => with $.shell('python3')
     def shell(self,command=None,funcname='shell',get_pty=True,*args,**kw):
-        """
-        :base_shell_for:
-            None: when this is for $.shell()
-            name:(su,sudo,enter) when this shell is as base shell of $.sudo(), $.su(), $.enter()
-                it is not necessary to return an instace of ConsoleWrapper
-        :kw:
-            keyword arguments for ConsoleWrapper, then InnerConsole (SuConsole, SudoConsole, EnterConsole)
+        """Open a persistent shell context on this session's host (default: bash -i).
+
+        Use the returned console for commands that share cwd and environment::
+
+            with session.shell() as sh:
+                sh("cd /tmp")
+                stdout, stderr = sh("pwd")
+
+        get_pty requests a PTY. In .spy files, use with $.shell() as sh.
+        funcname is an internal selector used by the other console factories.
         """
         ## sudo,su,enter should set get_pty when calling this function
         assert funcname in ('shell','enter','su','sudo')
@@ -1097,8 +1110,12 @@ class Session(object):
 
     ## v2.0 added feature
     def su(self,username,password=None,expect=None,initials=None,shell:bool=True,login=True,get_pty=True):
-        """
-        shell:str, the shell command to run as the base-shell
+        """Open a console as username using su; use as a with context.
+
+        password and expect handle authentication; initials runs setup commands.
+        login selects a login shell. shell=True starts a base shell first;
+        shell=False starts su directly. get_pty requests a PTY.
+        The SSH connection account, including SFTP permissions, is unchanged.
         """
         command = SuConsole.get_command(self,username,login,get_pty)
         if shell:
@@ -1112,6 +1129,13 @@ class Session(object):
         return self._lastDollar
     ## v2.0 added feature
     def sudo(self,password=None,username=None,expect=None,initials=None,shell:bool=True,login=True,get_pty=True):
+        """Open a console through sudo, optionally selecting username; use with.
+
+        password and expect handle authentication; initials runs setup commands.
+        login selects login behavior. shell=True starts a base shell first;
+        shell=False starts sudo directly. get_pty requests a PTY.
+        File transfers still use the original SSH connection account.
+        """
         command=SudoConsole.get_command(self,username,login)
         if shell:
             self.shell(None,get_pty=get_pty)
@@ -1128,6 +1152,17 @@ class Session(object):
         ## when base_shell is True, self.shell would assign value of self._lastDollar
         ## by assign to self._lastDollar, the $.exitcode and $.stderr would be available after "exit" the "enter"
         ## ensure having self._lastDollar (channel of ssh or popen)
+        """Enter an interactive program and return its console context.
+
+        expect/password handle an initial authentication prompt. prompt identifies
+        when the program is ready for more input. Inside the context, use input()
+        (or the console call alias) to send a line and wait, send() for raw input,
+        and expect() for output matching.
+
+        exit is the text sent when leaving, such as "quit()" or chr(3); None sends
+        no exit text. shell=True starts a base shell; False starts the command
+        directly. get_pty requests a PTY.
+        """
         if shell:
             self.shell(None,get_pty=get_pty)
             self._lastDollar = ConsoleWrapper(self._lastDollar,'enter',command,expect=expect,password=password,exit=exit,prompt=prompt)
@@ -1146,16 +1181,19 @@ class Session(object):
         return self._lastDollar
     @property
     def stdout(self):
+        """Return the latest command stdout; raise ValueError before any execution."""
         if self._lastDollar is None: raise ValueError('no execution result yet')
         return self._lastDollar.stdout
 
     @property
     def stderr(self):
+        """Return the latest command stderr; raise ValueError before any execution."""
         if self._lastDollar is None: raise ValueError('no execution result yet')
         return self._lastDollar.stderr
 
     @property
     def exitcode(self):
+        """Return the latest command exit status; raise ValueError before any execution."""
         if self._lastDollar is None: raise ValueError('no execution result yet')
         return self._lastDollar.exitcode
     def wait_for_silent(self,seconds,max_seconds=0):
@@ -1166,12 +1204,12 @@ class Session(object):
 
     @export2Dollar
     def close(self, strict=False):
-        """Close this session and report whether every cleanup step succeeded.
+        """Close this session and its children; return whether all cleanup succeeded.
 
-        Cleanup remains best-effort by default so it does not mask an exception
-        already leaving a ``with`` block.  Callers that require a hard resource
-        guarantee may pass ``strict=True``.  In either mode, details are retained
-        in ``close_errors`` as ``(operation, exception)`` tuples.
+        Cleanup attempts continue after individual failures. close_errors retains
+        (operation, exception) tuples. strict=True raises RuntimeError after cleanup
+        if any step failed; the default reports failure without masking an exception
+        leaving a with block. Repeated calls retain the same cleanup outcome.
         """
 
         ## don't allow to be called multiple times

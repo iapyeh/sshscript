@@ -13,6 +13,14 @@
 # You should have received a copy of the MIT License along with Sshscript;
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
+"""Public script runners and command-line entry point.
+
+For commands in ordinary Python, use Session: session(command) returns
+(stdout, stderr), and session.connect(host) creates a remote child session.
+run_file(path) executes one file; run_script(source) returns its namespace.
+Importing this module does not install .spy import hooks or console logging.
+"""
+
 import os
 import sys
 import time
@@ -52,25 +60,16 @@ def run_file(
     vars=None,
     showScript=False,
 ) -> int:
-    """Execute one Python or ``.spy`` script file in a new local session.
+    """Execute one Python or .spy file in a fresh local session.
 
-    ``script_path`` must identify one existing regular file; directories,
-    globs, and iterables of paths are not accepted.  Scripts that need code
-    from other files should use SSHScript include syntax or Python imports.
+    script_path is one str or path-like file path. vars supplies initial names;
+    showScript=True displays the translated source without executing it.
+    The script directory is temporarily on the import path, and .spy imports
+    are enabled for the run. The session is closed on completion or error.
 
-    Args:
-        script_path: A string or ``os.PathLike`` path to one script file.
-        vars: Optional initial names exposed to the script.
-        showScript: Convert and display the script without executing it.
-
-    Returns:
-        ``0`` after normal completion, or the status supplied to
-        ``$.break(status)``.
-
-    Raises:
-        TypeError: If ``script_path`` is not a string or path-like object.
-        RuntimeError: If the path is missing or is not a regular file.
-        SSHScriptExit: If the script calls ``$.exit(status)``.
+    Return 0 on normal completion, or the status passed to $.break(status).
+    $.exit(status) raises SSHScriptExit; other execution errors propagate.
+    Use run_script() for source text and a returned namespace.
     """
     if not isinstance(script_path, (str, os.PathLike)):
         raise TypeError('script_path must be str or os.PathLike')
@@ -147,6 +146,13 @@ def run_file(
 
 
 def run_script(script,varGlobals=None,showScript=False):
+    """Execute Python or .spy source in a fresh local session; return its namespace.
+
+    varGlobals supplies initial names and is copied for execution. showScript=True
+    prints the translated source and returns an empty dict without executing it.
+    The session is closed on completion or error; execution exceptions propagate.
+    Use Session.run() to execute source in an existing session.
+    """
     the_session = Session()
     started_at = time.monotonic()
     outcome = 'failed'
@@ -169,6 +175,64 @@ def run_script(script,varGlobals=None,showScript=False):
             exception_type,
             int((time.monotonic() - started_at) * 1000),
         )
+
+
+def _check_updates():
+    """Report the newest stable PyPI release allowed by this Python version."""
+    import json
+    import shlex
+    import urllib.error
+    import urllib.request
+    from packaging.specifiers import SpecifierSet
+    from packaging.utils import parse_wheel_filename, parse_sdist_filename
+    from packaging.version import Version
+
+    python_version = '.'.join(map(str, sys.version_info[:3]))
+    try:
+        request = urllib.request.Request(
+            "https://pypi.org/simple/sshscript/",
+            headers={"Accept": "application/vnd.pypi.simple.v1+json"},
+        )
+        with urllib.request.urlopen(request, timeout=3) as response:
+            files = json.load(response)['files']
+        if not isinstance(files, list):
+            raise ValueError('invalid file list from PyPI')
+        candidates = []
+        for file in files:
+            if not isinstance(file, dict):
+                raise ValueError('invalid file metadata from PyPI')
+            if file.get('yanked', False) is not False:
+                continue
+            filename = file['filename']
+            if filename.endswith('.whl'):
+                _, version, _, _ = parse_wheel_filename(filename)
+            else:
+                _, version = parse_sdist_filename(filename)
+            if version.is_prerelease or version.is_devrelease:
+                continue
+            requirement = SpecifierSet(file.get('requires-python') or '')
+            if requirement.contains(python_version, prereleases=True):
+                candidates.append(version)
+        current = Version(__version__)
+        latest = max(candidates) if candidates else None
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        reason = getattr(exc, 'reason', exc)
+        print(f"Unable to check for updates: {reason}", file=sys.stderr)
+        return 1
+
+    print(f"Installed SSHScript: {current}")
+    if latest is None:
+        print(f"No stable release supports Python {python_version} on PyPI.")
+    else:
+        print(f"Latest stable release for Python {python_version}: {latest}")
+        if latest > current:
+            command = shlex.join([sys.executable, '-m', 'pip', 'install',
+                                  '--upgrade', 'sshscript'])
+            print(f"Upgrade: {command}")
+        else:
+            print("No newer compatible stable release is available.")
+    return 0
+
 
 def main():
     ## Console logging is a CLI concern; importing sshscript remains silent.
@@ -203,11 +267,12 @@ def main():
 
     ## new on v1.1.17
     parser.add_argument('--version', dest='version', action='store_true',default=False,
-                        help='dump the version number')
+                        help='show the installed version')
 
     ## new on v2.0.2
-    parser.add_argument('--check', dest='checkversion', action='store_true',default=False,
-                        help='check the last version of SSHScript (need internet)')
+    parser.add_argument('--check-updates', '--check', dest='checkversion',
+                        action='store_true', default=False,
+                        help='check PyPI for a newer compatible stable release (requires internet)')
 
     ## new on v3.1.0
     parser.add_argument(
@@ -252,26 +317,7 @@ def main():
     if (args.version):
         print(get_current_version())
     elif (args.checkversion):
-        current_version = get_current_version()
-        import urllib.request
-        import json
-        info = json.loads(urllib.request.urlopen("https://iapyeh.github.io/sshscript/info.json",timeout=3).read())
-        mime = [x for x in current_version.split('.')]
-        current = [x for x in info['version'].split('.')]
-        print(f'The latest release of SSHScript is {info["version"]}, you have version {current_version} installed.')
-        if not current_version == info['version']:
-            canupgrade = True
-            for i in range(3):
-                if mime[i] > current[i]:
-                    canupgrade = False
-                    break
-            if canupgrade:
-                print(f"Installed SSHScript Version is \"{current_version}\", SSHScript has new version \"{info['version']}\".")
-                print("  You can upgrade it by: (choose one)")
-                print(f"  1.  pip install sshscript --upgrade")
-                print(f"  2.  pip install sshscript=={info['version']} --upgrade")
-                print(f"  3.  {sys.executable} -m pip install sshscript --upgrade")
-                print(f"  4.  {sys.executable} -m pip install sshscript=={info['version']} --upgrade")
+        sys.exit(_check_updates())
 
     elif args.path:
         

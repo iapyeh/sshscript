@@ -14,6 +14,13 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
+"""Rewrite dollar syntax into Python-compatible placeholders for DollarChanger.
+
+Keep source line/column positions usable by the AST conversion and diagnostics.
+F-string token handling differs before and after Python 3.12; both paths
+must preserve embedded dollar expressions.
+"""
+
 import tokenize,re,warnings
 from io import StringIO
 
@@ -43,6 +50,7 @@ def seek_non_space_prevtoken(tokens,i):
        if tokens[i].string != ' ': return tokens[i]
 
 def convert(code):
+    """Return placeholder Python source for AST transformation, warning on legacy $$ syntax."""
     legacy_twodollars_warned = False
 
     def warn_legacy_twodollars():

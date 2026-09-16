@@ -16,6 +16,8 @@
 
 ## 2025/3/3
 ## v2.0.3 feature: import *.spy file directly
+"""Explicit, reference-counted support for importing .spy modules and packages."""
+
 import importlib.abc
 import importlib.util
 import os
@@ -33,18 +35,17 @@ else:
     from dollar import Dollar
 
 class SpyLoader(importlib.abc.Loader):
-    """Custom loader to load and modify .spy files before execution."""
+    """Compile and execute .spy modules while preserving their original source locations."""
     
     def __init__(self, path, package):
         self.path = path
         self.package = package
 
     def create_module(self, spec):
-        """Create a module (default implementation)."""
         return None  # Use the default module creation process
 
     def exec_module(self, module):
-        """Execute the module with modified code."""
+        """Execute compiled .spy source in the module namespace."""
         with open(self.path, "r", encoding="utf-8") as file:
             original_code = file.read()
 
@@ -71,10 +72,9 @@ class SpyLoader(importlib.abc.Loader):
 
 
 class SpyFileFinder(importlib.abc.MetaPathFinder):
-    """Custom file finder for .spy files."""
+    """Find .spy modules and packages through Python's import machinery."""
 
     def find_spec(self, fullname, path=None, target=None):
-        """Find the module spec for a .spy file."""
         if path is None:
             path = sys.path  # Search in sys.path        
         fullname_file = fullname.rsplit('.', 1)[-1]
@@ -144,10 +144,11 @@ def unregister_spy_importer():
 
 @contextmanager
 def spy_imports():
-    """Temporarily enable ordinary Python imports of ``.spy`` modules.
+    """Temporarily enable Python imports of .spy modules and packages.
 
-    The registration is reference-counted, so nested and overlapping contexts
-    leave the process import state exactly as they found it.
+    Use with spy_imports(): before an import in ordinary Python. Registration
+    is reference-counted so nested/overlapping contexts retain the finder until
+    the last user exits. Imported modules remain cached in sys.modules.
     """
     register_spy_importer()
     try:

@@ -14,6 +14,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
 
+"""Internal local process/PTY transport; applications execute through Session."""
+
 import threading, os,sys
 
 import time,random
@@ -33,23 +35,16 @@ else:
 logger = get_logger()
 
 class POpenChannel(GenericChannel):
-    """Channel implementation for subprocess communication using POpen.
-    
-    Handles communication with subprocesses through standard input/output streams
-    and PTY operations.
+    """Provide GenericChannel operations over local process pipes or a PTY.
+
+    The channel owns the supplied cleanup handles and the process shutdown path.
     """
     count = 0
     def __init__(self,owner,cp,stdouterr,stdin,pty_to_close:list,get_pty:bool):
-        """Initialize POpenChannel.
-        
-        :stdouterr:(list)
-            [0]: stdout to read
-            [1]: stderr to read
-        :pty_to_close:(list)
-            file handle to close when this channel.close() was called
-        :get_pty:
-            owner (Dollar()) hints if this channel is a pty channel
-            doesn't matter if there is no cp (instance of subprocess.Popen)
+        """Attach process/stream handles; pty_to_close lists owned cleanup resources.
+
+        stdouterr supplies separate stdout/stderr descriptors, or one merged
+        descriptor in PTY mode. get_pty describes the transport mode.
         """
         super(POpenChannel,self).__init__(owner)
         self.prefixOfLog = "[POpen]"
@@ -213,10 +208,7 @@ class POpenChannel(GenericChannel):
         )
 
     def raw_send(self,s):
-        """Send data to subprocess through stdin.
-        
-        :s: string to send
-        """
+        """Write text to the process input or PTY."""
         if self.closed or self.cp.poll() is not None:
             raise BrokenPipeError(
                 errno.EPIPE,
@@ -235,7 +227,7 @@ class POpenChannel(GenericChannel):
             self.touchIO(False)
 
     def current_pid(self):
-        """ for debuging only"""
+        """Return process identification for diagnostics."""
         def get_child_pid(ppid):
             try:
                 children = subprocess.check_output(['pgrep', '-P', str(ppid)]).decode().strip()
@@ -248,10 +240,7 @@ class POpenChannel(GenericChannel):
                 return ppid
         return get_child_pid(self.cp.pid)
     def close(self):
-        """Close channel and cleanup resources.
-        
-        Sends exit command, waits for subprocess to exit, and closes PTY handles.
-        """
+        """Wait briefly for process exit, then terminate/kill if needed and close owned handles."""
         if not self._begin_close():
             return
 

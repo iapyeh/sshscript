@@ -13,6 +13,8 @@
 # if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 #
+"""Internal SSH channel transport; use Session.connect() and its console methods."""
+
 import errno
 import os
 import paramiko
@@ -29,18 +31,9 @@ else:
     from errorutils import get_logger
 logger = get_logger()
 class ParamikoChannel(object):
-    """Helper class for SSHChannel to manage PTY and non-PTY SSH sessions.
-    
-    This class handles the low-level communication with SSH channels using Paramiko,
-    supporting both PTY and non-PTY modes for different use cases.
-    """
+    """Adapt a Paramiko channel for PTY/non-PTY I/O and SSHChannel output buffers."""
     count = 0
     def __init__(self,sshchannel,get_pty,channel=None):
-        """Initialize ParamikoChannel.
-        
-        :sshchannel: parent SSHChannel instance
-        :get_pty: whether to enable PTY mode
-        """
         assert isinstance(sshchannel, SSHChannel)
         self.sshchannel = sshchannel 
         self.get_pty = get_pty
@@ -99,10 +92,7 @@ class ParamikoChannel(object):
 
     async def _start_reading(self):         
         async def _reading():
-            """Background thread for reading from SSH channel.
-            
-            Reads from stdout/stderr and adds data to parent channel buffers.
-            """
+            """Read remote stdout/stderr into the parent channel buffers."""
             ## this runs in a thread
             stdout = self.channel.makefile()
             stderr = self.channel.makefile_stderr()
@@ -150,10 +140,7 @@ class ParamikoChannel(object):
             #    self.sshchannel.close()
         await _reading()
     def raw_send(self,s):
-        """Send data through SSH channel.
-        
-        :s: string to send
-        """
+        """Write text to the SSH channel."""
         if self.channel.closed:
             raise BrokenPipeError(
                 errno.EPIPE,
@@ -162,31 +149,20 @@ class ParamikoChannel(object):
         self.channel.sendall(s)
     
     def exit_status_ready(self):
-        """Check if channel exit status is ready.
-        
-        :return: True if exit status available
-        """
         return self.channel.exit_status_ready()
     
     def recv_exit_status(self):
-        """Get channel exit status.
-        
-        :return: exit status code
-        """
         return self.channel.recv_exit_status()
 
     def shutdown_write(self):
-        """Shutdown write side of channel.
-        
-        :return: result of channel shutdown_write
-        """
         return self.channel.shutdown_write()
 
 
     def close(self):
-        """Close SSH channel and cleanup.
-        
-        Sends exit command, waits for closure, handles errors.
+        """Send EOF when needed and wait briefly for remote exit before closing.
+
+        A missing exit status does not prevent transport closure. The shell's last
+        command result is kept separately from the SSH channel exit status.
         """
         host = self.sshchannel.owner.session.host
         logger.debug('[SSHChannel] Closing SSH channel (host=%s)', host)
@@ -220,19 +196,10 @@ class ParamikoChannel(object):
             self.channel.close()
     
 class SSHChannel(GenericChannel):
-    """Channel implementation for SSH communication.
-    
-    Manages SSH sessions with PTY and non-PTY modes.
-    """
+    """Provide GenericChannel operations over an SSH transport."""
     is_ssh_channel = True
 
     def __init__(self,owner,client,get_pty=False):
-        """Initialize SSHChannel.
-        
-        :owner: channel owner
-        :client: SSH client instance
-        :get_pty: whether to enable PTY mode (default: True)
-        """
         super().__init__(owner)
         self.get_pty = get_pty
         with self.executing_lock:
@@ -271,10 +238,7 @@ class SSHChannel(GenericChannel):
                 self.channel = None
         
     def raw_send(self,s):
-        """Send data through SSH channel.
-        
-        :s: string to send
-        """
+        """Delegate raw text writing to the Paramiko channel adapter."""
         try:
             self.channel.raw_send(s)
         finally:
