@@ -1,11 +1,11 @@
 ---
-title: "Session.su()"
-parent: "Core Session API"
+title: "Using Session.su()"
+parent: "How-to Guides"
 grand_parent: "SSHScript v3.1 Documentation"
-nav_order: 2
+nav_order: 4
 ---
 
-# Session.su()
+# Using Session.su()
 
 `Session.su()` opens an interactive `su` context as another Unix account. It
 works on localhost and on a connected child Session.
@@ -86,4 +86,4 @@ with $.su("deploy", password=deploy_password):
 Never hard-code passwords in Python or `.spy` files. Use `getpass`, a secret
 manager, or narrowly scoped policy-based access.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-18 15:58:44

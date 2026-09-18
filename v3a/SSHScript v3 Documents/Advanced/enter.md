@@ -1,11 +1,11 @@
 ---
-title: "Session.enter()"
-parent: "Advanced Session API"
+title: "Interactive Programs with Session.enter()"
+parent: "How-to Guides"
 grand_parent: "SSHScript v3.1 Documentation"
-nav_order: 1
+nav_order: 5
 ---
 
-# Session.enter()
+# Interactive Programs with Session.enter()
 
 `Session.enter()` opens an interactive program in the current Session. Use it
 for REPLs, database clients, password-driven commands, and long-running
@@ -157,7 +157,7 @@ when the client has localized output.
 | `exit=None` | A command that finishes on its own |
 
 For a continuous producer, combine `enter()` with
-[Streaming Output](looping-output).
+[Streaming and Looping Output](../looping-output/).
 
 ## Nest remote and privileged Sessions
 
@@ -194,4 +194,4 @@ with $.enter("python3", prompt=">>>", exit="quit()"):
 The shorthand `$print(2 + 3)` also sends a line while `$.enter()` is active.
 Use `$.input()` when explicit interaction is easier to maintain.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-18 15:58:44

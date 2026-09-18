@@ -1,18 +1,19 @@
 ---
-title: "Dollar Syntax Add-on"
-parent: "Core Session API"
+title: "Dollar Syntax Reference"
+parent: "Reference"
 grand_parent: "SSHScript v3.1 Documentation"
-nav_order: 4
+nav_order: 2
 ---
 
-# Dollar Syntax Add-on
+# Dollar Syntax Reference
 
 Dollar syntax is SSHScript v3.1's optional shorthand for `.spy` files. It
 uses the same Session implementation as the primary Python API, but lets an
 automation script place `$` before a command.
 
-Use the [Module API](../module) for libraries, applications, and ordinary
-Python projects. Use Dollar syntax when concise, shell-like operational steps
+Use [Running Commands and Shell Pipelines](../../module/) for libraries,
+applications, and ordinary Python projects. Use Dollar syntax when concise,
+shell-like operational steps
 improve the readability of a standalone script.
 
 ## Execute commands and read results
@@ -59,8 +60,8 @@ folder = "/tmp/a folder"
 $f'mkdir -p {shlex.quote(folder)}'
 ```
 
-For direct execution, assemble an argument list with `shlex.join()` and use
-`shell=False`:
+For argument-preserving execution, assemble an argument list with
+`shlex.join()` and use `shell=False`:
 
 ```python
 arguments = ["printf", "%s\n", "hello world"]
@@ -70,8 +71,9 @@ $(shlex.join(arguments), shell=False)
 ## Automatic shell selection
 
 V3.1 inspects the final command string with quote awareness. Plain commands
-execute directly. Pipelines, redirection, logical operators, assignments,
-globbing, expansion, and command substitution automatically select a shell.
+use argument-preserving mode. Pipelines, redirection, logical operators,
+assignments, globbing, expansion, and command substitution automatically
+select a shell.
 
 ```python
 $printf 'alpha\\nbeta\\n' | grep beta
@@ -105,6 +107,12 @@ $(bash_command, shell=True, shell_executable="bash")
 
 `shell_executable=` chooses the executable used when shell mode is active; it
 does not by itself force a plain command into shell mode.
+
+On a local Session, `shell=False` launches the parsed argument vector without
+a shell. On a remote Session, SSHScript safely re-quotes the vector and sends
+`exec ...` through the SSH server's command shell. Operators remain literal
+arguments rather than user shell syntax, but a server-side shell still
+participates.
 
 ## One `$` replaces former `$$`
 
@@ -145,7 +153,7 @@ python3 sshscript.py unittest/dollar_syntax.spy
 ```
 
 It does not load credentials, connect to an SSH server, use an SSH agent, or
-read a private key. See [Development and Testing](../development-and-testing)
+read a private key. See [Contributing and Testing](../../development-and-testing/)
 for the unittest wrapper, full release gate, and language integration modes.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-18 15:58:44

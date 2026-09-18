@@ -1,15 +1,16 @@
 ---
-title: "Module API"
-parent: "SSHScript v3.1 Documentation"
+title: "Running Commands and Shell Pipelines"
+parent: "How-to Guides"
+grand_parent: "SSHScript v3.1 Documentation"
 nav_order: 1
 ---
 
-# Module API
+# Running Commands and Shell Pipelines
 
-The regular Python `Session` API is SSHScript v3.1's primary interface. Use it
-when automation belongs in an application, library, test suite, or ordinary
-`.py` file. Dollar syntax is an optional `.spy` shorthand built on the same
-session model.
+Use the regular Python `Session` API to run one-shot commands with preserved
+argument boundaries or through an explicitly selected shell. This is
+SSHScript v3.1's primary interface for applications, libraries, tests, and
+ordinary `.py` files.
 
 ## Create and close a Session
 
@@ -57,8 +58,8 @@ same string-only rule. New Python code should call `exec_command()`.
 ## Shell selection
 
 With the default `shell=None`, SSHScript inspects the final command string.
-Plain commands run directly; pipelines, redirection, expansion, assignments,
-and other shell syntax select a shell automatically.
+Plain commands use argument-preserving mode; pipelines, redirection,
+expansion, assignments, and other shell syntax select a shell automatically.
 
 ```python
 session.exec_command("uname -a", shell=False)
@@ -72,6 +73,10 @@ session.exec_command(
 
 Use `shell=False` for safely quoted argument strings, `shell=True` to force
 the POSIX shell, or `shell="bash"` only when a command needs Bash features.
+On localhost, `shell=False` launches the parsed argument vector without a
+shell. Over SSH, SSHScript safely re-quotes that vector and sends `exec ...`
+through the server's command shell; operators remain arguments rather than
+user shell syntax, but a server-side shell still participates.
 
 ## Results
 
@@ -110,8 +115,8 @@ finally:
 ```
 
 Connections can be nested for bastion-host workflows. See
-[`Session.connect()`](Basic/connect) for authentication and host-key
-verification.
+[Connections, Authentication, and Bastions](../Basic/connect/) for
+authentication and host-key verification.
 
 ## Script helpers
 
@@ -131,10 +136,10 @@ syntax.
 
 ## Next steps
 
-- Follow the [Module API Tutorial](tutorial).
-- Learn [CLI and Environment](cli-and-environment).
-- Review [Development and Testing](development-and-testing).
-- Use the [Dollar Syntax Add-on](Basic/dollar) only when concise `.spy`
+- Follow the [Module API Tutorial](../tutorial/).
+- Learn [CLI and Environment Variables](../cli-and-environment/).
+- Review [Contributing and Testing](../development-and-testing/).
+- Use the [Dollar Syntax Reference](../Basic/dollar/) only when concise `.spy`
   notation is useful.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-18 15:58:44

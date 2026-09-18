@@ -1,11 +1,11 @@
 ---
-title: "Session.sudo()"
-parent: "Core Session API"
+title: "Using Session.sudo()"
+parent: "How-to Guides"
 grand_parent: "SSHScript v3.1 Documentation"
 nav_order: 3
 ---
 
-# Session.sudo()
+# Using Session.sudo()
 
 `Session.sudo()` opens an interactive `sudo` context for a block. It handles
 the password prompt and restores the preceding Session context when the block
@@ -96,4 +96,4 @@ with $.connect("ops@example.net"):
 Never hard-code production passwords. Prefer narrowly scoped `sudoers` rules,
 SSH keys, and a secret manager or `getpass` for interactive use.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-18 15:58:44

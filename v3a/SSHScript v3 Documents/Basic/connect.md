@@ -1,11 +1,11 @@
 ---
-title: "Session.connect()"
-parent: "Core Session API"
+title: "Connections, Authentication, and Bastions"
+parent: "How-to Guides"
 grand_parent: "SSHScript v3.1 Documentation"
-nav_order: 1
+nav_order: 2
 ---
 
-# Session.connect()
+# Connections, Authentication, and Bastions
 
 `Session.connect()` creates a connected child Session. Commands use the same
 `exec_command()` method locally and remotely, and the connection closes when
@@ -157,4 +157,4 @@ with $.connect("ops@example.net"):
 Nested `$.connect()` blocks and the host-key policy follow the same Session
 API behavior.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-17 12:13:56

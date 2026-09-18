@@ -2,6 +2,9 @@
 title: "Dollar Syntax Tutorial (zh-TW)"
 parent: "SSHScript v3.1 Documentation"
 nav_order: 3
+nav_exclude: true
+search_exclude: true
+published: false
 ---
 
 # Dollar Syntax Tutorial (zh-TW)
@@ -433,7 +436,12 @@ with $.su("service-user", password=service_password):
 
 ## 9. 上傳與下載
 
-遠端 session 可使用 SFTP 上傳與下載檔案：
+上傳與下載需要有效的 SSH 連線。純本機、已斷線或沒有有效 transport 的 session 呼叫這兩個方法時，會在解析路徑或存取檔案之前拋出 `SSHScriptException`：
+
+- `upload() requires an active SSH connection`
+- `download() requires an active SSH connection`
+
+此檢查在 Python `-O` 模式下仍有效。若檢查後才斷線，則由實際 SFTP 操作拋出例外。請先透過 `connect()` 建立連線，再上傳或下載：
 
 ```python
 with $.connect("user@host.example.net") as remote:
@@ -446,7 +454,68 @@ with $.connect("user@host.example.net") as remote:
 - `upload(local_source, remote_destination)`
 - `download(remote_source, local_destination)`
 
-若下一步要把檔案移到只有 root 能寫入的位置，可先上傳至一般使用者可寫入的目錄，再進入 `$.sudo()` 執行 `install` 或 `mv`。
+### 上傳目的路徑與覆寫控制
+
+`$.upload(src, dst, makedirs=False, overwrite=True)` 的目的路徑規則如下：
+
+- `dst` 是已存在的遠端目錄：在目錄內使用來源檔名。
+- `dst` 結尾為 `/`：明確指定目錄，在目錄內使用來源檔名。
+- 其餘情況：`dst` 就是完整的目的檔名，不依副檔名猜測。
+
+遠端路徑使用 `/` 分隔。`makedirs=True` 只負責建立解析後缺少的父目錄，不改變上述規則；預設 `False` 要求父目錄已存在。
+
+```python
+with $.connect("user@host.example.net"):
+    # 建立目錄，保留來源檔名。
+    $.upload("summary.txt", "/tmp/reports/", makedirs=True)
+    # 建立父目錄並改名；不同副檔名仍視為目的檔名。
+    $.upload("summary.txt", "/tmp/reports/renamed.csv", makedirs=True)
+    # 不允許覆寫既有目的檔案。
+    $.upload("summary.txt", "/tmp/reports/new.txt",
+             makedirs=True, overwrite=False)
+```
+
+**舊版使用方式調整：** 舊版在 `makedirs=True` 時會依副檔名猜測目錄。若要指定尚不存在的目錄，請加上結尾 `/`，例如將 `/tmp/reports` 改成 `/tmp/reports/`；沒有結尾 `/` 且不是既有目錄時，現在一律當成目的檔名。
+
+`overwrite=True` 預設允許覆寫。`overwrite=False` 在檢查時發現目的檔已存在會拋出 `FileExistsError`，也適用於來源與目的檔名相同、以及 `makedirs=True` 的情況。實際寫入採用 SFTP 排他建立，即使另一個程式在檢查後建立目的檔，也會失敗而不覆寫；此時部分伺服器可能回報一般 `OSError`。權限、連線等錯誤會保留原本例外。
+
+排他建立不代表整個傳輸具有原子性：傳輸中斷仍可能留下不完整的新檔。若需要完整傳輸後才讓目的檔可見，請先傳至唯一暫存路徑，再另行發布。`download()` 沒有 `overwrite` 參數，可能覆寫既有本機檔案。
+
+### 回傳值與失敗處理
+
+`$.upload()`、`$.download()` 成功時回傳 `(來源路徑, 目的路徑)`；失敗時拋出 Python 或 SFTP 例外。
+
+```python
+with $.connect("user@host.example.net"):
+    try:
+        src, dst = $.download("/var/log/app.log", "app.log")
+    except OSError as exc:
+        print(f"下載失敗：{exc}")
+    else:
+        print(f"下載成功：{src} → {dst}")
+```
+
+此例捕捉 `OSError` 及其子類別（例如檔案不存在、權限不足）；其他 SSH 或連線例外仍可能向外傳遞。
+
+**傳檔不會更新 `$.stdout`、`$.stderr` 或 `$.exitcode`。** 這些屬性代表上一個命令的執行結果；傳檔後讀取 `$.exitcode` 仍會得到上一個命令的結束碼，若尚無命令結果則拋出 `ValueError`。請用正常回傳或例外判斷傳檔是否成功。
+
+### `su`／`sudo` 不會改變傳檔帳號
+
+**即使在 `with $.su(...)` 或 `with $.sudo(...)` 區塊內，傳檔仍使用目前 SSH 連線建立時的登入帳號權限。** 切換帳號只影響該 console 中執行的命令，不會改變 SFTP 的身分；透過 `remote.upload()`、`remote.download()` 呼叫也相同。
+
+```python
+with $.connect("ops@host.example.net"):
+    with $.sudo(password=password):
+        $whoami
+        # 命令可能以 root 執行，但下載仍使用 ops 的遠端檔案存取權限。
+        src, dst = $.download("/var/log/app.log", "app.log")
+```
+
+上述下載只有在 `ops` 能讀取遠端檔案、且能通過各層父目錄時才會成功；上傳也要求連線帳號有建立或寫入目的檔案的權限。權限不足會拋出例外，不會更新 `$.exitcode`。
+
+若下一步要把檔案移到只有 root 能寫入的位置，可先上傳至連線帳號可寫入的目錄，再進入 `$.sudo()` 執行 `install` 或 `mv`。下載只有特權帳號能讀取的檔案時，先透過特權 console 建立連線帳號可讀的暫存副本，下載後再清除副本。本機檔案存取則使用執行 SSHScript 的本機帳號權限，不受遠端 `su`／`sudo` 影響。
+
+完整說明見 [上傳與下載 API](Advanced/file-transfer)。
 
 ## 10. 直接匯入 `.spy` 模組
 
@@ -661,4 +730,4 @@ sshscript --traceback example.spy
 
 SSHScript v3.1 把 shell 擅長的「直接操作系統」和 Python 擅長的「程式結構與資料處理」放在同一個檔案裡。你可以從 `Session` API 建立可重用的 Python 自動化，再於適合的 `.spy` 腳本中採用 Dollar syntax，逐步擴展到本機、遠端、巢狀連線與平行作業。
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-18 15:58:44
