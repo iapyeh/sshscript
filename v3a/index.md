@@ -10,6 +10,11 @@ one programming model. Its primary interface is the regular Python `Session`
 API, while the optional Dollar syntax offers concise notation for standalone
 `.spy` scripts.
 
+> **Release status:** SSHScript v3.1 is beta source and is not currently
+> published on PyPI. The unqualified `pip install sshscript` command presently
+> installs v2.0.2. Follow the version-specific installation page before using
+> examples from this site.
+
 ## Why SSHScript?
 
 Use the same Session model to run a command on localhost, connect to a remote
@@ -26,59 +31,20 @@ SSHScript v3.1 emphasizes predictable and secure automation:
 - imports, threads, and script execution remain scoped instead of changing
   process-wide Python behavior.
 
-## Installation
+## Start here
 
-SSHScript requires Python 3.9 or newer:
+1. Read [Installation and Verification](getting-started/installation-and-verification/)
+   and confirm that both the CLI and import report `3.1.0`.
+2. Complete the credential-free [5-Minute Quickstart](getting-started/quickstart/).
+3. Continue with the
+   [Module API Tutorial](SSHScript%20v3%20Documents/tutorial/).
+4. Use the [SSHScript v3.1 Documentation](SSHScript%20v3%20Documents/)
+   sidebar for task guides, concepts, reference, security, and migration.
 
-```sh
-python3 -m pip install sshscript
-```
-
-Upgrade an existing installation with:
-
-```sh
-python3 -m pip install --upgrade sshscript
-```
-
-## First command
-
-```python
-import shlex
-from sshscript import Session
-
-session = Session()
-try:
-    stdout, stderr = session.exec_command("uname -a", shell=False)
-    print(str(stdout).strip())
-    print(session.exitcode)
-
-    arguments = ["printf", "%s\n", "hello world"]
-    session.exec_command(shlex.join(arguments), shell=False)
-finally:
-    session.close(strict=True)
-```
-
-`Session.exec_command()` accepts one command string. Lists and tuples are not
-accepted; use `shlex.join()` when building a direct command from arguments.
-
-## Continue learning
-
-Begin with the
-[Module API Tutorial](SSHScript%20v3%20Documents/tutorial/), then use the
-[SSHScript v3.1 Documentation](SSHScript%20v3%20Documents/) sidebar as the
-technical reference.
-
-The [Core Session API](SSHScript%20v3%20Documents/Basic/) covers connections
-and privilege contexts. The
-[Advanced Session API](SSHScript%20v3%20Documents/Advanced/) covers
-interactive programs, transfers, streaming output, and threading. Use the
-[Dollar Syntax Add-on](SSHScript%20v3%20Documents/Basic/dollar/) only when its
-`.spy` notation suits the project.
-
-For installation problems, see
-[Installation Troubleshooting](SSHScript%20v3%20Documents/troubleshooting-installation/).
-Practical scenarios are collected in the
-[Example Gallery](Example%20Gallery/).
+The documentation is English-first. Visible placeholders are intentional:
+they identify planned coverage without implying that an unfinished page is
+complete. The [Example Gallery](Example%20Gallery/) remains a placeholder
+catalog for future, tested operational recipes.
 
 ## Project status
 
@@ -86,4 +52,4 @@ SSHScript v3.1 is beta software. Run the credential-free release gate before
 deployment and validate real SSH behavior in an isolated test environment
 before production rollout. SSHScript is released under the MIT License.
 
-Last Updated: 2026-09-15 09:40:34
+Last Updated: 2026-09-18 15:58:44

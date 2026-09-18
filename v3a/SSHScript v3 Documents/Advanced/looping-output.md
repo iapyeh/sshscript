@@ -1,11 +1,11 @@
 ---
-title: "Streaming Output"
-parent: "Advanced Session API"
+title: "Streaming and Looping Output"
+parent: "How-to Guides"
 grand_parent: "SSHScript v3.1 Documentation"
-nav_order: 4
+nav_order: 7
 ---
 
-# Streaming Output
+# Streaming and Looping Output
 
 Long-running programs can produce output well before they exit.
 `Session.enter()` exposes that output as it arrives, so Python can process a
@@ -149,4 +149,4 @@ with $.enter("journalctl -f -u nginx", exit=chr(3)):
             print(line, end="")
 ```
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-17 12:13:56

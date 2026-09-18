@@ -1,10 +1,11 @@
 ---
-title: "Module API Tutorial (EN)"
-parent: "SSHScript v3.1 Documentation"
-nav_order: 2
+title: "Module API Tutorial"
+parent: "Tutorials"
+grand_parent: "SSHScript v3.1 Documentation"
+nav_order: 1
 ---
 
-# Module API Tutorial (EN)
+# Module API Tutorial
 
 This tutorial introduces SSHScript v3.1 through its primary Python
 `Session` API. The optional Dollar syntax is shown only after the module
@@ -12,11 +13,11 @@ workflow.
 
 ## Install SSHScript
 
-SSHScript requires Python 3.9 or newer:
-
-```sh
-python3 -m pip install sshscript
-```
+SSHScript v3.1 requires Python 3.9 or newer. It is currently beta source and
+is not the version installed by an unqualified PyPI command. Complete
+[Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/)
+and confirm that both the CLI and Python import report `3.1.0` before using
+this tutorial.
 
 ## Execute a local command
 
@@ -39,7 +40,7 @@ properties.
 ## Build a command safely
 
 `exec_command()` accepts exactly one non-empty string. Use `shlex.join()` to
-quote a dynamic argument list, then force direct execution:
+quote a dynamic argument list, then request argument-preserving execution:
 
 ```python
 import shlex
@@ -67,8 +68,11 @@ redirection, expansion, and other shell syntax.
 session.exec_command("printf 'alpha\\nbeta\\n' | grep beta")
 ```
 
-Set `shell=False` for direct execution, `shell=True` to force the POSIX
-shell, or `shell="bash"` for a Bash-only command.
+Set `shell=False` for argument-preserving execution, `shell=True` to force the
+POSIX shell, or `shell="bash"` for a Bash-only command. Locally, `shell=False`
+launches without a shell. Remotely, SSHScript safely re-quotes the arguments
+and sends `exec ...` through the server's command shell; shell operators are
+not interpreted as user shell syntax.
 
 ## Connect to a remote host
 
@@ -86,8 +90,8 @@ finally:
 
 SSHScript loads system host keys and rejects unknown or changed host keys by
 default. Add the server key to `known_hosts` before connecting. See
-[`Session.connect()`](Basic/connect) for authentication, trusted bootstrap,
-and nested connections.
+[Connections, Authentication, and Bastions](../Basic/connect/) for
+authentication, trusted bootstrap, and nested connections.
 
 ## Compose privileged contexts
 
@@ -130,8 +134,8 @@ finally:
 ```
 
 Use `enter()` for REPLs, database tools, password prompts, and long-running
-programs. See [`Session.enter()`](Advanced/enter) for prompt matching and
-safe password input.
+programs. See [Interactive Programs with `Session.enter()`](../Advanced/enter/)
+for prompt matching and safe password input.
 
 ## Transfer files
 
@@ -158,7 +162,7 @@ finally:
     local.close(strict=True)
 ```
 
-See [`Session.upload()` and `Session.download()`](Advanced/file-transfer)
+See [Uploading and Downloading Files](../Advanced/file-transfer/)
 for path and overwrite behavior.
 
 ## Run a `.spy` file
@@ -170,7 +174,7 @@ sshscript maintenance.spy
 ```
 
 Larger programs use imports or include syntax rather than multiple CLI
-paths. See [CLI and Environment](cli-and-environment).
+paths. See [CLI and Environment Variables](../cli-and-environment/).
 
 ## Optional Dollar syntax
 
@@ -183,7 +187,7 @@ with $.connect("ops@example.net"):
 ```
 
 In v3.1, one `$` handles both direct commands and shell features. The former
-`$$` form is deprecated. See [Dollar Syntax Add-on](Basic/dollar) if this
-notation suits the project.
+`$$` form is deprecated. See the [Dollar Syntax Reference](../Basic/dollar/)
+if this notation suits the project.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-18 15:58:44

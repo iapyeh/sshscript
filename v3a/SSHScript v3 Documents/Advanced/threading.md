@@ -1,11 +1,11 @@
 ---
-title: "Threading"
-parent: "Advanced Session API"
+title: "Concurrency and Threading"
+parent: "How-to Guides"
 grand_parent: "SSHScript v3.1 Documentation"
-nav_order: 3
+nav_order: 8
 ---
 
-# Threading
+# Concurrency and Threading
 
 SSHScript v3.1 does not replace the process-wide `threading.Thread` class.
 Regular Python code should make Session ownership explicit. Transformed
@@ -98,7 +98,7 @@ in-memory SSH clients:
 python3 -m unittest discover -v -s unittest -p 'test_*.py'
 ```
 
-See [Development and Testing](../development-and-testing) for the complete
+See [Contributing and Testing](../../development-and-testing/) for the complete
 release gate and the separate manual integration modes.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-17 12:13:56

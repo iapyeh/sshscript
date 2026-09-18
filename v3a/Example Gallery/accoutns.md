@@ -1,11 +1,11 @@
 ---
-title: "Accounts"
-parent: "Example Gallery"
-nav_order: 3
+title: "Accounts (legacy URL)"
+nav_exclude: true
+search_exclude: true
 ---
 
-# Accounts
+# Accounts (legacy URL)
 
-Placeholder for account-management examples.
+This misspelled legacy page has moved to [Accounts](accounts/).
 
-Last Updated: 2026-07-25 16:59:40
+Last Updated: 2026-09-18 15:58:44

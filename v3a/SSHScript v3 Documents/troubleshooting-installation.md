@@ -1,13 +1,19 @@
 ---
-title: "Installation Troubleshooting (EN)"
-parent: "SSHScript v3.1 Documentation"
-nav_order: 9
+title: "Installation Troubleshooting"
+parent: "Getting Started"
+grand_parent: "SSHScript v3.1 Documentation"
+nav_order: 5
 ---
 
-# Installation Troubleshooting (EN)
+# Installation Troubleshooting
 
 SSHScript v3.1 requires Python 3.9 or newer. Use the same Python interpreter
 for installation and execution to avoid most environment problems.
+
+> **Release status:** v3.1 is currently beta source. PyPI presently publishes
+> v2.0.2, so `pip install sshscript` does not install the version documented
+> here. Start with
+> [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/).
 
 ## Confirm the interpreter
 
@@ -25,11 +31,13 @@ virtual environment.
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip install sshscript
+test -f pyproject.toml
+python3 -m pip install -e .
 ```
 
 A virtual environment avoids system-package permissions and makes the Python
-and `pip` pair explicit.
+and `pip` pair explicit. Run the last two commands only from a supplied v3.1
+source tree containing the required packaging metadata.
 
 ## `sshscript: command not found`
 
@@ -37,13 +45,15 @@ First verify that the package is installed for the current interpreter:
 
 ```sh
 python3 -m pip show sshscript
-python3 -m pip install --upgrade sshscript
+python3 -m pip install -e .
 ```
 
 If the package is present but the command is unavailable, activate the
 virtual environment or add that Python installation's scripts directory to
 `PATH`. Running `python3 -m pip` is safer than assuming `pip` and `python3`
-refer to the same installation.
+refer to the same installation. Do not use a PyPI upgrade command to repair a
+v3.1 beta environment; it can replace the checkout with the published v2.0.2
+package.
 
 ## The wrong version is imported
 
@@ -68,7 +78,7 @@ Upgrade packaging tools, then retry:
 
 ```sh
 python3 -m pip install --upgrade pip setuptools wheel
-python3 -m pip install --upgrade sshscript
+python3 -m pip install -e .
 ```
 
 If installation still fails, record the Python version, operating system, and
@@ -81,7 +91,7 @@ An `unknown host key` or `host key changed` error means installation worked
 and SSHScript's secure connection policy rejected an unverified server.
 Verify the server identity and update `known_hosts`. Do not disable
 verification as a general workaround. See
-[`Session.connect()`](Basic/connect).
+[Connections, Authentication, and Bastions]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Basic/connect/).
 
 ## Minimal diagnostics
 
@@ -95,4 +105,4 @@ sshscript --version
 Use `--traceback` only in a protected diagnostic environment because a full
 trace can expose source, commands, paths, or secrets.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-17 12:13:56

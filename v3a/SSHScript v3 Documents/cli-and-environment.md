@@ -1,10 +1,11 @@
 ---
-title: "CLI and Environment"
-parent: "SSHScript v3.1 Documentation"
-nav_order: 4
+title: "CLI and Environment Variables"
+parent: "Reference"
+grand_parent: "SSHScript v3.1 Documentation"
+nav_order: 3
 ---
 
-# CLI and Environment
+# CLI and Environment Variables
 
 SSHScript v3.1 can run a regular Python file or a `.spy` file from the
 command line. The CLI deliberately accepts one script file at a time.
@@ -40,11 +41,14 @@ through `sys.argv`.
 | `-d`, `--debug [LEVEL]` | Enable debug logging; the default debug level is 10. |
 | `--traceback` | Show the full exception traceback. |
 | `--version` | Print the installed SSHScript version. |
-| `--check` | Check the latest published version; this requires Internet access. |
+| `--check-updates` | Check the latest compatible stable PyPI release; this requires Internet access. |
+| `--check` | Alias for `--check-updates`. |
 
-The default error record avoids printing command payloads. Use
-`--traceback` only when its diagnostic value outweighs the risk: a traceback
-can expose script source, commands, paths, or secrets.
+For ordinary runtime exceptions, the default error record avoids printing
+command payloads. Syntax errors are different: even without `--traceback`,
+Python can print the filename, line, source text, and caret. Use `--traceback`
+only when its diagnostic value outweighs the risk; keep secrets out of source
+and review every diagnostic before sharing it.
 
 Normal completion returns status 0. `$.break(code)` becomes the CLI process
 status, while `$.exit(code)` exits with the requested status.
@@ -118,7 +122,7 @@ configure application logging, alter the environment, or replace the asyncio
 event-loop policy. CLI-specific logging and warning formatting are enabled
 only by the CLI.
 
-See [Development and Testing](development-and-testing) for the
+See [Contributing and Testing](../development-and-testing/) for the
 credential-free release gate and isolated integration-test guidance.
 
-Last Updated: 2026-09-14 18:02:02
+Last Updated: 2026-09-18 15:58:44
