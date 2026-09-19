@@ -2,6 +2,7 @@
 title: "SSHScript v3.1 Documentation"
 nav_order: 1
 has_children: true
+has_toc: false
 ---
 
 # SSHScript v3.1 Documentation
@@ -32,4 +33,4 @@ excluded from the published site and sidebar.
 > [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/)
 > instead of assuming that an unqualified package installation provides v3.1.
 
-Last Updated: 2026-09-18 15:58:44
+Last Updated: 2026-09-19 13:20:55

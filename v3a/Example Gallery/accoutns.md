@@ -6,6 +6,6 @@ search_exclude: true
 
 # Accounts (legacy URL)
 
-This misspelled legacy page has moved to [Accounts](accounts/).
+This misspelled legacy page has moved to [Accounts](../accounts/).
 
-Last Updated: 2026-09-18 15:58:44
+Last Updated: 2026-09-19 13:16:26
