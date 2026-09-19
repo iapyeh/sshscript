@@ -3,6 +3,7 @@ title: "Advanced Session API"
 parent: "SSHScript v3.1 Documentation"
 nav_order: 6
 has_children: true
+has_toc: false
 nav_exclude: true
 search_exclude: true
 ---
@@ -13,4 +14,4 @@ These pages cover interactive programs, SFTP transfers, streaming output,
 and concurrent automation. Examples begin with the regular `Session` API;
 `.spy` shorthand is shown only where it adds useful context.
 
-Last Updated: 2026-09-17 12:13:56
+Last Updated: 2026-09-19 13:20:55

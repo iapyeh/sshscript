@@ -3,6 +3,7 @@ title: "Example Gallery"
 parent: "SSHScript v3.1 Documentation"
 nav_order: 7
 has_children: true
+has_toc: false
 ---
 
 # Example Gallery
@@ -18,4 +19,4 @@ as `local-only`, `SSH required`, `privileged`, `interactive`, and `SFTP`.
 | [Networking](networking/) | Placeholder |
 | [Accounts](accounts/) | Placeholder |
 
-Last Updated: 2026-09-18 15:58:44
+Last Updated: 2026-09-19 13:20:55
