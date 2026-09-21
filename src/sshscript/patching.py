@@ -40,7 +40,6 @@ class SshscriptStack(object):
     #instances = []
     def __init__(self,owner,initialitems=None):
         self.stack = deque(initialitems,maxlen=300) if initialitems else deque(maxlen=300)
-        assert isinstance(self.stack,deque),type(self.stack)
         self.owner_id = id(owner)
         self.locker = threading.Lock()
         #SshscriptStack.instances.append(self)
@@ -57,13 +56,6 @@ class SshscriptStack(object):
             return list(self.stack)
 
     def __getitem__(self, val): 
-        if val > 0:
-            assert len(self.stack) < val , f'len of stack:{len(self.stack)}, No item for "{val}"'
-        elif val == 0:
-            assert len(self.stack) > 0 , f'len of stack:{len(self.stack)}, No item for "{val}"'
-        else:
-            assert len(self.stack) >= abs(val) , f'len of stack:{len(self.stack)}, No item for "{val}"'
-
         return self.stack[val]
 
     def append(self,x):

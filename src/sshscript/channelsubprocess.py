@@ -58,20 +58,18 @@ class POpenChannel(GenericChannel):
         #    assert isinstance(self.stdouterr,list) and len(self.stdouterr)==2, f'standard output and error should be in a list of 2 elements, but got {self.stdouterr}'
         #    #self._dumpThread.start()
         if self.cp:
-            assert isinstance(self.stdouterr, list)
+            if not isinstance(self.stdouterr, list):
+                raise TypeError('stdouterr must be list')
             if self.get_pty:
-                assert len(self.stdouterr) == 1, (
-                    'PTY channel must have exactly one merged output descriptor, '
-                    f'got {self.stdouterr}'
-                )
+                if not (len(self.stdouterr) == 1):
+                    raise ValueError('PTY channel must have exactly one merged output descriptor')
             else:
-                assert len(self.stdouterr) == 2, (
-                    'non-PTY channel must have stdout and stderr descriptors, '
-                    f'got {self.stdouterr}'
-                )            
+                if not (len(self.stdouterr) == 2):
+                    raise ValueError('non-PTY channel must have stdout and stderr descriptors')
     async def _start_reading(self):  
         #asyncio.create_task(self._dumpThread.start())
-        assert self.cp is not None 
+        if self.cp is None:
+            raise RuntimeError('subprocess is not initialized')
         
         ## important for getting correct value of command output, can not be slow
         interval = 0.01

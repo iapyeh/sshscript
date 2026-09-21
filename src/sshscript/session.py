@@ -66,7 +66,8 @@ def export2Dollar(nameOrFunc):
     else:
         name = nameOrFunc
         def export2DollarWithName(func):
-            assert callable(func)
+            if not callable(func):
+                raise TypeError('func must be callable')
             SSHScriptExportedNamesByAlias[name] = func.__name__
             return func
         return export2DollarWithName
@@ -179,7 +180,10 @@ class ConsoleWrapper:
     consoles share the channel; the outermost wrapper closes it on exit.
     """
     def __init__(self,dollar,funcname,*args,**kwargs):
-        assert funcname in ('su','sudo','enter','shell')
+        if not isinstance(funcname, str):
+            raise TypeError('console funcname must be str')
+        if not (funcname in ('su','sudo','enter','shell')):
+            raise ValueError('invalid console funcname')
         self.funcname = funcname
         
         if isinstance(dollar,ConsoleWrapper):
@@ -190,7 +194,8 @@ class ConsoleWrapper:
             self.parentWrapper = None
         ## session's _lastDollar instance
         self.channel = self.dollar.channel
-        assert self.channel is not None
+        if self.channel is None:
+            raise RuntimeError('console channel is not initialized')
         self.args = args
         self.kwargs = kwargs
         self.wrapper = SessionWrapper(self)
@@ -322,8 +327,9 @@ class Session(object):
         self.enteringThreadsLocker = threading.Lock()
 
         ## parent is an Session() in the parent-thread, or parent-connection
-        if parent:
-            assert isinstance(parent,Session)
+        if parent is not None:
+            if not isinstance(parent,Session):
+                raise TypeError('parent must be Session')
             self.parent = parent
         else:
             self.parent = None
@@ -391,7 +397,8 @@ class Session(object):
 
     @property
     def sftp(self):
-        assert self.connected
+        if not self.connected:
+            raise SSHScriptException('sftp requires an active SSH connection')
         if self._sftp is not None:
             return self._sftp
         elif self._client:
@@ -1089,12 +1096,22 @@ class Session(object):
         funcname is an internal selector used by the other console factories.
         """
         ## sudo,su,enter should set get_pty when calling this function
-        assert funcname in ('shell','enter','su','sudo')
+        if not isinstance(funcname, str):
+            raise TypeError('console funcname must be str')
+        if not (funcname in ('shell','enter','su','sudo')):
+            raise ValueError('invalid console funcname')
         
-        if command:
-            command = command.strip()
-        else:
+        if get_pty is not None and not isinstance(get_pty, bool):
+            raise TypeError('get_pty must be None or bool')
+        if command is None:
             command = 'bash -i'
+        if not isinstance(command, str):
+            raise TypeError('command must be str')
+        command = command.strip()
+        if not command:
+            raise ValueError('command must not be empty')
+        if '\n' in command:
+            raise ValueError('persistent command must be a single line')
 
         if isinstance(self._lastDollar,ConsoleWrapper) and not self._lastDollar.channel.closed:
             ## inner with
