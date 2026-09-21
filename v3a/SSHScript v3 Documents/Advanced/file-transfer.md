@@ -245,4 +245,12 @@ with $.connect("ops@example.net"):
 
 The shorthand calls the same transfer methods on the current Session.
 
-Last Updated: 2026-09-17 12:13:56
+## Disconnected SFTP
+
+Accessing `Session.sftp` without an active SSH connection raises
+`SSHScriptException`, consistently with `upload()` and `download()`, in both
+normal Python and `python -O`. Transfer failures do not change command
+`exitcode`; filesystem and Paramiko exceptions still propagate. See
+[Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+
+Last Updated: 2026-09-21 17:45:03

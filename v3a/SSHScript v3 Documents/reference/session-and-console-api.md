@@ -460,4 +460,20 @@ are stabilized.
 Use `exec_command()`, `connect()`, and an explicit `shell=` choice in new
 code.
 
-Last Updated: 2026-09-18 15:58:44
+## Runtime validation
+
+Commands must be nonempty strings; wrong types raise `TypeError`, and empty
+commands raise `ValueError`. Persistent commands must contain only one line.
+`get_pty` accepts only `None` or bool. The internal `for_with` selector accepts
+only bool. Text matching rejects compiled bytes regular expressions with
+`TypeError`; appended output must be str.
+
+Invalid console/channel lifecycle transitions raise `RuntimeError`. Failed
+listener removal, duplicate hijack/release, and last-layer removal preserve
+state. Closed channel operations raise `BrokenPipeError`; a channel ending
+while a caller waits raises `EOFError`; timeout raises `TimeoutError`.
+Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
+Paramiko failures retain their original exception and traceback. See
+[Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+
+Last Updated: 2026-09-21 17:45:03

@@ -46,4 +46,21 @@ SSHScript v3.1 is currently beta. The changes below describe the unreleased
 See [Contributing and Testing](../development-and-testing/) for the release gate
 that validates these behaviors without SSH credentials.
 
-Last Updated: 2026-09-18 15:58:44
+## Production hardening
+
+- Minimum Python is now 3.11. CI targets 3.11, 3.12, 3.13, and 3.14;
+  local validation has passed on Python 3.11, with other matrix runs pending.
+- Package runtime assertions are replaced by explicit exceptions that remain
+  active under `python -O`; user-written `.spy` assertions are preserved.
+- Listener removal, hijack/release, and last-layer validation are atomic and
+  leave state unchanged on failure. Session-stack indexing follows deque.
+- Invalid command, PTY, pattern, and output arguments are rejected before
+  execution or buffer mutation. Disconnected SFTP raises SSHScriptException.
+- The credential-free suite passes 98 tests normally and under `-O`; all nine
+  dollar-syntax smoke cases pass. Release gates include an AST assertion scan.
+
+These changes do not constitute a Production/Stable release. Artifact-based
+CI, reproducible SSH integration, release preparation, and other existing
+release requirements remain separate work. See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+
+Last Updated: 2026-09-21 17:45:03

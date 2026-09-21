@@ -17,6 +17,6 @@ compatibility behavior.
 | [Session and Console API Reference](session-and-console-api/) | Core coverage |
 | [Dollar Syntax Reference]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Basic/dollar/) | Available |
 | [CLI and Environment Variables]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/cli-and-environment/) | Available |
-| [Exceptions and Return Values](exceptions-and-return-values/) | Placeholder |
+| [Exceptions and Return Values](exceptions-and-return-values/) | Available |
 
-Last Updated: 2026-09-19 13:20:55
+Last Updated: 2026-09-21 17:45:03

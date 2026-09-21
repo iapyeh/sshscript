@@ -7,7 +7,7 @@ nav_order: 5
 
 # Installation Troubleshooting
 
-SSHScript v3.1 requires Python 3.9 or newer. Use the same Python interpreter
+SSHScript v3.1 requires Python 3.11 or newer. Use the same Python interpreter
 for installation and execution to avoid most environment problems.
 
 > **Release status:** v3.1 is currently beta source. PyPI presently publishes
@@ -22,7 +22,7 @@ python3 --version
 python3 -m pip --version
 ```
 
-If Python is older than 3.9, install a supported version and create a fresh
+If Python is older than 3.11, install a supported version and create a fresh
 virtual environment.
 
 ## Install in a virtual environment
@@ -105,4 +105,4 @@ sshscript --version
 Use `--traceback` only in a protected diagnostic environment because a full
 trace can expose source, commands, paths, or secrets.
 
-Last Updated: 2026-09-17 12:13:56
+Last Updated: 2026-09-21 17:45:03

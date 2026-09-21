@@ -13,7 +13,7 @@ password, or host inventory.
 
 ## Development setup
 
-Use Python 3.9 or newer and install the checkout in editable mode:
+Use Python 3.11 or newer and install the checkout in editable mode:
 
 ```sh
 python3 -m venv .venv
@@ -23,12 +23,14 @@ python3 -m pip install -e .
 
 ## Required checks
 
-Run all three checks from the source directory before proposing a change:
+Run all checks from the source directory before proposing a change:
 
 ```sh
 python3 -m unittest discover -v -s unittest -p 'test_*.py'
 python3 sshscript.py unittest/dollar_syntax.spy
-python3 -m compileall -q .
+python3 -O -m unittest discover -v -s unittest -p 'test_*.py'
+python3 -m compileall -q -x 'unittest-v3' .
+python3 unittest/check_package_asserts.py
 ```
 
 The first command is the canonical credential-free release gate. A
@@ -139,4 +141,13 @@ logging, or SSH security defaults require synchronized implementation,
 tests, public documentation, and release notes. Avoid silently accepting
 insecure behavior.
 
-Last Updated: 2026-09-17 12:13:56
+## Supported matrix and assertion gate
+
+CI targets Python 3.11, 3.12, 3.13, and 3.14 on Linux and macOS. Python 3.11
+has passed the local hardening checks; the remaining matrix runs must pass
+before release. The dependency-free AST gate rejects `ast.Assert` in shipped
+package modules, excluding tests. Regression tests use unittest assertions so
+validation remains meaningful under `-O`. Historical `unittest-v3` material is
+not part of the credential-free gate and must not be bulk-added to Git.
+
+Last Updated: 2026-09-21 17:45:03

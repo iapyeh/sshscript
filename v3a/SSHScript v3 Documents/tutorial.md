@@ -13,7 +13,7 @@ workflow.
 
 ## Install SSHScript
 
-SSHScript v3.1 requires Python 3.9 or newer. It is currently beta source and
+SSHScript v3.1 requires Python 3.11 or newer. It is currently beta source and
 is not the version installed by an unqualified PyPI command. Complete
 [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/)
 and confirm that both the CLI and Python import report `3.1.0` before using
@@ -190,4 +190,4 @@ In v3.1, one `$` handles both direct commands and shell features. The former
 `$$` form is deprecated. See the [Dollar Syntax Reference](../Basic/dollar/)
 if this notation suits the project.
 
-Last Updated: 2026-09-18 15:58:44
+Last Updated: 2026-09-21 17:45:03

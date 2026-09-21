@@ -730,4 +730,17 @@ sshscript --traceback example.spy
 
 SSHScript v3.1 把 shell 擅長的「直接操作系統」和 Python 擅長的「程式結構與資料處理」放在同一個檔案裡。你可以從 `Session` API 建立可重用的 Python 自動化，再於適合的 `.spy` 腳本中採用 Dollar syntax，逐步擴展到本機、遠端、巢狀連線與平行作業。
 
-Last Updated: 2026-09-18 15:58:44
+## 生產環境的例外與 assert
+
+最低 Python 版本為 3.11。套件的輸入與狀態檢查使用明確例外，在一般模式
+與 `python -O` 下均有效；`AssertionError` 從來不是 SSHScript 公開 API 契約。
+
+本教學中的 `assert` 是示範驗證，使用者 `.spy` 中的 assert 仍保留 Python
+語意。`python -O` 會刪除整個 assert，包括其中的函式呼叫。生產腳本必須
+明確判斷 `session.exitcode` 或 `$.exitcode` 並處理失敗；本機命令也可使用
+`check=True`，但不要把它當作遠端命令的通用選項。
+
+未連線存取 SFTP 拋出 `SSHScriptException`。完整例外分類請參考
+[Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/)。
+
+Last Updated: 2026-09-21 17:45:03

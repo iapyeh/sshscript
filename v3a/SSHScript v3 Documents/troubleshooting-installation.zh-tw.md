@@ -9,7 +9,7 @@ published: false
 
 # 安裝疑難排解 (zh-TW)
 
-SSHScript v3.1 需要 Python 3.9 以上版本。安裝與執行時使用同一個 Python
+SSHScript v3.1 需要 Python 3.11 以上版本。安裝與執行時使用同一個 Python
 直譯器，可以避免多數環境問題。
 
 ## 確認 Python 與 pip
@@ -19,7 +19,7 @@ python3 --version
 python3 -m pip --version
 ```
 
-若 Python 低於 3.9，請安裝受支援的版本並建立新的虛擬環境。
+若 Python 低於 3.11，請安裝受支援的版本並建立新的虛擬環境。
 
 ## 在虛擬環境安裝
 
@@ -93,4 +93,4 @@ sshscript --version
 只有在受保護的除錯環境才使用 `--traceback`，因為完整 traceback
 可能包含程式碼、命令、路徑或秘密。
 
-Last Updated: 2026-09-18 15:58:44
+Last Updated: 2026-09-21 17:45:03
