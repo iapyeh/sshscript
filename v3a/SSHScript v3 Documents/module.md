@@ -142,4 +142,34 @@ syntax.
 - Use the [Dollar Syntax Reference](../Basic/dollar/) only when concise `.spy`
   notation is useful.
 
-Last Updated: 2026-09-18 15:58:44
+## Runtime validation
+
+Commands must be nonempty strings; wrong types raise `TypeError`, and empty
+commands raise `ValueError`. Persistent commands must contain only one line.
+`get_pty` accepts only `None` or bool. The internal `for_with` selector accepts
+only bool. Text matching rejects compiled bytes regular expressions with
+`TypeError`; appended output must be str.
+
+Invalid console/channel lifecycle transitions raise `RuntimeError`. Failed
+listener removal, duplicate hijack/release, and last-layer removal preserve
+state. Closed channel operations raise `BrokenPipeError`; a channel ending
+while a caller waits raises `EOFError`; timeout raises `TimeoutError`.
+Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
+Paramiko failures retain their original exception and traceback. See
+[Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+
+## Assertions and production command checks
+
+User-written `assert` statements in `.spy` files retain normal Python semantics.
+`python -O` removes them, including calls inside the assertion. They are useful
+for illustrative tests, but production scripts must explicitly inspect
+`session.exitcode` (or `$.exitcode`) and handle nonzero status. Local
+`Session.exec_command(..., check=True)` raises `subprocess.CalledProcessError`;
+this is not a portable remote-command option. SSH, timeout, and transport
+failures remain exceptions regardless of optimization.
+
+`AssertionError` was never a supported SSHScript API contract. Package runtime
+validation now uses explicit exceptions in both normal and optimized modes.
+See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+
+Last Updated: 2026-09-21 17:45:03

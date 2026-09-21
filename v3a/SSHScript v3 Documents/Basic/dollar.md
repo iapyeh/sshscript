@@ -156,4 +156,18 @@ It does not load credentials, connect to an SSH server, use an SSH agent, or
 read a private key. See [Contributing and Testing](../../development-and-testing/)
 for the unittest wrapper, full release gate, and language integration modes.
 
-Last Updated: 2026-09-18 15:58:44
+## Assertions and production command checks
+
+User-written `assert` statements in `.spy` files retain normal Python semantics.
+`python -O` removes them, including calls inside the assertion. They are useful
+for illustrative tests, but production scripts must explicitly inspect
+`session.exitcode` (or `$.exitcode`) and handle nonzero status. Local
+`Session.exec_command(..., check=True)` raises `subprocess.CalledProcessError`;
+this is not a portable remote-command option. SSH, timeout, and transport
+failures remain exceptions regardless of optimization.
+
+`AssertionError` was never a supported SSHScript API contract. Package runtime
+validation now uses explicit exceptions in both normal and optimized modes.
+See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+
+Last Updated: 2026-09-21 17:45:03

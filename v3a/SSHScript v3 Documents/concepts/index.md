@@ -16,7 +16,7 @@ for the first successful command, but they support safe design and debugging.
 | --- | --- |
 | [Session Lifecycle](session-lifecycle/) | Placeholder |
 | [Direct Execution vs Shell Execution](direct-execution-vs-shell-execution/) | Placeholder |
-| [Results and Error Model](results-and-error-model/) | Placeholder |
+| [Results and Error Model](results-and-error-model/) | Available |
 | [How `.spy` Transformation Works](how-spy-transformation-works/) | Placeholder |
 
-Last Updated: 2026-09-19 13:20:55
+Last Updated: 2026-09-21 17:45:03

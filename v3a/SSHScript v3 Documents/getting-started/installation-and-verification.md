@@ -26,7 +26,7 @@ updated when a packaged release is published.
 
 The prepared v3.1 source declares:
 
-- Python 3.9 or newer;
+- Python 3.11 or newer;
 - macOS or a POSIX Linux environment;
 - Paramiko 2.11 or newer, but earlier than 5; and
 - Packaging 21 or newer.
@@ -49,7 +49,7 @@ python3 -m venv .venv
 python3 -m pip install --upgrade pip
 ```
 
-Confirm that the selected interpreter is Python 3.9 or newer before
+Confirm that the selected interpreter is Python 3.11 or newer before
 continuing.
 
 ## Install the v3.1 beta source
@@ -140,4 +140,4 @@ credential-free command. See
 if the
 version or import path is not what you expect.
 
-Last Updated: 2026-09-18 15:58:44
+Last Updated: 2026-09-21 17:45:03

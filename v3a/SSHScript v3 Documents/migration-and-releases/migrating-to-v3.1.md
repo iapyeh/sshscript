@@ -293,4 +293,27 @@ authentication failure, remote nonzero status, timeout, privilege prompts,
 transfers, nested connections, concurrency, and cleanup against an isolated
 SSH environment.
 
-Last Updated: 2026-09-18 15:58:44
+## Python and exception compatibility
+
+Use Python 3.11 or newer. Python 3.9 and 3.10 are no longer supported.
+Do not catch AssertionError for SSHScript input/state validation: it was never
+a supported API contract. Update callers to the explicit exception types in
+[Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/). Empty commands and multiline persistent commands raise ValueError;
+wrong argument types and compiled bytes regexes raise TypeError. Disconnected
+SFTP access raises SSHScriptException in every optimization mode.
+
+## Assertions and production command checks
+
+User-written `assert` statements in `.spy` files retain normal Python semantics.
+`python -O` removes them, including calls inside the assertion. They are useful
+for illustrative tests, but production scripts must explicitly inspect
+`session.exitcode` (or `$.exitcode`) and handle nonzero status. Local
+`Session.exec_command(..., check=True)` raises `subprocess.CalledProcessError`;
+this is not a portable remote-command option. SSH, timeout, and transport
+failures remain exceptions regardless of optimization.
+
+`AssertionError` was never a supported SSHScript API contract. Package runtime
+validation now uses explicit exceptions in both normal and optimized modes.
+See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+
+Last Updated: 2026-09-21 17:45:03
