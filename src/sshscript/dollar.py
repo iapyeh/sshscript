@@ -38,7 +38,8 @@ DollarExportedNames = set(['stdout','stderr','exitcode','channel'])
 
 def export2Dollar(func):    
     """Register a method name for use through $. in translated scripts."""
-    assert callable(func)
+    if not callable(func):
+        raise TypeError('func must be callable')
     DollarExportedNames.add(func.__name__)
     return func
 
@@ -53,11 +54,15 @@ class Dollar(object):
                  shell_executable=None,**kw):
         """Capture the command, session, shell selection, and backend execution options."""
         
-        if not for_with and not isinstance(command,str):
-            raise TypeError(f'command must be str, not {type(command).__name__}')
-        command = command.strip() if isinstance(command,str) else command
-        ## this is appeared in "with $command"
-        assert not isinstance(for_with,str),f'"for_with" should be bool, not {for_with}'
+        if not isinstance(for_with, bool):
+            raise TypeError('for_with must be bool')
+        if not isinstance(command, str):
+            raise TypeError('command must be str')
+        command = command.strip()
+        if not command:
+            raise ValueError('command must not be empty')
+        if for_with and '\n' in command:
+            raise ValueError('persistent command must be a single line')
         self.for_with = for_with
 
         self.command = command
@@ -108,11 +113,17 @@ class Dollar(object):
     #    if self.call_thread and self.call_thread.is_alive():
     #        self.call_thread.join()
     def __del__(self):
-        thread = self.call_thread
+        thread = getattr(self, 'call_thread', None)
         if thread and thread.is_alive():
             thread.join(timeout=2)
 
+    def _validate_get_pty(self, get_pty):
+        for value in (get_pty, self._parameters_to_execute.get('get_pty')):
+            if value is not None and not isinstance(value, bool):
+                raise TypeError('get_pty must be None or bool')
+
     def __call__(self,get_pty=None):
+        self._validate_get_pty(get_pty)
         def r():
             nonlocal get_pty
             newloop = asyncio.new_event_loop()
@@ -227,6 +238,7 @@ class Dollar(object):
 
     async def async_call_worker(self,get_pty=None):
         """Dispatch execution to the session's local or SSH backend."""
+        self._validate_get_pty(get_pty)
         self.get_pty = get_pty
         if self.session.connected:
             ## necessary for this instance to be put in "with context"
@@ -247,7 +259,7 @@ class Dollar(object):
                 return self
     async def exec_by_subprocess(self,get_pty:bool):
         """Execute locally, using process pipes or a PTY for console contexts."""
-        assert get_pty is None or isinstance(get_pty,bool)
+        self._validate_get_pty(get_pty)
         kw = self._parameters_to_execute
         if get_pty is None and 'get_pty' in kw:
             get_pty = kw['get_pty']
@@ -273,7 +285,8 @@ class Dollar(object):
         env.update(kw.get('env',{}))
 
         if self.for_with:
-            assert '\n' not in self.command
+            if '\n' in self.command:
+                raise ValueError('persistent command must be a single line')
             cpargs = shlex.split(self.command)
             summary = command_summary(cpargs)
             if get_pty:
@@ -480,9 +493,9 @@ class Dollar(object):
 
     async def exec_by_ssh(self,get_pty:bool)->None:
         """Execute through the session's SSH connection, draining stdout and stderr."""
+        self._validate_get_pty(get_pty)
         host = self.session.host;
         client = self.session._client 
-
         kw = self._parameters_to_execute
         ## with_pty of ssh default to False for having stderr output
         if get_pty is None: get_pty = kw.get('get_pty',False)
@@ -514,7 +527,8 @@ class Dollar(object):
             else:
                 kw_input = None
             
-            assert self.command
+            if not self.command:
+                raise ValueError('command must not be empty')
 
             if self.use_shell:
                 shell_executable = self.shell_executable or '/bin/sh'

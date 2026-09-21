@@ -323,7 +323,8 @@ class DollarChanger(ast.NodeTransformer):
                 newnode = nodeToInsert
             
             
-            assert self.currentExpr.parent
+            if not getattr(self.currentExpr, 'parent', None):
+                raise RuntimeError('AST expression has no parent')
             box = self.currentExpr.parent
             parentNode = self.currentExpr
             try:
@@ -390,8 +391,10 @@ class DollarChanger(ast.NodeTransformer):
             ## verify our idea about "parentNode"
             parentContent = ast.unparse(self.currentExpr)
             nodeContent = ast.unparse(node)
-            assert parentContent.strip() == nodeContent.strip(),f'{parentContent} not same as {nodeContent}'
-            assert hasattr(self.currentExpr,'parent'), f'{ast.dump(self.currentExpr)} has no .parent'
+            if not (parentContent.strip() == nodeContent.strip()):
+                raise RuntimeError('AST parent content does not match node content')
+            if not (hasattr(self.currentExpr,'parent')):
+                raise RuntimeError('AST expression has no parent attribute')
         elif isinstance(node, ast.Attribute) and \
             isinstance(node.value, ast.Name) and \
             node.value.id in ('_sshscript_in_context_','_c'):
@@ -547,7 +550,8 @@ class DollarChanger(ast.NodeTransformer):
             ## add initial value into self.containsSSHScriptStack for this scope
 
             name = self.localSSHScriptListKeyStack.pop()
-            assert name == node.name            
+            if not (name == node.name):
+                raise RuntimeError('AST name does not match node name')
             
             if containsSSHScript:
                 nodeToInsert = self._template(self.tmplLinesBlowDef, node)

@@ -183,8 +183,9 @@ class GenericChannel(object):
             self.executing_locks.append(threading.Lock())
     def decrease_layer(self):
         ## keep at least one layer
-        assert self.layer_count > 1
         with self._lock:
+            if self.layer_count <= 1:
+                raise RuntimeError('cannot remove the last channel layer')
             self.prompts.pop()
             layer_lock = self.executing_locks.pop()
             self._exited_interactive_layers.discard(layer_lock)
@@ -369,25 +370,21 @@ class GenericChannel(object):
 
         EnterConsole owns this transition. exitcode returns -1 while hijacked.
         """
-        if yes:
-            assert not self.hijacked,'can not hijack twice'
-            assert self._send_line is None, 'can not hijack twice'
-            with self._lock:
-                self._exited_interactive_layers.discard(
-                    self.executing_lock
-                )
-            self._send_line = self.send_line
-            self.hijacked = True
-            self.send_line = self.input
+        with self._lock:
+            if yes:
+                if self.hijacked or self._send_line is not None:
+                    raise RuntimeError('cannot hijack twice')
+                self._exited_interactive_layers.discard(self.executing_lock)
+                self._send_line = self.send_line
+                self.hijacked = True
+                self.send_line = self.input
+            else:
+                if not self.hijacked or self._send_line is None:
+                    raise RuntimeError('cannot release hijack twice')
+                self.send_line = self._send_line
+                self._send_line = None
+                self.hijacked = False
             return True
-        else:
-            assert self.hijacked,'can not release hijack twice'
-            assert self._send_line is not None, 'should release before hijacking'
-            self.send_line = self._send_line
-            self._send_line = None
-            self.hijacked = False
-            return True
-        return False
 
     @property
     def exitcode(self)->int:
@@ -1070,10 +1067,11 @@ class GenericChannel(object):
             elif callable(pat):
                 callablePats.append(pat)
             elif isinstance(pat,re.Pattern):
-                assert isinstance(pat.pattern,str),f'expect() should be called with str-pattern, not "{pat.pattern}"'
+                if not isinstance(pat.pattern, str):
+                    raise TypeError('bytes regular expressions are not supported')
                 regularPats.append((pat,pat))
             else:
-                raise ValueError('expect() only accept bytes,str,re.Pattern(str) or list of them')
+                raise TypeError('expect() requires str, str regex, callable, or list of them')
 
         ## comparing starts below
         def remove_listener():
@@ -1588,8 +1586,10 @@ class GenericChannel(object):
     def get_exit_code(self,timeout=60):
         """Request and wait for a shell exit-code marker, bounded by timeout."""
         
-        assert not self.closed
-        assert not self.hijacked
+        if self.closed:
+            raise BrokenPipeError('channel is closed')
+        if self.hijacked:
+            raise RuntimeError('cannot get exit code when hijacked')
         deadline = None if timeout in (None, 0) else time.monotonic() + timeout
         executing_lock = self.executing_lock
         ## important for stability
@@ -1687,7 +1687,8 @@ class GenericChannel(object):
     ## run the commands    
     def send_line(self,line,**expections):
         """Execute one command string via send_command(); unavailable while hijacked."""
-        assert not self.hijacked, 'can not sendline when hijacked'
+        if self.hijacked:
+            raise RuntimeError('cannot sendline when hijacked')
 
         return self.send_command(line,**expections)
 
@@ -1705,6 +1706,10 @@ class GenericChannel(object):
         are expected patterns mapped to reply strings. Cleanup must affect only this
         command's callbacks and lock, even when an inner console changes the layer.
         """
+        if not isinstance(command, str):
+            raise TypeError('command must be str')
+        if not command.strip():
+            raise ValueError('command must not be empty')
         deadline = time.monotonic() + command_timeout
         executing_lock = self.executing_lock
         self._acquire_until(

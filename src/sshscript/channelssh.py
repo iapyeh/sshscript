@@ -34,7 +34,8 @@ class ParamikoChannel(object):
     """Adapt a Paramiko channel for PTY/non-PTY I/O and SSHChannel output buffers."""
     count = 0
     def __init__(self,sshchannel,get_pty,channel=None):
-        assert isinstance(sshchannel, SSHChannel)
+        if not isinstance(sshchannel, SSHChannel):
+            raise TypeError('sshchannel must be SSHChannel')
         self.sshchannel = sshchannel 
         self.get_pty = get_pty
         self.suspending = False
@@ -203,7 +204,8 @@ class SSHChannel(GenericChannel):
         super().__init__(owner)
         self.get_pty = get_pty
         with self.executing_lock:
-            assert not self.closed
+            if not (not self.closed):
+                raise BrokenPipeError('channel is closed')
             self.prefixOfLog = "[SSHChannel]"
            
             if isinstance(client,paramiko.client.SSHClient):

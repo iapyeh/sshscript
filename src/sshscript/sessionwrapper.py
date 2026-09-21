@@ -204,7 +204,8 @@ class SessionWrapper(object):
             args = args[1:]
 
         ## ShellConsole with command=False
-        assert isinstance(command,str) or isinstance(command,bool)
+        if not isinstance(command, (str, bool)):
+            raise TypeError('command must be str or bool')
         if command == False:
             return ShellConsole(self,False,*args,**kw)
         elif command == '':

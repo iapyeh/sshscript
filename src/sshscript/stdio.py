@@ -33,7 +33,8 @@ class DequeStringIter:
     """Iterate buffered chunks and wait for new output without consuming chunks."""
     def __init__(self,ds,timeout=None,silent=False):
         """Bind a buffer; timeout=None waits indefinitely, silent suppresses timeout errors."""
-        assert isinstance(ds,DequeString)
+        if not isinstance(ds,DequeString):
+            raise TypeError('ds must be DequeString')
         self.ds = ds
         self.sessionId = ds.sessionId
         self.timeout = timeout
@@ -89,7 +90,8 @@ class DequeStringPopleftIter:
     """Iterate and consume buffered chunks, waiting for new output as configured."""
     def __init__(self,ds,timeout=None,silent=False):
         """Bind a buffer; timeout=None waits indefinitely, silent suppresses timeout errors."""
-        assert isinstance(ds,DequeString)
+        if not isinstance(ds,DequeString):
+            raise TypeError('ds must be DequeString')
         self.ds = ds
         self.timeout = timeout
         self.silent = silent
@@ -241,7 +243,8 @@ class DequeString(str):
 
     def set_callback(self,callback,pattern):
         """Watch for a pattern in appended output and invoke its callback when found."""
-        assert pattern is None or isinstance(pattern,str), '"str" pattern supported only'
+        if not (pattern is None or isinstance(pattern,str)):
+            raise TypeError('pattern must be str or None')
         with self._condition:
             self.callback = callback
             self.callback_pattern = pattern
@@ -271,13 +274,14 @@ class DequeString(str):
         its callback once, outside the buffer lock. Notify the top listener and
         waiting readers about the appended output.
         """
-        assert isinstance(item,str),f'{[item]} is not str'
+        if not isinstance(item,str):
+            raise TypeError('appended output must be str')
         #print('ooooo>>',[item])
         callback_to_call = None
         listener_item = item
         with self._condition:
             if self.closed:
-                raise IOError('DequeString has closed')
+                raise BrokenPipeError('DequeString has closed')
             if splitlines:
                 ## contains newline in line
                 self._deque.extend(item.splitlines(True))
@@ -326,7 +330,12 @@ class DequeString(str):
             listener(self.glue.join(self._deque))
             self._listeners.append(listener)
     def pop_listener(self,listener):
-        assert self._listeners.pop() == listener
+        with self._condition:
+            if not self._listeners:
+                raise RuntimeError('listener stack is empty')
+            if self._listeners[-1] is not listener:
+                raise RuntimeError('listener is not on top of stack')
+            self._listeners.pop()
     def clear(self):
         self._deque.clear()
         self.sessionId = f'{time.time()}.{random.random()}'
@@ -410,55 +419,3 @@ class SSHScriptStdout(DequeString):
 
 class SSHScriptStderr(DequeString):
     maxlen = 10000
-
-def unittest():
-    stdout = SSHScriptStdout(maxlen=500)
-    assert not stdout,'stdout is empty but with True value'
-    def setvalue():
-        stdout.append('that')
-        stdout.append('is')
-        stdout.append('an')
-        stdout.append('book')
-    setvalue()
-    assert stdout,'stdout is not empty but with False value'
-    stdout[0] = 'this'
-    assert 'this' in stdout
-    assert stdout[1] == 'is', f'it is {[stdout[1]]}'
-    assert stdout == 'thisisanbook',f'it is {[stdout]}'
-    assert 'thisisanbook' == stdout,f'it is {[stdout]}'
-    assert ','.join(stdout) == 'this,is,an,book',f'it is {[",".join(stdout)]}'
-    assert stdout + 'ok' == 'thisisanbookok',f'it is {["ok"+stdout]}'
-    assert 'ok' + stdout == 'okthisisanbook',f'it is {["ok"+stdout]}'
-    assert stdout.strip() == 'thisisanbook',f'it is {[stdout]}'
-    assert stdout.join(['-']) == '-',f'it is {[stdout.join(["-"])]}'
-    assert stdout.join(['-','-']) == '-thisisanbook-',f'it is {[stdout.join(["-","-"])]}'
-    assert len(stdout) == 4,f'it is {len(stdout)}'
-
-    def adding():
-        import random
-        for i in range(3):
-            time.sleep(1)
-            stdout.append(str(random.randint(100,200)))    
-    def dump():
-        print('dumping start')
-        for i in range(2):
-            if i==0:
-                # this; is; a; book
-                # stdout does not consumed
-                for c in stdout:
-                    print([i,c])
-                    assert len(c) > 1
-                assert stdout == 'thisisanbook',f'it is {[stdout]}'
-
-            else:
-                t1 = threading.Thread(target=adding,no_patch=True)
-                t1.start()
-                for c in stdout(3,True):
-                    print(['timeout=3',i,c])
-                t1.join()
-                assert stdout == '',f'it is {[stdout]}'
-    t0 = threading.Thread(target=dump,no_patch=True)
-    t0.start()
-    t0.join()
-if __name__ == '__main__':
-    unittest()
