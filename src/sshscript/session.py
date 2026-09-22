@@ -31,7 +31,6 @@ import errno
 import time
 import os
 import sys
-import copy
 from io import StringIO
 import types
 import asyncio
@@ -913,7 +912,9 @@ class Session(object):
             
 
             ## v2.0.3 merge locals to globals
-            exec_vars = copy.copy(_vars)
+            # Frame locals are a mapping proxy on Python 3.13+. Execution
+            # needs an independent dict, without copying the referenced values.
+            exec_vars = dict(_vars)
 
             ## add from v1.1.18, v2.0.3 changed to '__main__'
             try:
