@@ -1,221 +1,141 @@
 # SSHScript
 
-SSHScript is a Python library for system automation. It provides one API for
-running commands locally, connecting to remote hosts over SSH, traversing
-nested SSH connections, changing execution identity, interacting with console
-programs, and transferring files.
-
-SSHScript v3 is designed to be used primarily as a regular Python module.
-The optional Dollar syntax remains available for concise `.spy` automation
-files.
-
-## Documentation
-
-The current documentation is the
-[SSHScript v3 Documentation](https://iapyeh.github.io/sshscript/v3a/).
+SSHScript is a Python automation library and `.spy` script runner for executing
+commands locally or over SSH. It provides a regular Python `Session` API and a
+compact dollar syntax for automation scripts.
 
 ## Installation
+
+SSHScript requires Python 3.11 or newer.
+
+Use `sshscript --version` to display the installed version, or
+`sshscript --check-updates` to query PyPI for a newer stable release compatible
+with the current Python version. The check only prints an upgrade command;
+it does not install anything. `--check` remains an alias. A failed query exits
+with status 1; a successful check exits with status 0, whether an update exists
+or not. This checks release Python requirements, not dependency resolution or
+platform availability.
 
 ```sh
 python3 -m pip install sshscript
 ```
 
-Upgrade an existing installation:
+For a release checkout containing `src/sshscript/`, `python3 -m pip install .`
+installs that checkout. The flat development checkout is not an installable
+package; use the following checks instead:
 
 ```sh
-python3 -m pip install --upgrade sshscript
+python3 -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine
+python3 tools/run_checks.py
+python3 tools/check_release.py --output /tmp/sshscript-candidate-UNIQUE
 ```
 
-Check the installed version:
+See [RELEASING.md](RELEASING.md) for synchronization and publishing. The v3.1
+source on the release branch is beta; a GitHub source update does not publish
+a new version to PyPI. See the [v3.1 documentation](https://iapyeh.github.io/sshscript/v3a/).
+
+## Python API
+
+```python
+from sshscript import Session
+
+session = Session()
+try:
+    stdout, stderr = session.exec_command("uname -a", shell=False)
+    print(str(stdout))
+    print(session.exitcode)
+finally:
+    session.close(strict=True)
+```
+
+Pass command arguments as a safely quoted string, for example with
+`shlex.join()`, and use `shell=False` when shell expansion is not required.
+
+## Running `.spy` files
 
 ```sh
-python3 -c "import sshscript; print(sshscript.__version__)"
+sshscript automation.spy
 ```
 
-## Module API
+The CLI and `run_file()` execute exactly one file. Directories, globs, and
+multiple paths are intentionally unsupported. Compose larger automation with
+SSHScript include syntax or ordinary Python imports.
 
-### Execute a local command
+Importing SSHScript does not globally enable Python imports of `.spy` files.
+Use the explicit, temporary importer when a regular Python program needs one:
 
 ```python
 import sshscript
 
-session = sshscript.Session()
-try:
-    stdout, stderr = session.exec_command("hostname")
-    print(str(stdout).strip())
-    print("exit code:", session.exitcode)
-finally:
-    session.close()
+with sshscript.spy_imports():
+    import automation  # loads automation.spy
 ```
 
-`Session.exec_command()` returns `(stdout, stderr)`. The latest result is also
-available through `session.stdout`, `session.stderr`, and
-`session.exitcode`.
+`run_file()` enables this importer only for the duration of the script, so
+imports between `.spy` files continue to work without additional setup.
+Threads created with `threading.Thread(...)` inside a `.spy` file inherit the
+session that is active when the thread is constructed, without patching the
+process-wide `threading.Thread` class.
 
-The command must be a string. Use `shell=False` when direct execution must be
-explicit:
+## SSH host-key security
 
-```python
-command = "python3 -c \"print('ready')\""
-stdout, stderr = session.exec_command(command, shell=False)
-```
+SSH connections verify system host keys by default and reject unknown or
+changed keys. Load the server key into `known_hosts` before connecting.
 
-String commands use quote-aware automatic shell detection. Pipelines,
-redirection, expansion, assignments, and logical operators automatically
-select a shell:
+Accepting a new key without verification must be an explicit decision:
 
 ```python
-stdout, stderr = session.exec_command(
-    "printf 'alpha\nbeta\n' | grep beta"
+import paramiko
+
+remote = session.connect(
+    "user@new-host.example",
+    policy=paramiko.AutoAddPolicy(),
 )
-assert str(stdout).strip() == "beta"
 ```
 
-Use `shell=False` or `shell=True` when the execution mode must be explicit.
-Use `shell="bash"` to select a particular shell.
+Do this only in a trusted bootstrap environment. Interactive SSH sessions do
+not forward the complete local process environment; only terminal/locale
+defaults and values explicitly supplied through `env={...}` are sent.
 
-### Connect to a remote host
+## Tests
 
-`Session.connect()` returns a connected session. Commands inside its context
-run on that host:
-
-```python
-import sshscript
-
-session = sshscript.Session()
-try:
-    with session.connect("ops@example.net") as remote:
-        stdout, stderr = remote.exec_command("hostname")
-        print("remote host:", str(stdout).strip())
-finally:
-    session.close()
-```
-
-SSHScript also supports nested connections:
-
-```python
-with session.connect("ops@bastion.example.net") as bastion:
-    with bastion.connect("db@db.internal") as database:
-        stdout, stderr = database.exec_command(
-            "systemctl is-active postgresql"
-        )
-```
-
-Authentication options such as `password`, `port`, `pkey`, and `pkey_path`
-can be passed to `connect()`. Prefer SSH agents, managed keys, or a secret
-manager instead of hard-coding credentials.
-
-### Privilege changes
-
-Use context managers for a bounded privilege change:
-
-```python
-from getpass import getpass
-
-with session.connect("ops@example.net") as remote:
-    password = getpass("sudo password: ")
-    with remote.sudo(password=password) as root:
-        root.exec_command("systemctl restart nginx")
-```
-
-`Session.su()` provides the corresponding account-switching context.
-
-### Interactive programs
-
-`Session.enter()` handles programs that prompt for input:
-
-```python
-with session.enter("python3", prompt=">>>", exit="quit()") as console:
-    console.input("print('hello')")
-    console.expect("hello")
-```
-
-It can also answer a password prompt from a command such as `mysqldump`:
-
-```python
-from getpass import getpass
-
-password = getpass("MySQL password: ")
-with session.enter(
-    "mysqldump -u backup -p app > /tmp/app.sql"
-) as console:
-    console.expect("password")
-    console.input(password)
-```
-
-### Upload and download
-
-File transfers use the active connected session:
-
-```python
-with session.connect("ops@example.net") as remote:
-    remote.upload(
-        "./release.tar.gz",
-        "/var/tmp/releases/",
-        makedirs=True,
-    )
-    source, destination = remote.download(
-        "/var/tmp/report.txt",
-        "./reports/",
-    )
-```
-
-## Optional Dollar syntax
-
-Dollar syntax is an additional interface for `.spy` files. It is useful when
-command-shaped notation makes an operations script easier to read:
-
-```python
-# example.spy
-$hostname
-print($.stdout.strip())
-
-with $.connect("ops@example.net"):
-    $systemctl is-active nginx
-    print($.stdout.strip())
-```
-
-Run the file with:
+The canonical credential-free release gate is:
 
 ```sh
-sshscript example.spy
+python3 -m unittest discover -v -s unittest -p 'test_*.py'
 ```
 
-In v3, a single `$` handles both direct commands and shell features such as
-pipelines and redirection. The old `$$` form is retained only for
-compatibility and is deprecated.
+It includes unit tests and localhost integration tests and requires no SSH
+credentials. The `.spy` language smoke suite can also be run directly:
 
-The Module API and Dollar syntax use the same session, connection, result,
-console, and file-transfer implementation. New applications should start
-with the Module API and adopt Dollar syntax only when its concise notation is
-an advantage.
+```sh
+python3 sshscript.py unittest/dollar_syntax.spy
+```
 
-## Why SSHScript?
+Site-specific and credentialed SSH tests live under `unittest-v3/` and are not
+part of the default release gate. See [CONTRIBUTING.md](CONTRIBUTING.md) before
+running them.
 
-- One interface for local subprocesses and remote SSH execution.
-- Nested SSH sessions without duplicating connection logic.
-- Python data processing, exceptions, functions, packages, and threading.
-- Explicit context managers for connections, privilege changes, and
-  interactive programs.
-- Direct access to stdout, stderr, and exit status.
-- Optional command-oriented syntax without giving up the Python ecosystem.
+## Project status
 
-## Common use cases
-
-- Server provisioning and configuration.
-- Deployment and operational testing.
-- Backup and restore workflows.
-- Monitoring, data collection, and reporting.
-- Network and account administration.
-- Troubleshooting and repetitive maintenance.
-
-## Links
-
-- [SSHScript v3 Documentation](https://iapyeh.github.io/sshscript/v3a/)
-- [GitHub repository](https://github.com/iapyeh/sshscript)
-- [PyPI package](https://pypi.org/project/sshscript/)
-- [Paramiko](https://www.paramiko.org/)
-
-## License
+Version 3.1 is beta software. Public behavior is covered by the credential-free
+test suite, while real SSH behavior should additionally be validated in an
+isolated test environment before production rollout.
 
 SSHScript is released under the MIT License.
+
+## Production exception contract
+
+SSHScript validates runtime inputs in both normal and optimized Python modes.
+See [the stable exception matrix](EXCEPTIONS.md). `AssertionError` was never a
+supported SSHScript API contract. User-written `.spy` assertions remain ordinary
+Python assertions: `python -O` removes them. Production scripts must use explicit
+status checks or `check=True` for command-success handling.
+
+```python
+with Session() as session:
+    session.exec_command("false", check=True)
+```
+
+A nonzero exit status otherwise remains result data, available as
+`session.exitcode`.

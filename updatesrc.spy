@@ -1,0 +1,6 @@
+# Compatibility entry point; synchronization does not commit or publish.
+from pathlib import Path
+import subprocess
+import sys
+root = Path(__file__).resolve().parent
+subprocess.run([sys.executable, str(root.parent / "src/tools/prepare_release.py"), "--source", str(root.parent / "src"), "--destination", str(root)], check=True)

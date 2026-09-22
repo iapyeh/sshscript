@@ -1,0 +1,7 @@
+# Compatibility entry point: use --output with a new artifact directory.
+from pathlib import Path
+import subprocess
+import sys
+import __main__
+root = Path(__file__).resolve().parent
+subprocess.run([sys.executable, str(root / "tools/check_release.py"), "--source", str(root), *getattr(__main__, "unknown_args", [])], check=True)

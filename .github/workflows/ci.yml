@@ -1,0 +1,27 @@
+name: CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.11', '3.12', '3.13', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test and build dependencies
+        run: python -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine
+      - name: Test source
+        run: python tools/run_checks.py
+      - name: Build and verify installed release
+        run: python tools/check_release.py --output '${{ runner.temp }}/verified-artifacts'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sshscript-${{ matrix.os }}-${{ matrix.python-version }}
+          path: ${{ runner.temp }}/verified-artifacts/
