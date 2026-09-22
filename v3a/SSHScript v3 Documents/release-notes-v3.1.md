@@ -7,8 +7,8 @@ nav_order: 2
 
 # SSHScript v3.1 Release Notes
 
-SSHScript v3.1 is currently beta. The changes below describe the unreleased
-`working_branch` state used to prepare this documentation.
+SSHScript v3.1 remains beta. Version 3.1.1 updates the release source and
+build workflow; publishing source does not create a PyPI release.
 
 ## Security
 
@@ -39,9 +39,14 @@ SSHScript v3.1 is currently beta. The changes below describe the unreleased
 
 ## Project preparation
 
-- Packaging metadata, an MIT license, contributor guidance, and CI
-  configuration have been prepared in the development workspace. They remain
-  pending release until they are committed with a public v3.1 artifact.
+- Version 3.1.1 fixes the release `src/sshscript/` package mapping and includes
+  the MIT license as `LICENSE.txt`.
+- A shared allowlist prepares release sources; verification builds an sdist
+  and its wheel and tests installation in a fresh virtual environment.
+- CI applies the same checks to development and release layouts. Explicit
+  publishing checks artifact hashes and uses credentials supplied externally.
+- Version metadata is read from `_version.py`; build and upload tools do not
+  modify version numbers.
 
 See [Contributing and Testing](../development-and-testing/) for the release gate
 that validates these behaviors without SSH credentials.
@@ -59,8 +64,7 @@ that validates these behaviors without SSH credentials.
 - The credential-free suite passes 98 tests normally and under `-O`; all nine
   dollar-syntax smoke cases pass. Release gates include an AST assertion scan.
 
-These changes do not constitute a Production/Stable release. Artifact-based
-CI, reproducible SSH integration, release preparation, and other existing
-release requirements remain separate work. See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+These changes do not constitute a Production/Stable release. Passing the published CI matrix, reproducible SSH integration, and the
+remaining production requirements are still required before stable release. See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-22 15:50:06

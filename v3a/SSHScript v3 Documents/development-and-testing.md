@@ -13,12 +13,14 @@ password, or host inventory.
 
 ## Development setup
 
-Use Python 3.11 or newer and install the checkout in editable mode:
+Use Python 3.11 or newer. The flat development checkout uses a release-only
+packaging template; do not install it with `pip install .` or `pip install -e .`.
+Install the test and build dependencies instead:
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install -e .
+python3 -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine
 ```
 
 ## Required checks
@@ -150,4 +152,35 @@ package modules, excluding tests. Regression tests use unittest assertions so
 validation remains meaningful under `-O`. Historical `unittest-v3` material is
 not part of the credential-free gate and must not be bulk-added to Git.
 
-Last Updated: 2026-09-21 17:45:03
+## Release layout and artifact verification
+
+Run `python3 tools/run_checks.py` from either the development checkout or the
+release repository root. It selects the correct source directory and runs the
+normal and optimized tests, Dollar syntax checks, compilation, and assertion scan.
+
+```sh
+python3 tools/check_release.py --output /tmp/sshscript-candidate-UNIQUE
+```
+
+Choose a new output directory each time. The command prepares an allowlisted
+source tree, builds an sdist and then its wheel, runs strict metadata checks,
+and installs the wheel in a fresh virtual environment outside the source tree.
+It verifies the module version, CLI, and local command execution. Build and
+installation steps need network access for dependencies; runtime tests do not
+need SSH credentials. Successful verification saves both distributions and a
+`verified.json` SHA-256 manifest.
+
+Development changes flow from `working_branch` into `src/main`, then through
+`update_from_src.sh` into the release repository's `src/sshscript/` layout.
+The shared `tools/prepare_release.py` owns the explicit file allowlist.
+Only reviewed files should be staged and committed; private integration tests
+and credentials are excluded. See
+[the release procedure](https://github.com/iapyeh/sshscript/blob/release/RELEASING.md).
+
+GitHub Actions runs these checks on Linux/macOS and Python 3.11–3.14 for pushes
+and pull requests. Check the actual workflow results before declaring a candidate
+validated on every platform. CI does not upload to PyPI. Publishing requires a
+separate explicit `tools/publish_release.py` invocation with verified artifacts
+and externally supplied credentials; it never edits versions or rebuilds files.
+
+Last Updated: 2026-09-22 15:50:06
