@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sshscript"
+dynamic = ["version"]
+description = "Python automation for local processes, SSH, and SSHScript .spy files"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [
+  {name = "Hsin Yuan Yeh", email = "iapyeh@gmail.com"},
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: System :: Systems Administration",
+]
+dependencies = [
+  "paramiko>=2.11,<5",
+  "packaging>=21",
+]
+
+[project.urls]
+Documentation = "https://iapyeh.github.io/sshscript/"
+Source = "https://github.com/iapyeh/sshscript"
+Issues = "https://github.com/iapyeh/sshscript/issues"
+
+[project.scripts]
+sshscript = "sshscript.sshscript:main"
+
+[tool.setuptools]
+packages = ["sshscript"]
+package-dir = {sshscript = "."}
+
+
+[tool.setuptools.dynamic]
+version = {attr = "sshscript._version.__version__"}
