@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import MappingProxyType
 
 import sshscript
 import patching
@@ -245,17 +246,44 @@ class SessionModuleTests(unittest.TestCase):
         stack = patching.get_thread_stack()
         before = stack.snapshot()
         session = sshscript.Session()
-
         namespace = session.run(
             "active_session = patching.peek_thread_stack()[-1]"
         )
         self.assertIs(namespace["active_session"], session)
         self.assertEqual(stack.snapshot(), before)
-
         with session:
             self.assertIs(stack[-1], session)
         self.assertEqual(stack.snapshot(), before)
         session.close()
+
+    def test_run_copies_mapping_namespace_without_copying_values(self):
+        shared = []
+        original = {'number': 7, 'shared': shared}
+        result = self.session.run(
+            'number = 9\nshared.append(number)\ncreated = True',
+            vars=MappingProxyType(original),
+        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(original['number'], 7)
+        self.assertNotIn('created', original)
+        self.assertEqual(result['number'], 9)
+        self.assertIs(result['shared'], shared)
+        self.assertEqual(shared, [9])
+
+    def test_run_uses_caller_frame_locals_on_supported_python_versions(self):
+        sentinel = object()
+        for script in ('captured = sentinel', '$true\ncaptured = sentinel'):
+            with self.subTest(script=script):
+                result = self.session.run(script)
+                self.assertIs(result['captured'], sentinel)
+                self.assertNotIn('captured', locals())
+
+    def test_run_script_accepts_explicit_frame_locals(self):
+        sentinel = object()
+        result = sshscript.run_script(
+            'captured = sentinel', varGlobals=sys._getframe().f_locals,
+        )
+        self.assertIs(result['captured'], sentinel)
 
     def test_direct_command_captures_output_and_exit_code(self):
         command = shlex.join(

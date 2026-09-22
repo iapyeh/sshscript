@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
+import tokenize
 import unittest
 import uuid
 
@@ -19,6 +20,19 @@ import dollarparser
 
 
 class SpySourceMappingTests(unittest.TestCase):
+    def test_tokenizer_eof_wording_maps_to_unmatched_delimiter(self):
+        for message in ('EOF in multi-line statement',
+                        'unexpected EOF in multi-line statement'):
+            with self.subTest(message=message):
+                error = dollarparser._token_syntax_error(
+                    tokenize.TokenError(message, (3, 0)),
+                    'unfinished.spy', '\n$(\n',
+                )
+                self.assertEqual(error.filename, 'unfinished.spy')
+                self.assertEqual(error.lineno, 2)
+                self.assertEqual(error.offset, 2)
+                self.assertEqual(error.text, '$(\n')
+
     def test_generated_with_targets_have_store_context(self):
         sources = (
             "with $:\n    pass\n",

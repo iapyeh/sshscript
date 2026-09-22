@@ -108,7 +108,8 @@ def _token_syntax_error(error, script_path, spyscript):
     message, location = error.args
     lineno, offset = location
 
-    if message == 'EOF in multi-line statement':
+    if message in ('EOF in multi-line statement',
+                   'unexpected EOF in multi-line statement'):
         opening = {'(': ')', '[': ']', '{': '}'}
         closing = {value: key for key, value in opening.items()}
         delimiters = []
