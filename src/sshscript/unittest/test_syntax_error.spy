@@ -1,0 +1,21 @@
+def get_mysql_state_on_master():
+    with $.connect(config['master']['account']):
+        with $.enter(f'mysql -uroot -p -e "show master status\G"'):
+            $.expect('password')
+            $.input(config['master']['db']['passwd'])
+        if $.exitcode == 0:
+            for line in [x.strip() for x in $.stdout.splitlines():
+                if line.startswith('File:'):
+                    master_status['File'] = line.split(':')[1].strip()
+                elif line.startswith('Position:'):
+                    master_status['Position'] = line.split(':')[1].strip()
+                    break
+            try:
+                master_status['File']
+                master_status['Position']
+            except KeyError:
+                raise Exception(f'master status malfuncional:{master_status}')
+        else:
+            raise RuntimeError(f'show master status failure:{$.stdout},{$.stderr}')
+    return master_status
+

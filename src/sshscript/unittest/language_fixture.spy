@@ -1,0 +1,10 @@
+"""Fixture imported by language.spy to exercise the .spy import hook."""
+
+
+MODULE_KIND = "spy"
+
+
+def run_fixture_command():
+    $python3 -c "print('imported-spy')"
+    return $.stdout.strip(), $.stderr, $.exitcode
+

@@ -1,0 +1,533 @@
+"""Self-contained regression tests for SSHScript's extended Python syntax.
+
+Run from the repository root with:
+
+    python3 sshscript.py unittest/language.spy
+
+The default environment uses only the local session.  Optional remote and
+threaded-remote environments use the same host layout as basic.spy.
+"""
+
+import os
+import shlex
+import sys
+import threading
+import traceback
+import uuid
+import warnings
+
+from errorutils import command_requires_shell
+
+
+passed = []
+test_context = threading.local()
+
+
+def case(name):
+    environment = getattr(test_context, "environment", "unknown")
+    print(f"\n[{environment}: {name}]", flush=True)
+
+
+def done(name):
+    environment = getattr(test_context, "environment", "unknown")
+    test_context.passed += 1
+    passed.append((environment, name))
+    print(f"PASS: {environment}: {name}", flush=True)
+
+
+def test_python_is_untouched():
+    name = "ordinary Python and dollar text"
+    case(name)
+
+    # Dollar characters in comments and ordinary strings must not be parsed.
+    literal = "$.stdout $echo $$echo"
+    raw_literal = r"$HOME and $.stderr"
+    doubled_braces = f"literal={{$.stdout}}"
+
+    assert literal == "$.stdout $echo $$echo"
+    assert raw_literal == r"$HOME and $.stderr"
+    assert doubled_braces == "literal={$.stdout}"
+    done(name)
+
+
+def test_shell_detection():
+    name = "quote-aware automatic shell detection"
+    case(name)
+
+    direct_commands = (
+        "hostname",
+        "python3 -c \"print('a|b')\"",
+        "echo '$HOME'",
+        r"echo \$HOME",
+    )
+    shell_commands = (
+        'echo "$HOME"',
+        "printf 'a\\nb\\n' | grep b",
+        "printf redirected > /tmp/sshscript-language-detection",
+        "false || true",
+        "VALUE=expanded; echo \"$VALUE\"",
+    )
+
+    for command in direct_commands:
+        required, reasons = command_requires_shell(command)
+        assert not required, (command, reasons)
+    for command in shell_commands:
+        required, reasons = command_requires_shell(command)
+        assert required, (command, reasons)
+
+    done(name)
+
+
+def test_one_dollar_forms():
+    name = "one-dollar command forms"
+    case(name)
+
+    $python3 -c "print('bare-command')"
+    assert $.stdout.strip() == "bare-command"
+    assert $.stderr == ""
+    assert $.exitcode == 0
+
+    $r'printf raw-string'
+    assert $.stdout.strip() == "raw-string"
+
+    $'printf string-literal'
+    assert $.stdout.strip() == "string-literal"
+
+    command = "python3 -c \"print('parenthesized')\""
+    $(command)
+    assert $.stdout.strip() == "parenthesized"
+
+    value = "f-string"
+    $f'python3 -c "print(\'{value}\')"'
+    assert $.stdout.strip() == value
+
+    $('python3 -c "print(\'keyword-arguments\')"', timeout=5)
+    assert $.stdout.strip() == "keyword-arguments"
+
+    $(shlex.join(['printf', 'argv-list']), shell=False)
+    assert $.stdout == "argv-list"
+    assert $.dollar.use_shell is False
+    done(name)
+
+
+def test_result_state_and_assignment():
+    name = "stdout, stderr, exit code, and assignment"
+    case(name)
+
+    stdout, stderr = $python3 -c "import sys; print('out'); sys.stderr.write('err\\n')"
+    assert stdout.strip() == "out"
+    assert stderr.strip() == "err"
+    # stdout/stderr are live str-like buffer objects; compare their content.
+    assert str($.stdout) == str(stdout)
+    assert str($.stderr) == str(stderr)
+    assert $.exitcode == 0
+
+    $python3 -c "import sys; sys.stderr.write('failed\\n'); sys.exit(7)"
+    assert $.stdout == ""
+    assert $.stderr.strip() == "failed"
+    assert $.exitcode == 7
+
+    summary = f"exit={$.exitcode}, stderr={$.stderr.strip()}"
+    assert summary == "exit=7, stderr=failed"
+    done(name)
+
+
+def test_automatic_shell_features():
+    name = "automatic shell features with one dollar"
+    case(name)
+
+    $printf 'alpha\nbeta\n' | grep beta
+    assert $.stdout.strip() == "beta"
+    assert $.exitcode == 0
+    assert $.dollar.use_shell is True
+
+    dynamic_pipeline = "printf dynamic-shell | tr a-z A-Z"
+    $(dynamic_pipeline, timeout=5)
+    assert $.stdout.strip() == "DYNAMIC-SHELL"
+
+    $'printf string-direct'
+    assert $.stdout == "string-direct"
+    assert $.dollar.use_shell is False
+
+    $r'printf raw-direct'
+    assert $.stdout == "raw-direct"
+    assert $.dollar.use_shell is False
+
+    $echo "$HOME"
+    assert $.stdout.strip()
+    assert $.dollar.use_shell is True
+
+    $echo '$HOME'
+    assert $.stdout.strip() == "$HOME"
+    assert $.dollar.use_shell is False
+
+    $echo \$HOME
+    assert $.stdout.strip() == "$HOME"
+    assert $.dollar.use_shell is False
+
+    forced_direct = 'python3 -c "import sys; print(sys.argv[1:])" "|" "cat"'
+    $(forced_direct, shell=False)
+    assert $.stdout.strip() == "['|', 'cat']"
+    assert $.dollar.use_shell is False
+
+    $('printf forced-shell', shell=True)
+    assert $.stdout == "forced-shell"
+    assert $.dollar.use_shell is True
+
+    $('printf bash-shell', shell=True, shell_executable='bash')
+    assert $.stdout == "bash-shell"
+    assert $.dollar.shell_executable == "bash"
+
+    $('printf bash-shorthand', shell='bash')
+    assert $.stdout == "bash-shorthand"
+    assert $.dollar.shell_executable == "bash"
+
+    $f'VALUE={shlex.quote("expanded")}; printf "%s" "$VALUE"'
+    assert $.stdout == "expanded"
+
+    done(name)
+
+
+def test_one_dollar_replaces_two_dollar_features():
+    name = "one dollar replaces two-dollar shell features"
+    case(name)
+
+    $printf 'pipe-alpha\npipe-beta\n' | grep beta
+    assert $.stdout.strip() == "pipe-beta"
+    assert "pipeline" in $.dollar.shell_reasons
+
+    $true | false
+    assert $.exitcode != 0
+    $false | true
+    assert $.exitcode == 0
+
+    $false || printf recovered
+    assert $.stdout == "recovered"
+    assert "logical-operator" in $.dollar.shell_reasons
+
+    $true && printf continued
+    assert $.stdout == "continued"
+
+    $printf 'nested-%s' "$(printf command-substitution)"
+    assert $.stdout == "nested-command-substitution"
+    assert "command-substitution" in $.dollar.shell_reasons
+
+    $VALUE=assigned; printf '%s' "$VALUE"
+    assert $.stdout == "assigned"
+    assert "assignment" in $.dollar.shell_reasons
+
+    $printf '%s' ~
+    assert $.stdout.startswith("/")
+    assert "tilde-expansion" in $.dollar.shell_reasons
+
+    $printf 'quoted|pipe>redirect;$HOME'
+    assert $.stdout == "quoted|pipe>redirect;$HOME"
+    assert $.dollar.use_shell is False
+
+    folder = f"/tmp/sshscript-one-dollar-{uuid.uuid4().hex}"
+    quoted_folder = shlex.quote(folder)
+    output_path = os.path.join(folder, "combined output.txt")
+    error_path = os.path.join(folder, "error output.txt")
+    quoted_output = shlex.quote(output_path)
+    quoted_error = shlex.quote(error_path)
+    try:
+        $f'mkdir -p {quoted_folder}'
+        $f'printf first > {quoted_output}'
+        assert "redirection" in $.dollar.shell_reasons
+        $f'printf second >> {quoted_output}'
+        $f'cat < {quoted_output}'
+        assert $.stdout == "firstsecond"
+
+        $f'''python3 -c "import sys; sys.stderr.write('redirected-error\\n')" 2> {quoted_error}
+cat {quoted_error}'''
+        assert $.stdout.strip() == "redirected-error"
+        assert $.stderr == ""
+
+        $f'printf a > {quoted_folder}/match-alpha.txt; printf b > {quoted_folder}/match-beta.txt'
+        $f'printf "%s\n" {quoted_folder}/match-*.txt'
+        matched = {os.path.basename(path) for path in $.stdout.splitlines()}
+        assert matched == {"match-alpha.txt", "match-beta.txt"}
+        assert "glob" in $.dollar.shell_reasons
+    finally:
+        $f'rm -rf {quoted_folder}'
+
+    done(name)
+
+
+def test_legacy_two_dollar_compatibility():
+    name = "legacy two-dollar compatibility"
+    case(name)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        $$'printf legacy-shell'
+    assert $.stdout == "legacy-shell"
+    assert $.dollar.use_shell is True
+    assert any("$$ is deprecated" in str(item.message) for item in caught)
+
+    done(name)
+
+
+def test_shell_redirection_and_cleanup():
+    name = "shell redirection and cleanup"
+    case(name)
+
+    shell_value = "expanded"
+    $f'VALUE={shlex.quote(shell_value)}; printf "%s" "$VALUE"'
+    assert $.stdout == shell_value
+
+    folder = f"/tmp/sshscript-language-{uuid.uuid4().hex}"
+    try:
+        quoted_folder = shlex.quote(folder)
+        output_path = os.path.join(folder, "output file.txt")
+        quoted_path = shlex.quote(output_path)
+        $f'''mkdir -p {quoted_folder}
+printf 'line-1\nline-2\n' > {quoted_path}
+cat {quoted_path} | tail -n 1'''
+        assert $.stdout.strip() == "line-2"
+        $f'cat {quoted_path}'
+        assert $.stdout == "line-1\nline-2\n"
+    finally:
+        $f'rm -rf {quoted_folder}'
+
+    done(name)
+
+
+def test_function_scope():
+    name = "commands inside Python functions"
+    case(name)
+
+    def run_dynamic(command):
+        return $(command)
+
+    def run_f_string(value):
+        $f'python3 -c "print(\'{value}\')"'
+        return $.stdout.strip(), $.stderr, $.exitcode
+
+    stdout, stderr = run_dynamic("python3 -c \"print('from-return')\"")
+    assert stdout.strip() == "from-return"
+    assert stderr == ""
+
+    stdout, stderr, exitcode = run_f_string("function-f-string")
+    assert (stdout, stderr, exitcode) == ("function-f-string", "", 0)
+    done(name)
+
+
+def test_session_context_shorthand():
+    name = "with-dollar session shorthand"
+    case(name)
+
+    with $ as console:
+        $python3 -c "print('session-context')"
+        assert $.stdout.strip() == "session-context"
+        assert str(console.stdout) == str($.stdout)
+
+    with $('bash') as shell:
+        $STATE=kept
+        $printf '%s' "$STATE"
+        assert $.stdout == "kept"
+        assert shell.exitcode == 0
+
+    with $#!/usr/bin/env bash as shell:
+        $cd /tmp
+        $pwd
+        assert $.stdout.strip() == "/tmp"
+
+    shell_command = "bash"
+    with $f'{shell_command}' as shell:
+        $printf dynamic-session
+        assert $.stdout == "dynamic-session"
+        assert shell.exitcode == 0
+
+    done(name)
+
+
+def test_explicit_shell_context():
+    name = "explicit persistent shell and nesting"
+    case(name)
+
+    with $.shell('bash') as shell:
+        $PERSISTED=hello
+        $printf '%s' "$PERSISTED"
+        assert $.stdout == "hello"
+
+        with $.enter('python3 -q', prompt='>>>', exit=chr(4)) as python:
+            $("print('nested-enter')")
+            $.expect('nested-enter')
+            assert "nested-enter" in $.stdout
+            assert str(python.stdout) == str($.stdout)
+
+        $printf shell-restored
+        # Returning from an inner console can preserve prior layer output.
+        assert "shell-restored" in $.stdout
+        assert shell.exitcode == 0
+
+    assert $.exitcode == 0
+    done(name)
+
+
+def test_direct_enter_context():
+    name = "interactive enter, input, and expect"
+    case(name)
+
+    with $.enter('python3 -q', prompt='>>>', exit=chr(4)) as console:
+        $("print('first-line')")
+        $.expect('first-line')
+        assert "first-line" in $.stdout
+
+        $.input("print('second-line')")
+        $.expect('second-line')
+        assert "second-line" in console.stdout
+
+    assert $.exitcode == 0
+    done(name)
+
+
+def test_spy_import():
+    name = "direct import of another .spy module"
+    case(name)
+
+    import language_fixture
+
+    assert language_fixture.MODULE_KIND == "spy"
+    stdout, stderr, exitcode = language_fixture.run_fixture_command()
+    assert (stdout, stderr, exitcode) == ("imported-spy", "", 0)
+    done(name)
+
+
+TESTS = (
+    test_python_is_untouched,
+    test_shell_detection,
+    test_one_dollar_forms,
+    test_result_state_and_assignment,
+    test_automatic_shell_features,
+    test_one_dollar_replaces_two_dollar_features,
+    test_legacy_two_dollar_compatibility,
+    test_shell_redirection_and_cleanup,
+    test_function_scope,
+    test_session_context_shorthand,
+    test_explicit_shell_context,
+    test_direct_enter_context,
+    test_spy_import,
+)
+
+
+def run_suite(environment):
+    test_context.environment = environment
+    test_context.passed = 0
+    for test in TESTS:
+        test()
+
+    count = test_context.passed
+    assert count == len(TESTS), (environment, count, len(TESTS))
+    print(f"\nAll {count} SSHScript language tests passed on {environment}.")
+
+
+def account(hostoption):
+    return hostoption["uname"] + "@" + hostoption["hostname"]
+
+
+def load_hostoptions():
+    try:
+        import localsecret as host_config
+    except ImportError:
+        try:
+            import secret as host_config
+        except ImportError as exc:
+            raise RuntimeError(
+                "remote language tests require localsecret.py or secret.py "
+                "with at least four hostoptions entries"
+            ) from exc
+
+    hostoptions = host_config.hostoptions
+    if len(hostoptions) < 4:
+        raise RuntimeError("remote language tests require hostoptions[1:4]")
+    return hostoptions
+
+
+def run_local_environment():
+    run_suite("local")
+
+
+def run_remote_environment(hostoptions):
+    tested_hosts = []
+    proxy_host, nested_host_1, nested_host_2 = hostoptions[1:4]
+
+    with $.connect(account(proxy_host), proxyCommand=proxy_host["proxy_command"]):
+        tested_hosts.append(proxy_host["hostname"])
+        run_suite(f"remote:{proxy_host['hostname']}")
+
+        for option in (nested_host_1, nested_host_2):
+            tested_hosts.append(option["hostname"])
+            with $.connect(account(option), pkey_path="/home/iap/.ssh/id_rsa"):
+                run_suite(f"remote:{option['hostname']}")
+
+    print(f"Sequential remote environments passed: {', '.join(tested_hosts)}")
+
+
+def run_threaded_environment(hostoptions):
+    proxy_host, nested_host_1, nested_host_2 = hostoptions[1:4]
+    tested_hosts = []
+    failures = []
+    result_lock = threading.Lock()
+
+    def job(option, do_connect=False):
+        hostname = option["hostname"]
+        try:
+            if do_connect:
+                with $.connect(account(option), pkey_path="/home/iap/.ssh/id_rsa"):
+                    run_suite(f"threaded:{hostname}")
+            else:
+                run_suite(f"threaded:{hostname}")
+        except BaseException as exc:
+            with result_lock:
+                failures.append((hostname, exc, traceback.format_exc()))
+        else:
+            with result_lock:
+                tested_hosts.append(hostname)
+
+    with $.connect(account(proxy_host), proxyCommand=proxy_host["proxy_command"]):
+        threads = (
+            threading.Thread(target=job, args=(proxy_host,), daemon=True),
+            threading.Thread(target=job, args=(nested_host_1, True), daemon=True),
+            threading.Thread(target=job, args=(nested_host_2, True), daemon=True),
+        )
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+    if failures:
+        hostname, exc, formatted_traceback = failures[0]
+        raise AssertionError(
+            f"threaded language tests failed on {hostname}: {exc}\n"
+            f"{formatted_traceback}"
+        ) from exc
+
+    assert len(tested_hosts) == 3, tested_hosts
+    print(f"Threaded remote environments passed: {', '.join(tested_hosts)}")
+
+
+def requested_environment():
+    prefix = "--environment="
+    values = [arg[len(prefix):] for arg in sys.argv[1:] if arg.startswith(prefix)]
+    environment = values[-1] if values else "local"
+    if environment not in {"local", "remote", "threaded", "all"}:
+        raise ValueError(
+            "--environment must be local, remote, threaded, or all; "
+            f"got {environment!r}"
+        )
+    return environment
+
+
+if __name__ == "__main__":
+    environment = requested_environment()
+
+    if environment in {"local", "all"}:
+        run_local_environment()
+    if environment in {"remote", "all"}:
+        run_remote_environment(load_hostoptions())
+    if environment in {"threaded", "all"}:
+        run_threaded_environment(load_hostoptions())
+
+    print(f"\nCompleted language test environment: {environment}.")
