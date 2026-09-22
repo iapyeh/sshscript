@@ -25,14 +25,13 @@ import os
 import sys
 import time
 import traceback
-## starts from 3.1, asyncio is introduced.
-__version__ = "3.1.0"
 
 # set here used in sshscriptdollar
 import warnings
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
     return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
 if __package__:
+    from ._version import __version__
     from .session import Session
     from .errorutils import SSHScriptExit, SSHScriptBreak, get_logger, set_logger, SSHScriptException,command_summary
     ## 2025/3/3 v2.0.3 feature: import *.spy file directly
@@ -41,6 +40,7 @@ else:
     ## 2024/8/16, should add mydir into sys.path for python 3.12
     mydir = os.path.abspath(os.path.dirname(__file__))
     if not mydir in sys.path: sys.path.insert(0,mydir)
+    from _version import __version__
     from session import Session
     from errorutils import SSHScriptExit, SSHScriptBreak, get_logger, set_logger, SSHScriptException,command_summary
     import spyimporter

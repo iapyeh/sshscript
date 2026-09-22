@@ -36,17 +36,18 @@ and spy_imports() to temporarily enable Python imports of .spy modules.
 """
 
 if __package__:
+    from ._version import __version__
     from . import sshscript
     from . import session
     from . import errorutils
     from .spyimporter import spy_imports
 else:
+    from _version import __version__
     import sshscript
     import session
     import errorutils
     from spyimporter import spy_imports
 
-__version__ = sshscript.__version__
 run_file = sshscript.run_file
 run_script = sshscript.run_script
 Session = session.Session

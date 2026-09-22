@@ -1,0 +1,4 @@
+include README.md LICENSE.txt RELEASING.md
+recursive-include tools *.py
+include .github/workflows/ci.yml
+recursive-include src/sshscript/unittest *.py *.spy

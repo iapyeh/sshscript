@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,13 +8,13 @@ dynamic = ["version"]
 description = "Python automation for local processes, SSH, and SSHScript .spy files"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {file = "LICENSE"}
+license = "MIT"
+license-files = ["LICENSE.txt"]
 authors = [
-  {name = "Hsin Yuan Yeh", email = "iapyeh@gmail.com"},
+  {name = "Yeh, Hsin-Yuan", email = "iapyeh@gmail.com"},
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
-  "License :: OSI Approved :: MIT License",
   "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",
@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://iapyeh.github.io/sshscript/"
+Documentation = "https://iapyeh.github.io/sshscript/v3a/"
 Source = "https://github.com/iapyeh/sshscript"
 Issues = "https://github.com/iapyeh/sshscript/issues"
 
@@ -39,8 +39,8 @@ sshscript = "sshscript.sshscript:main"
 
 [tool.setuptools]
 packages = ["sshscript"]
-package-dir = {sshscript = "."}
-
+include-package-data = false
+package-dir = {"" = "src"}
 
 [tool.setuptools.dynamic]
 version = {attr = "sshscript._version.__version__"}
