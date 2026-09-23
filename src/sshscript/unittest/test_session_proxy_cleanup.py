@@ -58,8 +58,17 @@ class ProxyShutdownTests(unittest.TestCase):
         self.assertTrue(proxy.process.stderr.closed)
 
     def test_session_close_stops_real_paramiko_transport_cleanly(self):
+        self._check_transport_shutdown(banner_delay=0)
+
+    def test_session_close_waits_for_delayed_banner_before_shutdown(self):
+        # Exceed multiple socket read timeouts: a repeated recv alone does
+        # not imply that the SSH banner has been parsed.
+        self._check_transport_shutdown(banner_delay=0.4)
+
+    def _check_transport_shutdown(self, banner_delay):
         child = (
             "import sys,time; "
+            f"time.sleep({banner_delay}); "
             "sys.stdout.write('SSH-2.0-fake\\r\\n'); "
             "sys.stdout.flush(); "
             "time.sleep(30)"
@@ -69,20 +78,21 @@ class ProxyShutdownTests(unittest.TestCase):
             '-c',
             child,
         ]))
-        second_recv = threading.Event()
+        reading_after_banner = threading.Event()
         recv_calls = [0]
         original_recv = proxy.recv
 
         def observed_recv(size):
             recv_calls[0] += 1
-            if recv_calls[0] >= 2:
-                second_recv.set()
+            # Signal a read after banner parsing, not a timeout retry while
+            # still waiting for the child to emit its first bytes.
+            if transport.remote_version:
+                reading_after_banner.set()
             return original_recv(size)
 
         proxy.recv = observed_recv
         transport = paramiko.Transport(proxy)
         transport.banner_timeout = 3
-        transport.start_client(event=threading.Event())
 
         class FakeClient:
             def __init__(self, active_transport):
@@ -108,10 +118,14 @@ class ProxyShutdownTests(unittest.TestCase):
 
         session = None
         try:
+            transport.start_client(event=threading.Event())
             self.assertTrue(
-                second_recv.wait(3),
-                (recv_calls[0], transport.is_alive()),
+                reading_after_banner.wait(5),
+                (recv_calls[0], transport.is_alive(),
+                 transport.remote_version, transport.saved_exception,
+                 [record.getMessage() for record in records]),
             )
+            self.assertEqual(transport.remote_version, 'SSH-2.0-fake')
 
             session = Session()
             session._host = 'fake-host'
@@ -127,12 +141,13 @@ class ProxyShutdownTests(unittest.TestCase):
                 transport.saved_exception,
                 ValueError,
             )
-            self.assertFalse(any(
-                record.levelno >= logging.ERROR
+            errors = [
+                record.getMessage() for record in records
+                if record.levelno >= logging.ERROR
                 or 'Unknown exception' in record.getMessage()
                 or 'I/O operation on closed file' in record.getMessage()
-                for record in records
-            ))
+            ]
+            self.assertEqual(errors, [], '\n'.join(errors))
             self.assertIsNotNone(proxy.process.poll())
             self.assertTrue(proxy.process.stdin.closed)
             self.assertTrue(proxy.process.stdout.closed)
