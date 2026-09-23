@@ -1,3 +1,3 @@
 """Single source of the SSHScript package version."""
 
-__version__ = "3.1.2"
+__version__ = "3.1.3"
