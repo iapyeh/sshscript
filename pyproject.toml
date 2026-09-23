@@ -25,7 +25,7 @@ classifiers = [
   "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-  "paramiko>=2.11,<5",
+  "paramiko>=5.0.0,<6",
   "packaging>=21",
 ]
 
