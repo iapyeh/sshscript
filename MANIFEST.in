@@ -1,4 +1,7 @@
 include README.md LICENSE.txt RELEASING.md
+include CHANGELOG.md CONTRIBUTING.md EXCEPTIONS.md SECURITY.md SUPPORT.md
 recursive-include tools *.py
-include .github/workflows/ci.yml
+include tools/setup_openssh_ci.sh
+include .github/dependabot.yml
+recursive-include .github/workflows *.yml
 recursive-include src/sshscript/unittest *.py *.spy

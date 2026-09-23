@@ -10,4 +10,20 @@ From git/, run `sh update_from_src.sh` to synchronize the integrated src tree. T
 
 The default `python -m build` operation builds an sdist and then a wheel from that sdist. Successful verification writes verified.json containing artifact SHA-256 hashes. Keep this file with the two distribution files. CI artifacts are for inspection; select one verified candidate for release.
 
-Publishing is a separate, explicit operation: `python tools/publish_release.py --artifacts /tmp/sshscript-release-UNIQUE --repository testpypi` (or `pypi`). Supply Twine credentials externally, for example TWINE_USERNAME=__token__ and TWINE_PASSWORD through a secret manager. Never put credentials in source files. Upload verifies the hashes and never rebuilds or changes the version. Git push, tags and PyPI upload are independent explicit operations.
+Production publication uses `.github/workflows/release.yml`. Configure the PyPI
+Trusted Publisher for owner `iapyeh`, repository `sshscript`, workflow
+`release.yml`, and GitHub environment `pypi`. Require approval on that
+environment. Pushing an annotated tag that exactly matches
+`v<package-version>` rebuilds, tests, hashes, and attests the distributions.
+The workflow then creates a draft GitHub Release, publishes to PyPI with a
+short-lived OIDC credential, and makes the GitHub Release public only after
+PyPI accepts the verified artifacts. The hash manifest is retained with the
+release assets; build, OpenSSH integration, OIDC publishing, and public-release
+jobs remain separate.
+
+Manual upload remains an emergency-only operation:
+`python tools/publish_release.py --artifacts /tmp/sshscript-release-UNIQUE
+--repository pypi`. Supply credentials through an external secret manager;
+never put credentials in source files. Upload verifies the recorded hashes and
+never rebuilds or changes the version. Branch push, tag creation, GitHub Release
+publication, and PyPI publication are distinct auditable operations.

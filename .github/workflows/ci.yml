@@ -4,6 +4,7 @@ permissions:
   contents: read
 jobs:
   verify:
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -11,8 +12,10 @@ jobs:
         python-version: ['3.11', '3.12', '3.13', '3.14']
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install test and build dependencies
@@ -21,7 +24,62 @@ jobs:
         run: python tools/run_checks.py
       - name: Build and verify installed release
         run: python tools/check_release.py --output '${{ runner.temp }}/verified-artifacts'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sshscript-${{ matrix.os }}-${{ matrix.python-version }}
           path: ${{ runner.temp }}/verified-artifacts/
+
+  openssh-integration:
+    name: OpenSSH integration (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.14']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install test and build dependencies
+        run: python -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine
+      - name: Build and verify wheel
+        run: python tools/check_release.py --output "$RUNNER_TEMP/verified-artifacts"
+      - name: Install verified wheel
+        run: python -m pip install --force-reinstall "$RUNNER_TEMP"/verified-artifacts/*.whl
+      - name: Provision loopback OpenSSH server
+        run: bash tools/setup_openssh_ci.sh "$GITHUB_ENV"
+      - name: Test installed wheel against OpenSSH
+        run: |
+          mkdir -p "$RUNNER_TEMP/openssh-tests"
+          cp src/sshscript/unittest/test_openssh_integration.py "$RUNNER_TEMP/openssh-tests/"
+          cd "$RUNNER_TEMP/openssh-tests"
+          python -I test_openssh_integration.py -v
+      - name: Upload OpenSSH server log
+        if: ${{ failure() && env.SSHSCRIPT_OPENSSH_LOG != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: openssh-log-python-${{ matrix.python-version }}
+          if-no-files-found: warn
+          path: ${{ env.SSHSCRIPT_OPENSSH_LOG }}
+      - name: Remove disposable OpenSSH state
+        if: always()
+        run: |
+          if [[ -n "${SSHSCRIPT_OPENSSH_PID_FILE:-}" && -s "$SSHSCRIPT_OPENSSH_PID_FILE" ]]; then
+            sudo kill "$(cat "$SSHSCRIPT_OPENSSH_PID_FILE")" || true
+          fi
+          if [[ -n "${SSHSCRIPT_OPENSSH_SUDOERS:-}" ]]; then
+            sudo rm -f "$SSHSCRIPT_OPENSSH_SUDOERS"
+          fi
+          if [[ -n "${SSHSCRIPT_OPENSSH_USER:-}" ]]; then
+            sudo userdel -r "$SSHSCRIPT_OPENSSH_USER" 2>/dev/null || true
+          fi
+          if [[ -n "${SSHSCRIPT_OPENSSH_TARGET_USER:-}" ]]; then
+            sudo userdel -r "$SSHSCRIPT_OPENSSH_TARGET_USER" 2>/dev/null || true
+          fi
+          if [[ -n "${SSHSCRIPT_OPENSSH_ROOT:-}" && "$SSHSCRIPT_OPENSSH_ROOT" == "$RUNNER_TEMP"/sshscript-openssh.* ]]; then
+            sudo rm -rf -- "$SSHSCRIPT_OPENSSH_ROOT"
+          fi

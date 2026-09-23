@@ -66,6 +66,9 @@ def run_file(
     showScript=True displays the translated source without executing it.
     The script directory is temporarily on the import path, and .spy imports
     are enabled for the run. The session is closed on completion or error.
+    Cleanup failures raise RuntimeError after an otherwise successful run. If
+    execution already failed, that exception remains primary and receives a
+    cleanup-failure note.
 
     Return 0 on normal completion, or the status passed to $.break(status).
     $.exit(status) raises SSHScriptExit; other execution errors propagate.
@@ -87,6 +90,7 @@ def run_file(
     outcome = 'failed'
     script_exitcode = None
     exception_type = None
+    primary_exception = None
     script_folder = os.path.dirname(absfile)
     inserted_path = False
     logger.debug('Starting script file (path=%s)', absfile)
@@ -116,11 +120,13 @@ def run_file(
         outcome = 'exit'
         raise
     except SSHScriptException as exc:
+        primary_exception = exc
         script_exitcode = exc.errno
         outcome = 'sshscript_error'
         exception_type = type(exc).__name__
         raise
     except BaseException as exc:
+        primary_exception = exc
         outcome = 'error'
         exception_type = type(exc).__name__
         raise
@@ -130,7 +136,7 @@ def run_file(
     finally:
         if inserted_path:
             sys.path.remove(script_folder)
-        session.close()
+        session._close_after_scope(primary_exception)
         logger.debug(
             'Script file finished '
             '(path=%s, outcome=%s, exit_code=%s, '
@@ -151,23 +157,30 @@ def run_script(script,varGlobals=None,showScript=False):
     varGlobals supplies initial names and is copied for execution. showScript=True
     prints the translated source and returns an empty dict without executing it.
     The session is closed on completion or error; execution exceptions propagate.
-    Use Session.run() to execute source in an existing session.
+    Cleanup failures raise RuntimeError after an otherwise successful run. If
+    execution already failed, that exception remains primary and receives a
+    cleanup-failure note. Use Session.run() to execute source in an existing
+    session.
     """
     the_session = Session()
     started_at = time.monotonic()
     outcome = 'failed'
     exception_type = None
+    primary_exception = None
     logger.debug('Starting in-memory script')
     try:
         ## this is a blocking call
         result = the_session.run(script,vars=varGlobals,showScript=showScript)
         outcome = 'completed'
         return result
+    except (SSHScriptBreak, SSHScriptExit):
+        raise
     except BaseException as exc:
+        primary_exception = exc
         exception_type = type(exc).__name__
         raise
     finally:
-        the_session.close()
+        the_session._close_after_scope(primary_exception)
         logger.debug(
             'In-memory script finished '
             '(outcome=%s, exception_type=%s, duration_ms=%d)',

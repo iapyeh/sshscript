@@ -8,6 +8,7 @@ import tempfile
 import traceback
 import tokenize
 import unittest
+from unittest import mock
 import uuid
 
 
@@ -223,6 +224,39 @@ class SpySourceMappingTests(unittest.TestCase):
         self.assertEqual(exception.filename, str(path))
         self.assertEqual(exception.lineno, 1)
         self.assertEqual(exception.text, "with $.unsupported_context():\n")
+
+    def test_internal_translation_error_keeps_runtime_cause_and_source(self):
+        class FailingChanger:
+            def visit(self, tree):
+                node = tree.body[0]
+                raise RuntimeError('AST parent invariant failed')
+
+        with mock.patch.object(
+            dollarparser,
+            'DollarChanger',
+            return_value=FailingChanger(),
+        ):
+            with self.assertRaises(SyntaxError) as caught:
+                dollarparser.parse(
+                    'translation_contract.spy',
+                    'value = 1\n',
+                )
+
+        self.assertEqual(caught.exception.filename, 'translation_contract.spy')
+        self.assertEqual(caught.exception.lineno, 1)
+        self.assertEqual(caught.exception.text, 'value = 1\n')
+        self.assertIsInstance(caught.exception.__cause__, RuntimeError)
+
+    def test_user_assertion_error_is_not_swallowed(self):
+        sources = (
+            "raise AssertionError('plain sentinel')\n",
+            "$true\nraise AssertionError('dollar sentinel')\n",
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                _, exception = self.run_failing_file(source)
+                self.assertIs(type(exception), AssertionError)
+                self.assertIn('sentinel', str(exception))
 
     def test_imported_spy_runtime_error_uses_original_source(self):
         temporary = tempfile.TemporaryDirectory(prefix="sshscript-import-")

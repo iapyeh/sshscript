@@ -216,9 +216,13 @@ class GenericChannel(object):
         with self._lock:
             failure = self._failure
             state = self._state
+            closed = self.closed
 
         if failure is not None:
             raise failure
+
+        if closed or state in ('closing', 'closed'):
+            raise BrokenPipeError('channel is closed')
 
         if state != 'open':
             raise BrokenPipeError(
@@ -1585,9 +1589,8 @@ class GenericChannel(object):
 
     def get_exit_code(self,timeout=60):
         """Request and wait for a shell exit-code marker, bounded by timeout."""
-        
-        if self.closed:
-            raise BrokenPipeError('channel is closed')
+
+        self._raise_if_unusable()
         if self.hijacked:
             raise RuntimeError('cannot get exit code when hijacked')
         deadline = None if timeout in (None, 0) else time.monotonic() + timeout

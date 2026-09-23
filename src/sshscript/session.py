@@ -273,7 +273,9 @@ class Session(object):
     A new Session is local. connect() returns a remote child session; connecting
     from that child tunnels through its SSH connection. Use a with block to
     activate a session for .spy syntax; leaving a remote session context closes
-    it when its last active context exits. A local session remains reusable.
+    it when its last active context exits. A cleanup failure is raised after a
+    successful block, or attached as a note to an exception from the block. A
+    local session remains reusable.
 
     session(command) aliases exec_command() and returns (stdout, stderr).
     Read session.exitcode for the last command status. Use shell() when commands
@@ -510,7 +512,7 @@ class Session(object):
             self.enteringThreads.append(current_thread)
         return self
 
-    def __exit__(self,*args):
+    def __exit__(self, exc_type, exc_value, traceback):
         current_thread = threading.current_thread()
         with self.enteringThreadsLocker:
             idx = listRightIndex(self.enteringThreads, current_thread)
@@ -522,8 +524,28 @@ class Session(object):
             del self.enteringThreads[idx]
             close_remote = not self.enteringThreads and self._client is not None
         if close_remote:
-            self.close()
+            self._close_after_scope(exc_value)
         return False
+
+    def _close_after_scope(self, primary_exception=None):
+        """Close strictly without hiding an exception already being propagated."""
+        try:
+            return self.close(strict=True)
+        except Exception as cleanup_exception:
+            if primary_exception is None:
+                raise
+            primary_exception.add_note(
+                'SSHScript session cleanup also failed: '
+                f'{cleanup_exception}'
+            )
+            self.logger.error(
+                'Session cleanup failed while preserving the primary exception '
+                '(primary_exception_type=%s, cleanup_exception_type=%s)',
+                type(primary_exception).__name__,
+                type(cleanup_exception).__name__,
+                exc_info=True,
+            )
+            return False
 
     @property    
     @export2Dollar
@@ -768,8 +790,11 @@ class Session(object):
                                    stat.S_ISDIR(destination_stat.st_mode)):
             dst = posixpath.join(dst, os.path.basename(src))
 
-        logger.info('Starting upload (host=%s, source=%s, destination=%s)',
-                    self.host, src, dst)
+        logger.info(
+            'Starting upload (overwrite=%s, create_directories=%s)',
+            overwrite,
+            makedirs,
+        )
         if makedirs:
             missing = []
             parent = posixpath.dirname(dst)
@@ -815,12 +840,7 @@ class Session(object):
                 remote_size = sftp.stat(dst).st_size
                 if remote_size != size:
                     raise IOError(f'size mismatch in upload: {remote_size} != {size}')
-        logger.info(
-            'Upload completed (host=%s, source=%s, destination=%s)',
-            self.host,
-            src,
-            dst,
-        )
+        logger.info('Upload completed')
         return (src,dst)
 
     @export2Dollar
@@ -848,21 +868,11 @@ class Session(object):
         if os.path.isdir(dst):
             dst = os.path.join(dst,os.path.basename(src))
 
-        logger.info(
-            'Starting download (host=%s, source=%s, destination=%s)',
-            self.host,
-            src,
-            dst,
-        )
+        logger.info('Starting download')
         
         self.sftp.get(src,dst)
         
-        logger.info(
-            'Download completed (host=%s, source=%s, destination=%s)',
-            self.host,
-            src,
-            dst,
-        )
+        logger.info('Download completed')
         return (src,dst)
 
     def _socket_of_proxy_command(self, argsOfProxyCommand):
@@ -1108,11 +1118,11 @@ class Session(object):
             command = 'bash -i'
         if not isinstance(command, str):
             raise TypeError('command must be str')
+        if '\n' in command or '\r' in command:
+            raise ValueError('persistent command must be a single line')
         command = command.strip()
         if not command:
             raise ValueError('command must not be empty')
-        if '\n' in command:
-            raise ValueError('persistent command must be a single line')
 
         if isinstance(self._lastDollar,ConsoleWrapper) and not self._lastDollar.channel.closed:
             ## inner with
@@ -1135,6 +1145,8 @@ class Session(object):
         shell=False starts su directly. get_pty requests a PTY.
         The SSH connection account, including SFTP permissions, is unchanged.
         """
+        if get_pty is not None and not isinstance(get_pty, bool):
+            raise TypeError('get_pty must be None or bool')
         command = SuConsole.get_command(self,username,login,get_pty)
         if shell:
             self.shell(None,get_pty=get_pty)
@@ -1154,6 +1166,8 @@ class Session(object):
         shell=False starts sudo directly. get_pty requests a PTY.
         File transfers still use the original SSH connection account.
         """
+        if get_pty is not None and not isinstance(get_pty, bool):
+            raise TypeError('get_pty must be None or bool')
         command=SudoConsole.get_command(self,username,login)
         if shell:
             self.shell(None,get_pty=get_pty)
@@ -1181,6 +1195,15 @@ class Session(object):
         no exit text. shell=True starts a base shell; False starts the command
         directly. get_pty requests a PTY.
         """
+        if not isinstance(command, str):
+            raise TypeError('command must be str')
+        if '\n' in command or '\r' in command:
+            raise ValueError('persistent command must be a single line')
+        command = command.strip()
+        if not command:
+            raise ValueError('command must not be empty')
+        if get_pty is not None and not isinstance(get_pty, bool):
+            raise TypeError('get_pty must be None or bool')
         if shell:
             self.shell(None,get_pty=get_pty)
             self._lastDollar = ConsoleWrapper(self._lastDollar,'enter',command,expect=expect,password=password,exit=exit,prompt=prompt)

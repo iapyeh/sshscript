@@ -164,6 +164,66 @@ class LoggerIntegrationTests(unittest.TestCase):
                     makedirs=True,
                 )
 
+    def test_transfer_info_logs_do_not_disclose_host_or_paths(self):
+        class SFTP:
+            def stat(self, path):
+                raise FileNotFoundError(path)
+
+            def put(self, source, destination):
+                self.uploaded = Path(source).read_bytes()
+
+            def get(self, source, destination):
+                Path(destination).write_bytes(b'downloaded')
+
+            def close(self):
+                pass
+
+        class SSHClient:
+            class Transport:
+                def is_active(self):
+                    return True
+
+            def get_transport(self):
+                return self.Transport()
+
+            def close(self):
+                pass
+
+        capture = self.capture_sshscript_logs()
+        session = Session()
+        session._host = 'private-host.example.invalid'
+        session._port = 22
+        session._username = 'private-user'
+        session._client = SSHClient()
+        session._sftp = SFTP()
+        self.addCleanup(session.close)
+
+        with tempfile.TemporaryDirectory(
+            prefix='sshscript-private-transfer-'
+        ) as folder:
+            source = Path(folder) / 'private-source-name.txt'
+            destination = Path(folder) / 'private-download-name.txt'
+            source.write_text('content', encoding='utf-8')
+            remote_upload = '/private/remote/upload-name.txt'
+            remote_download = '/private/remote/download-name.txt'
+
+            session.upload(str(source), remote_upload)
+            session.download(remote_download, str(destination))
+            logs = capture.getvalue()
+
+        self.assertIn('Starting upload', logs)
+        self.assertIn('Upload completed', logs)
+        self.assertIn('Starting download', logs)
+        self.assertIn('Download completed', logs)
+        for private_value in (
+            session.host,
+            str(source),
+            str(destination),
+            remote_upload,
+            remote_download,
+        ):
+            self.assertNotIn(private_value, logs)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

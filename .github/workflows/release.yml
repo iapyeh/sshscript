@@ -1,0 +1,214 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Verify and attest release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - name: Install pinned build dependencies
+        run: >-
+          python -m pip install
+          'paramiko>=2.11,<5' 'packaging>=21'
+          'build==1.6.1' 'twine==7.0.0'
+      - name: Verify tag targets the current release branch
+        run: |
+          git fetch --no-tags --depth=1 origin release
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)"
+      - name: Verify tag and package version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          PACKAGE_VERSION=$(python -c "import runpy; print(runpy.run_path('src/sshscript/_version.py')['__version__'])")
+          test "$RELEASE_TAG" = "v$PACKAGE_VERSION"
+      - name: Stabilize build timestamps
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+      - name: Run release gates and build verified artifacts
+        run: |
+          python tools/run_checks.py
+          python tools/check_release.py --output "$RUNNER_TEMP/sshscript-release"
+      - name: Attest wheel and source distribution
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: |
+            ${{ runner.temp }}/sshscript-release/*.whl
+            ${{ runner.temp }}/sshscript-release/*.tar.gz
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: python-package-distributions
+          if-no-files-found: error
+          path: ${{ runner.temp }}/sshscript-release/
+
+  openssh-integration:
+    name: Release OpenSSH integration (Python ${{ matrix.python-version }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.14']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: python-package-distributions
+          path: dist
+      - name: Install verified wheel
+        run: python -m pip install dist/*.whl
+      - name: Provision loopback OpenSSH server
+        run: bash tools/setup_openssh_ci.sh "$GITHUB_ENV"
+      - name: Test installed wheel against OpenSSH
+        run: |
+          mkdir -p "$RUNNER_TEMP/openssh-tests"
+          cp src/sshscript/unittest/test_openssh_integration.py "$RUNNER_TEMP/openssh-tests/"
+          cd "$RUNNER_TEMP/openssh-tests"
+          python -I test_openssh_integration.py -v
+      - name: Upload OpenSSH server log
+        if: ${{ failure() && env.SSHSCRIPT_OPENSSH_LOG != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-openssh-log-python-${{ matrix.python-version }}
+          if-no-files-found: warn
+          path: ${{ env.SSHSCRIPT_OPENSSH_LOG }}
+      - name: Remove disposable OpenSSH state
+        if: always()
+        run: |
+          if [[ -n "${SSHSCRIPT_OPENSSH_PID_FILE:-}" && -s "$SSHSCRIPT_OPENSSH_PID_FILE" ]]; then
+            sudo kill "$(cat "$SSHSCRIPT_OPENSSH_PID_FILE")" || true
+          fi
+          if [[ -n "${SSHSCRIPT_OPENSSH_SUDOERS:-}" ]]; then
+            sudo rm -f "$SSHSCRIPT_OPENSSH_SUDOERS"
+          fi
+          if [[ -n "${SSHSCRIPT_OPENSSH_USER:-}" ]]; then
+            sudo userdel -r "$SSHSCRIPT_OPENSSH_USER" 2>/dev/null || true
+          fi
+          if [[ -n "${SSHSCRIPT_OPENSSH_TARGET_USER:-}" ]]; then
+            sudo userdel -r "$SSHSCRIPT_OPENSSH_TARGET_USER" 2>/dev/null || true
+          fi
+          if [[ -n "${SSHSCRIPT_OPENSSH_ROOT:-}" && "$SSHSCRIPT_OPENSSH_ROOT" == "$RUNNER_TEMP"/sshscript-openssh.* ]]; then
+            sudo rm -rf -- "$SSHSCRIPT_OPENSSH_ROOT"
+          fi
+
+  draft-github-release:
+    name: Create draft GitHub Release
+    needs: [build, openssh-integration]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: python-package-distributions
+          path: dist
+      - name: Verify artifact hashes
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("dist")
+          manifest = json.loads((root / "verified.json").read_text())
+          if len(manifest) != 2:
+              raise SystemExit("expected exactly two verified distributions")
+          for name, expected in manifest.items():
+              if Path(name).name != name:
+                  raise SystemExit(f"invalid distribution name: {name}")
+              actual = hashlib.sha256((root / name).read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"artifact hash mismatch: {name}")
+          PY
+      - name: Create immutable draft with verified assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: >-
+          gh release create "$RELEASE_TAG"
+          dist/*.whl dist/*.tar.gz dist/verified.json
+          --repo "$GITHUB_REPOSITORY"
+          --verify-tag --draft --generate-notes
+          --title "SSHScript ${RELEASE_TAG#v}"
+
+  publish-to-pypi:
+    name: Publish distributions to PyPI
+    needs: draft-github-release
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/sshscript
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: python-package-distributions
+          path: dist
+      - name: Recheck hashes and isolate distributions
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("dist")
+          manifest = json.loads((root / "verified.json").read_text())
+          if len(manifest) != 2:
+              raise SystemExit("expected exactly two verified distributions")
+          publish = Path("publish")
+          publish.mkdir()
+          for name, expected in manifest.items():
+              if Path(name).name != name:
+                  raise SystemExit(f"invalid distribution name: {name}")
+              source = root / name
+              actual = hashlib.sha256(source.read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"artifact hash mismatch: {name}")
+              (publish / name).write_bytes(source.read_bytes())
+          PY
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          packages-dir: publish/
+
+  publish-github-release:
+    name: Publish GitHub Release
+    needs: publish-to-pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the verified draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false

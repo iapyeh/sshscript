@@ -58,11 +58,11 @@ class Dollar(object):
             raise TypeError('for_with must be bool')
         if not isinstance(command, str):
             raise TypeError('command must be str')
+        if for_with and ('\n' in command or '\r' in command):
+            raise ValueError('persistent command must be a single line')
         command = command.strip()
         if not command:
             raise ValueError('command must not be empty')
-        if for_with and '\n' in command:
-            raise ValueError('persistent command must be a single line')
         self.for_with = for_with
 
         self.command = command
@@ -285,7 +285,7 @@ class Dollar(object):
         env.update(kw.get('env',{}))
 
         if self.for_with:
-            if '\n' in self.command:
+            if '\n' in self.command or '\r' in self.command:
                 raise ValueError('persistent command must be a single line')
             cpargs = shlex.split(self.command)
             summary = command_summary(cpargs)

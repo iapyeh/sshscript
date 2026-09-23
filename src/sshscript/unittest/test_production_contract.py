@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from channelgeneric import GenericChannel
+from channelsubprocess import POpenChannel
 from dollar import Dollar
 from errorutils import SSHScriptException
 from patching import SshscriptStack
@@ -117,6 +118,64 @@ class ProductionContractTests(unittest.TestCase):
             run.assert_not_called()
             thread.assert_not_called()
 
+    def test_parent_pty_and_descriptor_types(self):
+        for value in (1, 'parent', object()):
+            self.exact_error(
+                TypeError,
+                'parent must be Session',
+                lambda value=value: Session(value),
+            )
+
+        session = Session()
+        self.addCleanup(session.close)
+        for value in (1, 'yes', [], {}):
+            for call in (
+                lambda value=value: session.su('nobody', get_pty=value),
+                lambda value=value: session.sudo(get_pty=value),
+                lambda value=value: session.enter('python3', get_pty=value),
+            ):
+                self.exact_error(TypeError, 'get_pty', call)
+
+        with patch(
+            'channelsubprocess.GenericChannel.__init__',
+            return_value=None,
+        ) as channel_init:
+            process = object()
+            for value in (1, 'yes', [], {}):
+                self.exact_error(
+                    TypeError,
+                    'get_pty must be None or bool',
+                    lambda value=value: POpenChannel(
+                        None, process, [], None, [], value
+                    ),
+                )
+            self.exact_error(
+                TypeError,
+                'stdouterr must be list',
+                lambda: POpenChannel(
+                    None, process, (1,), None, [], True
+                ),
+            )
+            for get_pty, descriptors in (
+                (True, []),
+                (True, [1, 2]),
+                (False, []),
+                (False, [1]),
+            ):
+                self.exact_error(
+                    ValueError,
+                    'descriptor',
+                    lambda get_pty=get_pty, descriptors=descriptors: POpenChannel(
+                        None, process, descriptors, None, [], get_pty
+                    ),
+                )
+            channel_init.assert_not_called()
+            channel = POpenChannel(
+                None, process, [1, 2], None, [], None
+            )
+            self.assertIs(channel.get_pty, False)
+            channel_init.assert_called_once_with(None)
+
     def test_buffers_and_patterns_validate_before_mutation(self):
         ch = self.channel()
         buf = ch._stdout
@@ -125,6 +184,14 @@ class ProductionContractTests(unittest.TestCase):
         buf.set_callback(callback, 'marker')
         for value in (b'bad', 1, None):
             self.exact_error(TypeError, 'must be str', lambda: buf.append(value))
+        self.exact_error(TypeError, 'output item', lambda: buf.__setitem__(0, 1))
+        self.assertEqual(str(buf), 'original')
+        for value in (["not", "text"], 1, object()):
+            self.exact_error(
+                TypeError,
+                'initial output',
+                lambda value=value: SSHScriptStdout(value),
+            )
         self.exact_error(TypeError, 'pattern', lambda: buf.set_callback(None, re.compile(b'x')))
         self.assertIs(buf.callback, callback)
         self.assertEqual(buf.callback_pattern, 'marker')
@@ -160,12 +227,21 @@ class ProductionContractTests(unittest.TestCase):
 
     def test_closed_and_hijacked_channel_exceptions(self):
         ch = self.channel()
+        ch._set_open()
         ch.hijack(True)
         self.exact_error(RuntimeError, 'hijacked', ch.get_exit_code)
         self.exact_error(RuntimeError, 'hijacked', lambda: GenericChannel.send_line(ch, 'echo ok'))
         ch.hijack(False)
-        ch.closed = True
+        ch._finish_close()
         self.exact_error(BrokenPipeError, 'closed', ch.get_exit_code)
+
+        failed = self.channel()
+        failed._set_open()
+        failure = ConnectionError('transport failed')
+        failed.fail(failure)
+        with self.assertRaises(ConnectionError) as caught:
+            failed.get_exit_code()
+        self.assertIs(caught.exception, failure)
         buf = self.buffer()
         buf.close()
         self.exact_error(BrokenPipeError, 'closed', lambda: buf.append('x'))
@@ -179,4 +255,117 @@ class ProductionContractTests(unittest.TestCase):
             self.exact_error(TypeError, 'command must be str', lambda: session.shell(command=1))
             self.exact_error(ValueError, 'empty', lambda: session.shell(command=' '))
             self.exact_error(ValueError, 'single line', lambda: session.shell(command='bash\nsh'))
+            self.exact_error(ValueError, 'single line', lambda: session.shell(command='bash\rsh'))
             dollar.assert_not_called()
+
+    def test_all_persistent_command_entry_points_validate_first(self):
+        session = Session()
+        self.addCleanup(session.close)
+        for value in (None, 1, [], {}):
+            self.exact_error(
+                TypeError,
+                'command must be str',
+                lambda value=value: session.enter(value),
+            )
+        for value in ('', '   '):
+            self.exact_error(
+                ValueError,
+                'empty',
+                lambda value=value: session.enter(value),
+            )
+        for value in ('python3\n-i', 'python3\r-i'):
+            self.exact_error(
+                ValueError,
+                'single line',
+                lambda value=value: session.enter(value),
+            )
+
+        class Console:
+            channel = object()
+
+        from sessionwrapper import SessionWrapper
+        wrapper = SessionWrapper(Console())
+        for value in (None, 1, [], {}):
+            self.exact_error(
+                TypeError,
+                'command must be str',
+                lambda value=value: wrapper.enter(value),
+            )
+        for value in ('', '   '):
+            self.exact_error(
+                ValueError,
+                'empty',
+                lambda value=value: wrapper.enter(value),
+            )
+            self.exact_error(
+                ValueError,
+                'empty',
+                lambda value=value: wrapper.shell(value),
+            )
+        for value in ('bash\nsh', 'bash\rsh'):
+            self.exact_error(
+                ValueError,
+                'single line',
+                lambda value=value: wrapper.shell(value),
+            )
+            self.exact_error(
+                ValueError,
+                'single line',
+                lambda value=value: wrapper.enter(value),
+            )
+        for value in (1, [], {}, True):
+            for call in (
+                lambda value=value: wrapper.su('nobody', command=value),
+                lambda value=value: wrapper.sudo('secret', command=value),
+            ):
+                self.exact_error(TypeError, 'command must be str', call)
+        for value in ('', '   '):
+            for call in (
+                lambda value=value: wrapper.su('nobody', command=value),
+                lambda value=value: wrapper.sudo('secret', command=value),
+            ):
+                self.exact_error(ValueError, 'empty', call)
+        for value in ('su\nsh', 'sudo\rsh'):
+            for call in (
+                lambda value=value: wrapper.su('nobody', command=value),
+                lambda value=value: wrapper.sudo('secret', command=value),
+            ):
+                self.exact_error(ValueError, 'single line', call)
+        for value in (1, 'yes', [], {}):
+            for call in (
+                lambda value=value: wrapper.su('nobody', get_pty=value),
+                lambda value=value: wrapper.sudo('secret', get_pty=value),
+                lambda value=value: wrapper.enter('python3', get_pty=value),
+            ):
+                self.exact_error(TypeError, 'get_pty', call)
+
+    def test_ast_parent_mismatches_are_runtime_errors(self):
+        import ast
+        from dollarchanger import DollarChanger
+
+        changer = DollarChanger()
+        changer.currentExpr = ast.parse('different()').body[0]
+        call = ast.parse(
+            "_sshscript_in_context_.connect('host')"
+        ).body[0].value
+        self.exact_error(
+            RuntimeError,
+            'AST parent content',
+            lambda: changer.generic_visit(call),
+        )
+
+        changer = DollarChanger()
+        current = ast.parse(
+            "_sshscript_in_context_.connect('host')"
+        ).body[0]
+        current.parent = ast.If(
+            test=ast.Constant(value=True),
+            body=[],
+            orelse=[],
+        )
+        changer.currentExpr = current
+        self.exact_error(
+            RuntimeError,
+            'parent body',
+            lambda: changer.generic_visit(current.value),
+        )
