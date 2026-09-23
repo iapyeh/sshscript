@@ -1,5 +1,8 @@
 # SSHScript
 
+[![CI](https://github.com/iapyeh/sshscript/actions/workflows/ci.yml/badge.svg?branch=release)](https://github.com/iapyeh/sshscript/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml/badge.svg?branch=release)](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml)
+
 SSHScript is a Python automation library and `.spy` script runner for executing
 commands locally or over SSH. It provides a regular Python `Session` API and a
 compact dollar syntax for automation scripts.
@@ -30,9 +33,10 @@ python3 tools/run_checks.py
 python3 tools/check_release.py --output /tmp/sshscript-candidate-UNIQUE
 ```
 
-See [RELEASING.md](RELEASING.md) for synchronization and publishing. The v3.1
-source on the release branch is beta; a GitHub source update does not publish
-a new version to PyPI. See the [v3.1 documentation](https://iapyeh.github.io/sshscript/v3a/).
+See [RELEASING.md](RELEASING.md) for synchronization and publishing. SSHScript
+3.1 is the supported production line; a GitHub source update does not by itself
+publish a new version to PyPI. See the
+[v3.1 documentation](https://iapyeh.github.io/sshscript/v3a/).
 
 ## Python API
 
@@ -102,11 +106,15 @@ defaults and values explicitly supplied through `env={...}` are sent.
 The canonical credential-free release gate is:
 
 ```sh
-python3 -m unittest discover -v -s unittest -p 'test_*.py'
+python3 tools/run_checks.py
 ```
 
-It includes unit tests and localhost integration tests and requires no SSH
-credentials. The `.spy` language smoke suite can also be run directly:
+It includes normal and optimized unit tests, compile checks, the package assert
+scan, and the `.spy` language smoke suite. Public CI additionally provisions a
+disposable loopback OpenSSH server to validate real SSH, SFTP, host-key, PTY,
+sudo/su and timeout behavior against the built wheel.
+
+The `.spy` language smoke suite can also be run directly:
 
 ```sh
 python3 sshscript.py unittest/dollar_syntax.spy
@@ -118,11 +126,15 @@ running them.
 
 ## Project status
 
-Version 3.1 is beta software. Public behavior is covered by the credential-free
-test suite, while real SSH behavior should additionally be validated in an
-isolated test environment before production rollout.
+Version 3.1 is production/stable software. Public behavior is covered by the
+credential-free release gates and isolated OpenSSH integration CI. Operators
+should still validate site-specific PAM, sudoers, network and host-key policy in
+a disposable environment before production rollout.
 
 SSHScript is released under the MIT License.
+See [SUPPORT.md](SUPPORT.md), [SECURITY.md](SECURITY.md),
+[CONTRIBUTING.md](CONTRIBUTING.md), and [CHANGELOG.md](CHANGELOG.md) for project
+policies and release history.
 
 ## Production exception contract
 

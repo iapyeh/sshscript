@@ -171,6 +171,16 @@ class SessionWrapper(object):
         initials contains setup commands. shell/get_pty are compatibility placeholders;
         they do not replace or reconfigure the existing channel.
         """
+        if get_pty is not None and not isinstance(get_pty, bool):
+            raise TypeError('get_pty must be None or bool')
+        if command is not None and command is not False:
+            if not isinstance(command, str):
+                raise TypeError('command must be str, False, or None')
+            if '\n' in command or '\r' in command:
+                raise ValueError('persistent command must be a single line')
+            command = command.strip()
+            if not command:
+                raise ValueError('command must not be empty')
         ## when localhost is ubuntu, pty is required for su to send password
         return SuConsole(self,username,password,expect=expect,initials=initials,command=command,login=login)
     #sudo(self,password=None,expect=None,initials=None,shell:bool=True,login=True,username=None,get_pty=True):
@@ -180,6 +190,16 @@ class SessionWrapper(object):
         initials contains setup commands. shell/get_pty are compatibility placeholders;
         SFTP operations retain the SSH connection account's permissions.
         """
+        if get_pty is not None and not isinstance(get_pty, bool):
+            raise TypeError('get_pty must be None or bool')
+        if command is not None and command is not False:
+            if not isinstance(command, str):
+                raise TypeError('command must be str, False, or None')
+            if '\n' in command or '\r' in command:
+                raise ValueError('persistent command must be a single line')
+            command = command.strip()
+            if not command:
+                raise ValueError('command must not be empty')
         return SudoConsole(self,password,username=username,expect=expect,initials=initials,command=command,login=login)
 
     def enter(self,command,expect=None,password=None,exit=None,shell=None,get_pty=None,prompt=None):
@@ -189,7 +209,15 @@ class SessionWrapper(object):
         exit is text to send on leaving (None sends nothing). shell/get_pty are
         compatibility placeholders for an already established channel.
         """
-
+        if not isinstance(command, str):
+            raise TypeError('command must be str')
+        if '\n' in command or '\r' in command:
+            raise ValueError('persistent command must be a single line')
+        command = command.strip()
+        if not command:
+            raise ValueError('command must not be empty')
+        if get_pty is not None and not isinstance(get_pty, bool):
+            raise TypeError('get_pty must be None or bool')
         return EnterConsole(self,command,expect=expect,password=password,exit=exit,prompt=prompt)
 
     ## $sh      => with _sshscriptstack_[-1].shell(' sh ') 
@@ -198,23 +226,25 @@ class SessionWrapper(object):
     def shell(self,*args,**kw):
         """Enter a nested shell on the existing channel; return a ShellConsole context."""
         if len(args) == 0:
-            command = ''
+            command = 'bash'
         else:
             command = args[0]
             args = args[1:]
 
         ## ShellConsole with command=False
-        if not isinstance(command, (str, bool)):
-            raise TypeError('command must be str or bool')
-        if command == False:
+        if command is False:
             return ShellConsole(self,False,*args,**kw)
-        elif command == '':
-            return ShellConsole(self,'bash',*args,**kw)
-        elif command_is_shell(command):
+        if not isinstance(command, str):
+            raise TypeError('command must be str or False')
+        if '\n' in command or '\r' in command:
+            raise ValueError('persistent command must be a single line')
+        command = command.strip()
+        if not command:
+            raise ValueError('command must not be empty')
+        if command_is_shell(command):
             ## this command is a kind of shell
             return ShellConsole(self,command,*args,**kw)
-        else:
-            raise ValueError(f'command "{command}" is not a shell, maybe you want to use $.enter("{command}") instead') 
+        raise ValueError(f'command "{command}" is not a shell, maybe you want to use $.enter("{command}") instead')
     def set_prompt(self,prompt):
         self.channel.prompt = prompt
         self.channel._stdout.callback_pattern = prompt

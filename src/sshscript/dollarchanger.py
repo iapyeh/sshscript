@@ -309,7 +309,9 @@ class DollarChanger(ast.NodeTransformer):
             ## if self.currentExpr is a ast.Expr they should the same
             ## if self.currentExpr is a ast.Assign nodeContent should be included in the parentContent
             if not ((parentContent == nodeContent) or parentContent.find(nodeContent) != -1):
-                raise ValueError(f'"{parentContent}" not same as "{nodeContent}"')
+                raise RuntimeError(
+                    'AST parent content does not contain node content'
+                )
 
             if isinstance(self.currentExpr,ast.Assign):
                 ## nodeToInsert is a ast.Assign
@@ -329,10 +331,15 @@ class DollarChanger(ast.NodeTransformer):
             parentNode = self.currentExpr
             try:
                 idx = box.body.index(parentNode)
-            except ValueError:
+            except ValueError as parent_error:
                 if isinstance(box, ast.If):
                     ## search "else"
-                    idx = box.orelse.index(parentNode)
+                    try:
+                        idx = box.orelse.index(parentNode)
+                    except ValueError as else_error:
+                        raise RuntimeError(
+                            'AST expression is not present in its parent body'
+                        ) from else_error
                     if isinstance(self.currentExpr,ast.Return):
                         """
                         case like:
@@ -350,7 +357,9 @@ class DollarChanger(ast.NodeTransformer):
                     else:
                         pass
                 else:
-                    raise
+                    raise RuntimeError(
+                        'AST expression is not present in its parent body'
+                    ) from parent_error
             else:
                 if isinstance(self.currentExpr,ast.Return):
                     ## case like:

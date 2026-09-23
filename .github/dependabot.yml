@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    target-branch: release
+    schedule:
+      interval: weekly
+    groups:
+      python-patch-and-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: release
+    schedule:
+      interval: weekly
+    groups:
+      actions-patch-and-minor:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+          - minor

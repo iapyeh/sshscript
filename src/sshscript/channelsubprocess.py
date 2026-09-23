@@ -46,9 +46,19 @@ class POpenChannel(GenericChannel):
         stdouterr supplies separate stdout/stderr descriptors, or one merged
         descriptor in PTY mode. get_pty describes the transport mode.
         """
+        if get_pty is not None and not isinstance(get_pty, bool):
+            raise TypeError('get_pty must be None or bool')
+        normalized_get_pty = False if get_pty is None else get_pty
+        if cp:
+            if not isinstance(stdouterr, list):
+                raise TypeError('stdouterr must be list')
+            if normalized_get_pty and len(stdouterr) != 1:
+                raise ValueError('PTY channel must have exactly one merged output descriptor')
+            if not normalized_get_pty and len(stdouterr) != 2:
+                raise ValueError('non-PTY channel must have stdout and stderr descriptors')
         super(POpenChannel,self).__init__(owner)
         self.prefixOfLog = "[POpen]"
-        self.get_pty = get_pty
+        self.get_pty = normalized_get_pty
         self.cp = cp
         self.stdouterr = stdouterr
         self.stdin = stdin
@@ -57,15 +67,6 @@ class POpenChannel(GenericChannel):
         #if self.cp:
         #    assert isinstance(self.stdouterr,list) and len(self.stdouterr)==2, f'standard output and error should be in a list of 2 elements, but got {self.stdouterr}'
         #    #self._dumpThread.start()
-        if self.cp:
-            if not isinstance(self.stdouterr, list):
-                raise TypeError('stdouterr must be list')
-            if self.get_pty:
-                if not (len(self.stdouterr) == 1):
-                    raise ValueError('PTY channel must have exactly one merged output descriptor')
-            else:
-                if not (len(self.stdouterr) == 2):
-                    raise ValueError('non-PTY channel must have stdout and stderr descriptors')
     async def _start_reading(self):  
         #asyncio.create_task(self._dumpThread.start())
         if self.cp is None:

@@ -144,8 +144,9 @@ class DequeString(str):
         '__getitem__', 'size', '__setitem__', '__contains__', 'splitlines',
     }
     def __new__(cls,initial=None, maxlen=None):
-        initial = ''.join([str(x) for x in initial]) if initial else None
-        value = "" if initial is None else str(initial)  
+        if initial is not None and not isinstance(initial, str):
+            raise TypeError('initial output must be str or None')
+        value = "" if initial is None else str(initial)
         return super().__new__(cls, value)
     def __init__(self, initial=None,maxlen=None):
         if maxlen is None: maxlen = self.__class__.maxlen
@@ -166,7 +167,7 @@ class DequeString(str):
             self._deque = deque(maxlen=maxlen)
             self._deque.append(initial)
         else:
-            raise ValueError('initial value should be string')
+            raise TypeError('initial output must be str or None')
         self._lock = threading.Lock()
         self._condition = threading.Condition(self._lock)
         
@@ -197,6 +198,8 @@ class DequeString(str):
         return self._deque.__getitem__(idx)
     
     def __setitem__(self, idx, value):
+        if not isinstance(value, str):
+            raise TypeError('output item must be str')
         return self._deque.__setitem__(idx,value)
     
     def size(self):
