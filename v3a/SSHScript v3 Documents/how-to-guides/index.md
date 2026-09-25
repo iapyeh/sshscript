@@ -21,6 +21,6 @@ Use these task-oriented pages after completing the quickstart.
 | [Uploading and Downloading Files]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Advanced/file-transfer/) | Available |
 | [Streaming and Looping Output]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Advanced/looping-output/) | Available |
 | [Concurrency and Threading]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Advanced/threading/) | Available |
-| [CLI and Script Composition](cli-and-script-composition/) | Placeholder |
+| [CLI and Script Composition](cli-and-script-composition/) | Complete |
 
-Last Updated: 2026-09-19 13:20:55
+Last Updated: 2026-09-25 16:37:52

@@ -13,10 +13,10 @@ workflow.
 
 ## Install SSHScript
 
-SSHScript v3.1 requires Python 3.11 or newer. It is currently beta source and
-is not the version installed by an unqualified PyPI command. Complete
+SSHScript v3.1 requires Python 3.11 or newer. Version 3.1.4 is the current
+Production/Stable release on PyPI. Complete
 [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/)
-and confirm that both the CLI and Python import report `3.1.0` before using
+and confirm that both the CLI and Python import report `3.1.4` before using
 this tutorial.
 
 ## Execute a local command
@@ -173,8 +173,9 @@ The CLI runs exactly one regular Python or `.spy` file:
 sshscript maintenance.spy
 ```
 
-Larger programs use imports or include syntax rather than multiple CLI
-paths. See [CLI and Environment Variables](../cli-and-environment/).
+Larger programs use ordinary Python imports, including scoped peer `.spy`
+imports where necessary, rather than multiple CLI paths. See
+[CLI and Environment Variables](../cli-and-environment/).
 
 ## Optional Dollar syntax
 
@@ -190,4 +191,4 @@ In v3.1, one `$` handles both direct commands and shell features. The former
 `$$` form is deprecated. See the [Dollar Syntax Reference](../Basic/dollar/)
 if this notation suits the project.
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-25 16:37:52

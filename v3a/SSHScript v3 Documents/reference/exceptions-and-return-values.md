@@ -8,8 +8,8 @@ permalink: /v3a/reference/exceptions-and-return-values/
 
 # Exceptions and Return Values
 
-This contract describes the v3.1 development implementation and applies in both
-normal Python and `python -O`.
+This contract describes the supported v3.1 Production/Stable implementation,
+verified with 3.1.4, and applies in both normal Python and `python -O`.
 
 ## Exception matrix
 
@@ -63,4 +63,4 @@ not alter their associated state.
 See [Session and Console API Reference](../session-and-console-api/) for
 operation signatures and cleanup details.
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-24 15:36:45

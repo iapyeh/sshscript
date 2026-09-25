@@ -7,6 +7,8 @@
   - 第二層類別頁使用 `parent: "SSHScript v3.1 Documentation"` 與
     `has_children: true`。若頁面已自行列出文章表格，另設
     `has_toc: false`，避免 Just the Docs 在頁尾重複產生 child-page TOC。
+    若類別目前只有隱藏的 Placeholder 文章，暫設 `has_children: false`，
+    以免 sidebar 顯示可展開但沒有可見子項目的空節點。
   - 第三層文章使用類別名稱作為 `parent`，並以
     `grand_parent: "SSHScript v3.1 Documentation"` 指向根節點。
   - `nav_order` 在同一層內必須唯一且連續。
@@ -18,6 +20,14 @@
   顯示於 sidebar 或搜尋結果。
 - 尚未完成的規劃文章仍建立 `.md`，並在標題下清楚標示
   `Documentation status: Placeholder`；類別索引也必須標出其狀態。
+  Placeholder 文章在完成前設為 `nav_exclude: true` 與
+  `search_exclude: true`，保留原始碼與類別索引連結，但不出現在 sidebar
+  或搜尋結果。
+- `Example Gallery` 採開放式、append-only 結構：每個新案例建立獨立
+  `.md`，直接以 `parent: "Example Gallery"` 掛在 Gallery 下，並使用新的
+  連續 `nav_order`。既有案例不得因分類擴充而搬移或改網址；主索引以表格
+  按主題整理案例。每個案例都必須說明安全標籤、前置條件、完整程式、
+  預期結果、失敗邊界、驗證、rollback 與 cleanup。
 - 每篇公開 `.md` 以第一個 H1 作為頁面顯示標題，且應與 front matter 的
   `title` 一致。
 - 每篇公開 `.md` 最後一行保留 `Last Updated: YYYY-MM-DD HH:MM:SS`，並讓
@@ -25,3 +35,7 @@
 - 發布前必須以 `git add -A -- v3a` 納入新增頁面；不可只使用
   `git add -u`，因為它不會追蹤新建立的章節與文章，會造成 sidebar parent
   缺頁及站內連結 404。
+- 發布前在 repository 根目錄執行
+  `python3 tools/check_docs.py --check-mtime` 與 `git diff --check`。
+  Pull request 與 push 另以不檢查 mtime 的模式執行文件驗證（Git checkout
+  不保留檔案 mtime），並必須通過 Jekyll build，才可視為可發布。

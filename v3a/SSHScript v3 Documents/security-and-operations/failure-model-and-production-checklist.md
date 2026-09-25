@@ -255,7 +255,7 @@ controlled diagnostic environment, and review all output before sharing it.
 
 ### Version and deployment
 
-- [ ] The installed version is explicitly verified as `3.1.0`.
+- [ ] The installed version is explicitly verified as `3.1.4`.
 - [ ] Python and dependency versions are pinned or otherwise reproducible.
 - [ ] The credential-free test gate passes in the deployment artifact.
 - [ ] Real SSH behavior is tested against an isolated representative host.
@@ -303,4 +303,4 @@ failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-24 15:36:45

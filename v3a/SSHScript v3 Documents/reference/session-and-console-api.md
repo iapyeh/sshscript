@@ -8,9 +8,10 @@ permalink: /v3a/reference/session-and-console-api/
 
 # Session and Console API Reference
 
-This page defines the supported core Session and Console API for SSHScript
-v3.1 beta. Examples that teach a workflow belong in the tutorials and how-to
-guides; this page focuses on signatures, results, errors, and lifetime rules.
+This page defines the supported core Session and Console API for the SSHScript
+v3.1 Production/Stable line, verified with 3.1.4. Examples that teach a
+workflow belong in the tutorials and how-to guides; this page focuses on
+signatures, results, errors, and lifetime rules.
 
 ## Package-level entry points
 
@@ -476,4 +477,4 @@ Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
 Paramiko failures retain their original exception and traceback. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-24 15:36:45

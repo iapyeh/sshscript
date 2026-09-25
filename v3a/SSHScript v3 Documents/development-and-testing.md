@@ -6,45 +6,51 @@ nav_order: 9
 
 # Contributing and Testing
 
-SSHScript v3.1 separates credential-free release checks from manual,
-site-specific SSH integration tests. The default gate must work on a clean
-developer machine without a network connection, SSH agent, private key,
-password, or host inventory.
+SSHScript v3.1 separates credential-free release checks and public disposable
+OpenSSH integration from manual, site-specific SSH tests. The default gate must
+work on a clean developer machine without a network connection, SSH agent,
+private key, password, or host inventory.
 
 ## Development setup
 
-Use Python 3.11 or newer. The flat development checkout uses a release-only
-packaging template; do not install it with `pip install .` or `pip install -e .`.
-Install the test and build dependencies instead:
+Use Python 3.11 or newer. Clone the public release branch, then create an
+isolated environment for its test and build dependencies:
 
 ```sh
+git clone --branch release --single-branch https://github.com/iapyeh/sshscript.git
+cd sshscript
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine
 ```
 
+Contributors normally work in a personal fork and propose changes through a
+pull request. Do not add credentials, private host inventories, or captured
+production output to the checkout.
+
 ## Required checks
 
-Run all checks from the source directory before proposing a change:
+Run the canonical credential-free gate from the public repository root before
+proposing a change:
 
 ```sh
-python3 -m unittest discover -v -s unittest -p 'test_*.py'
-python3 sshscript.py unittest/dollar_syntax.spy
-python3 -O -m unittest discover -v -s unittest -p 'test_*.py'
-python3 -m compileall -q -x 'unittest-v3' .
-python3 unittest/check_package_asserts.py
+python3 tools/run_checks.py
 ```
 
-The first command is the canonical credential-free release gate. A
-regression fix should add a credential-free test whenever the behavior can be
-reproduced with a local subprocess, in-memory SSH client, or Paramiko test
-double.
+The tool locates the release package under `src/sshscript`, then runs the
+normal and optimized unit suites, compilation, the Dollar-syntax smoke suite,
+and the package assertion scan from the correct working directory. The
+low-level tests reside under `src/sshscript/unittest`; invoking the tool avoids
+instructions that work only in the project's separate internal development
+layout. A regression fix should add a credential-free test whenever the
+behavior can be reproduced with a local subprocess, in-memory SSH client, or
+Paramiko test double.
 
 ## Credential-free Module API tests
 
-`test_sshscript_module.py` verifies the regular Python API, and
-`test_spy_thread_session.py` verifies Session inheritance in transformed
-`.spy` threads. The tests cover:
+`src/sshscript/unittest/test_sshscript_module.py` verifies the regular Python
+API, and `src/sshscript/unittest/test_spy_thread_session.py` verifies Session
+inheritance in transformed `.spy` threads. The tests cover:
 
 - import-time isolation for process hooks, warnings, logging, and threads;
 - explicit and reversible imports through `sshscript.spy_imports()`;
@@ -65,41 +71,26 @@ runtime dependencies. No separate test framework is required.
 
 ## Credential-free Dollar syntax tests
 
-`unittest/dollar_syntax.spy` is a localhost-only smoke suite:
-
-```sh
-python3 sshscript.py unittest/dollar_syntax.spy
-```
+`src/sshscript/unittest/dollar_syntax.spy` is a localhost-only smoke suite run
+by `python3 tools/run_checks.py` from the public repository root.
 
 It covers bare, string, raw-string, expression, and f-string command forms;
 result properties; automatic shell selection; string-only command
 validation; function bodies; persistent shell contexts; and imports between
 `.spy` files.
 
-A standard-library wrapper runs the same suite in an isolated subprocess
-with an empty temporary home directory and SSH-agent variables removed:
-
-```sh
-python3 -m unittest discover -v -s unittest \
-  -p 'test_sshscript_dollar_syntax.py'
-```
-
-Run the historical module and Dollar wrapper subset with:
-
-```sh
-python3 -m unittest discover -v -s unittest -p 'test_sshscript_*.py'
-```
-
-For the complete release gate, continue to prefer the broader `test_*.py`
-pattern.
+Its standard-library wrapper runs the suite in an isolated subprocess with an
+empty temporary home directory and SSH-agent variables removed. Use the
+canonical gate instead of copying its internal discovery commands; this keeps
+local validation aligned with CI as the test set changes.
 
 ## Language and integration tests
 
-`unittest/language.spy` exercises extended syntax on localhost by default:
+`src/sshscript/unittest/language.spy` provides an additional maintainer
+diagnostic for extended syntax on localhost. From the public repository root:
 
 ```sh
-python3 sshscript.py unittest/language.spy
-python3 sshscript.py unittest/language.spy --environment=local
+(cd src/sshscript && python3 sshscript.py unittest/language.spy --environment=local)
 ```
 
 Its coverage includes one-Dollar replacements for former `$$` behavior,
@@ -108,24 +99,19 @@ persistent shell contexts, `enter()`, and imports between `.spy` modules.
 Temporary filesystem assertions use unique paths and clean up in `finally`
 blocks.
 
-The `remote`, `threaded`, and `all` environments are manual, credentialed
-integration modes:
-
-```sh
-python3 sshscript.py unittest/language.spy --environment=remote
-python3 sshscript.py unittest/language.spy --environment=threaded
-python3 sshscript.py unittest/language.spy --environment=all
-```
-
-Configure hosts and credentials in ignored local files or environment
-variables. Public documentation and committed tests must not contain real
-usernames, host inventories, key paths, passwords, or captured secrets.
+Historical remote modes require private, site-specific configuration and are
+not part of the public release gate. New portable SSH coverage belongs in the
+disposable OpenSSH integration suite. Keep any additional host configuration
+in ignored local files or environment variables. Public documentation and
+committed tests must not contain real usernames, host inventories, key paths,
+passwords, or captured secrets.
 
 ## Credentialed test safety
 
-Scenarios under `unittest-v3/` and older integration scripts may connect to
-real hosts, change privileges, transfer files, or run administrative
-commands. Before running them:
+Maintainers may keep separate, untracked site-specific scenarios that connect
+to real hosts, change privileges, transfer files, or run administrative
+commands. These are not part of the public repository or release gate. Before
+running such tests:
 
 - use disposable test hosts;
 - inspect every command for destructive effects;
@@ -145,18 +131,21 @@ insecure behavior.
 
 ## Supported matrix and assertion gate
 
-CI targets Python 3.11, 3.12, 3.13, and 3.14 on Linux and macOS. Python 3.11
-has passed the local hardening checks; the remaining matrix runs must pass
-before release. The dependency-free AST gate rejects `ast.Assert` in shipped
-package modules, excluding tests. Regression tests use unittest assertions so
-validation remains meaningful under `-O`. Historical `unittest-v3` material is
-not part of the credential-free gate and must not be bulk-added to Git.
+CI targets Python 3.11, 3.12, 3.13, and 3.14 on Linux and macOS. All eight
+platform/interpreter combinations passed both normal and optimized checks for
+the 3.1.4 release. Disposable OpenSSH integration jobs also passed on Python
+3.11 and 3.14. Every new candidate must pass its own current
+workflow; an earlier green release does not validate later changes. The
+dependency-free AST gate rejects `ast.Assert` in shipped package modules,
+excluding tests. Regression tests use unittest assertions so validation
+remains meaningful under `-O`. Private historical integration material is not
+part of the credential-free gate and must not be bulk-added to Git.
 
 ## Release layout and artifact verification
 
-Run `python3 tools/run_checks.py` from either the development checkout or the
-release repository root. It selects the correct source directory and runs the
-normal and optimized tests, Dollar syntax checks, compilation, and assertion scan.
+Run `python3 tools/run_checks.py` from the public repository root. It selects
+the release package source directory and runs the normal and optimized tests,
+Dollar syntax checks, compilation, and assertion scan.
 
 ```sh
 python3 tools/check_release.py --output /tmp/sshscript-candidate-UNIQUE
@@ -170,17 +159,25 @@ installation steps need network access for dependencies; runtime tests do not
 need SSH credentials. Successful verification saves both distributions and a
 `verified.json` SHA-256 manifest.
 
-Development changes flow from `working_branch` into `src/main`, then through
-`update_from_src.sh` into the release repository's `src/sshscript/` layout.
-The shared `tools/prepare_release.py` owns the explicit file allowlist.
-Only reviewed files should be staged and committed; private integration tests
-and credentials are excluded. See
+Release preparation uses `tools/prepare_release.py` and an explicit file
+allowlist so private integration tests, credentials, and unrelated files are
+excluded. Project maintainers should follow
 [the release procedure](https://github.com/iapyeh/sshscript/blob/release/RELEASING.md).
 
 GitHub Actions runs these checks on Linux/macOS and Python 3.11–3.14 for pushes
-and pull requests. Check the actual workflow results before declaring a candidate
-validated on every platform. CI does not upload to PyPI. Publishing requires a
-separate explicit `tools/publish_release.py` invocation with verified artifacts
-and externally supplied credentials; it never edits versions or rebuilds files.
+and pull requests. Separate Linux jobs install the verified wheel and exercise
+host keys, SFTP, PTY behavior, `sudo`/`su`, and timeouts against a disposable
+OpenSSH server. Check the actual workflow results before declaring a candidate
+validated on every platform.
 
-Last Updated: 2026-09-22 15:50:06
+Production publication is performed only by the tag-triggered
+`.github/workflows/release.yml` workflow. It verifies that `v<version>` points
+to the current `release` branch tip and matches package metadata, rebuilds and
+tests the distributions, attests them, creates a draft GitHub Release,
+publishes to PyPI through its Trusted Publisher with a short-lived OIDC
+credential, and then makes the GitHub Release public. `verified.json` is
+retained with the release assets. Manual upload is an emergency-only path;
+it must verify the recorded hashes and use credentials supplied by an external
+secret manager.
+
+Last Updated: 2026-09-24 15:36:45

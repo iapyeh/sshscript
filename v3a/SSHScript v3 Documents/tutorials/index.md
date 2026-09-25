@@ -15,6 +15,6 @@ API is the primary learning path.
 | Tutorial | Status |
 | --- | --- |
 | [Module API Tutorial]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/tutorial/) | Available |
-| [Dollar Syntax Tutorial](dollar-syntax/) | Placeholder |
+| [Dollar Syntax Tutorial](dollar-syntax/) | Complete |
 
-Last Updated: 2026-09-19 13:20:55
+Last Updated: 2026-09-25 16:37:52
