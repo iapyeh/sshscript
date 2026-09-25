@@ -8,12 +8,12 @@ permalink: /v3a/migration-and-releases/migrating-to-v3-1/
 
 # Migrating to v3.1
 
-This guide updates v3.0 and earlier code to the v3.1 beta contract. Make the
+This guide updates v3.0 and earlier code to the supported v3.1 contract. Make the
 changes in a branch, run credential-free tests first, and validate SSH and
 privileged workflows only against isolated test systems.
 
 Before migrating, read [Installation and Verification](../../getting-started/installation-and-verification/).
-The current PyPI package is not v3.1.
+Version 3.1.4 is the current Production/Stable release on PyPI.
 
 ## Migration checklist
 
@@ -106,10 +106,10 @@ v3.1:
 status = sshscript.run_file("deploy_main.spy")
 ```
 
-Make `deploy_main.spy` compose the program through ordinary Python imports or
-SSHScript include syntax. `run_file()` returns zero on normal completion or
-the code passed to `$.break(code)`. `$.exit(code)` and execution exceptions
-propagate.
+Make `deploy_main.spy` compose the program through ordinary Python imports.
+`run_file()` temporarily enables imports of peer `.spy` modules and returns
+zero on normal completion or the code passed to `$.break(code)`.
+`$.exit(code)` and execution exceptions propagate.
 
 The package-level `sshscript.run()` helper has been removed. Use:
 
@@ -240,7 +240,7 @@ sshscript --check-updates
 
 `--check` remains an alias. The command queries stable, non-yanked PyPI
 artifacts compatible with the current Python version. It never installs an
-update and should not be used to validate an unpublished beta.
+update and does not replace verifying the installed version and import path.
 
 Use `--traceback` only for controlled diagnostics:
 
@@ -283,10 +283,13 @@ finally:
 Then run the repository's credential-free gate:
 
 ```sh
-python3 -m unittest discover -v -s unittest -p 'test_*.py'
-python3 sshscript.py unittest/dollar_syntax.spy
-python3 -m compileall -q .
+python3 tools/run_checks.py
 ```
+
+Run the command from the public repository root. The tool finds the
+`src/sshscript` package and runs the normal and optimized unit suites,
+Dollar-syntax smoke test, compilation, and package assertion scan from the
+correct working directory.
 
 Only after those checks pass should the migration exercise host-key failure,
 authentication failure, remote nonzero status, timeout, privilege prompts,
@@ -316,4 +319,4 @@ failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-25 16:37:52

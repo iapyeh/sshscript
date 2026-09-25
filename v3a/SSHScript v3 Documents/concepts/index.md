@@ -14,9 +14,9 @@ for the first successful command, but they support safe design and debugging.
 
 | Concept | Status |
 | --- | --- |
-| [Session Lifecycle](session-lifecycle/) | Placeholder |
-| [Direct Execution vs Shell Execution](direct-execution-vs-shell-execution/) | Placeholder |
+| [Session Lifecycle](session-lifecycle/) | Complete |
+| [Direct Execution vs Shell Execution](direct-execution-vs-shell-execution/) | Complete |
 | [Results and Error Model](results-and-error-model/) | Available |
-| [How `.spy` Transformation Works](how-spy-transformation-works/) | Placeholder |
+| [How `.spy` Transformation Works](how-spy-transformation-works/) | Complete |
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-25 16:37:52

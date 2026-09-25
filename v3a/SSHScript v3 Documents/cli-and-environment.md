@@ -21,12 +21,16 @@ sshscript automation.spy
 From a source checkout:
 
 ```sh
-python3 sshscript.py automation.spy
+python3 src/sshscript/sshscript.py automation.spy
 ```
+
+This form assumes the public `release` checkout's `src/` package layout.
+Ordinary users should use the installed `sshscript` command.
 
 The path must name one existing regular file. Directories, globs, iterables,
 and multiple file paths are not supported. Compose a larger automation
-project with ordinary Python imports or SSHScript include syntax.
+project with ordinary Python imports; `run_file()` temporarily enables peer
+`.spy` imports.
 
 Arguments not consumed by the SSHScript CLI remain available to the script
 through `sys.argv`.
@@ -125,4 +129,4 @@ only by the CLI.
 See [Contributing and Testing](../development-and-testing/) for the
 credential-free release gate and isolated integration-test guidance.
 
-Last Updated: 2026-09-18 15:58:44
+Last Updated: 2026-09-25 16:37:52

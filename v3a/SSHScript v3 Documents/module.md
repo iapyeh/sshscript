@@ -131,8 +131,8 @@ status = sshscript.run_file("automation.spy")
 ```
 
 Directories, globs, iterables, and multiple paths are not accepted. Compose
-larger automation through ordinary Python imports or SSHScript include
-syntax.
+larger automation through ordinary Python imports; `run_file()` temporarily
+enables peer `.spy` imports as well.
 
 ## Next steps
 
@@ -172,4 +172,4 @@ failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-25 16:37:52

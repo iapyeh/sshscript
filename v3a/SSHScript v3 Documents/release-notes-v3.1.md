@@ -7,16 +7,45 @@ nav_order: 2
 
 # SSHScript v3.1 Release Notes
 
-SSHScript v3.1 remains beta. Version 3.1.1 updates the release source and
-build workflow; publishing source does not create a PyPI release.
+SSHScript 3.1.4 was published on 2026-09-24 as the first Production/Stable
+release in the supported v3.1 line. Install it from
+[PyPI](https://pypi.org/project/sshscript/3.1.4/) or review the corresponding
+[GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v3.1.4).
+
+The release requires Python 3.11 or newer and supports Python 3.11–3.14 on
+Linux and macOS.
+
+## Production hardening
+
+- Package runtime assertions were replaced by the stable exception contract
+  documented in [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+  Validation remains active under `python -O`; user-written `.spy` assertions
+  retain ordinary Python semantics.
+- Listener removal, hijack/release, and last-layer checks are atomic and do
+  not mutate state when validation fails. Positive Session-stack indexing was
+  corrected.
+- Invalid commands, PTY modes, patterns, output buffers, and descriptor
+  combinations are rejected before execution or buffer mutation.
+- Closed and hijacked channel operations, AST invariants, persistent commands,
+  and disconnected SFTP access now use stable documented exception types.
+- Normal, optimized, compile, Dollar-syntax, and package AST assertion gates
+  are part of the credential-free release checks.
 
 ## Security
 
 - SSH connections verify system host keys by default. Insecure automatic key
   acceptance now requires an explicit Paramiko policy.
-- Interactive SSH sessions no longer forward the complete local environment.
-- Private keys on a connected parent host are read through SFTP instead of
-  being interpolated into a shell command.
+- Interactive SSH sessions do not forward the complete local environment;
+  only terminal and locale defaults plus explicitly supplied values are sent.
+- Remote private keys are read through SFTP instead of interpolated shell
+  commands.
+- Upload and download INFO logs no longer reveal SSH hostnames or complete
+  local and remote paths.
+- CodeQL, Dependabot, private vulnerability reporting guidance, and an
+  OIDC-based trusted publishing workflow were added.
+- Release actions and build tools are pinned. Distributions are hashed and
+  attested, and the GitHub Release stays in draft until PyPI publication
+  succeeds.
 
 ## Fixed
 
@@ -25,8 +54,7 @@ build workflow; publishing source does not create a PyPI release.
   made strict with `close(strict=True)`.
 - `$.break(code)` is preserved as the CLI exit status.
 - `run_file()` executes exactly one file. Programs should compose scripts
-  through include syntax or Python imports instead of directory or glob
-  execution.
+  through ordinary Python imports instead of directory or glob execution.
 - `.spy` importing is explicit through `sshscript.spy_imports()` and is
   scoped automatically while `run_file()` is executing.
 - Importing SSHScript no longer patches `threading.Thread`, warning handling,
@@ -37,34 +65,34 @@ build workflow; publishing source does not create a PyPI release.
   scoped to execution, context managers, or an explicit unscoped
   `$.connect()` operation.
 
-## Project preparation
-
-- Version 3.1.1 fixes the release `src/sshscript/` package mapping and includes
-  the MIT license as `LICENSE.txt`.
-- A shared allowlist prepares release sources; verification builds an sdist
-  and its wheel and tests installation in a fresh virtual environment.
-- CI applies the same checks to development and release layouts. Explicit
-  publishing checks artifact hashes and uses credentials supplied externally.
-- Version metadata is read from `_version.py`; build and upload tools do not
-  modify version numbers.
-
 See [Contributing and Testing](../development-and-testing/) for the release gate
 that validates these behaviors without SSH credentials.
 
-## Production hardening
+## Packaging and project policy
 
-- Minimum Python is now 3.11. CI targets 3.11, 3.12, 3.13, and 3.14;
-  local validation has passed on Python 3.11, with other matrix runs pending.
-- Package runtime assertions are replaced by explicit exceptions that remain
-  active under `python -O`; user-written `.spy` assertions are preserved.
-- Listener removal, hijack/release, and last-layer validation are atomic and
-  leave state unchanged on failure. Session-stack indexing follows deque.
-- Invalid command, PTY, pattern, and output arguments are rejected before
-  execution or buffer mutation. Disconnected SFTP raises SSHScriptException.
-- The credential-free suite passes 98 tests normally and under `-O`; all nine
-  dollar-syntax smoke cases pass. Release gates include an AST assertion scan.
+- Package metadata, the MIT license, security and support policies,
+  contributor guidance, and CI configuration are included in the public
+  release repository.
+- `tools/run_checks.py` provides the canonical credential-free gate.
+  `tools/check_release.py` builds the sdist and wheel, validates metadata,
+  installs the wheel in a fresh environment, and writes a SHA-256 manifest.
+- Public CI tests Python 3.11–3.14 on Linux and macOS. Separate disposable
+  OpenSSH jobs cover host keys, SFTP, PTY behavior, `sudo`/`su`, and timeouts.
 
-These changes do not constitute a Production/Stable release. Passing the published CI matrix, reproducible SSH integration, and the
-remaining production requirements are still required before stable release. See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
+## Publication and provenance
 
-Last Updated: 2026-09-22 15:50:06
+The tagged 3.1.4 release passed the complete public matrix and release OpenSSH
+integration jobs. The release workflow built and attested the distributions,
+published them to PyPI through its Trusted Publisher using a short-lived OIDC
+credential, and made the GitHub Release public only after PyPI accepted the
+artifacts. The release retains `verified.json` with the distribution hashes.
+
+- [Release workflow run](https://github.com/iapyeh/sshscript/actions/runs/35963068790)
+- [PyPI release](https://pypi.org/project/sshscript/3.1.4/)
+- [GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v3.1.4)
+
+Provenance establishes the origin and integrity of an artifact; it does not
+replace source review or validation against the target organization's SSH,
+PAM, `sudoers`, network, and host-key policies.
+
+Last Updated: 2026-09-25 16:37:52

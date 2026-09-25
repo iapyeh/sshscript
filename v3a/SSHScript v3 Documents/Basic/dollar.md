@@ -149,8 +149,11 @@ with $.connect("ops@example.net"):
 The source checkout includes a localhost-only smoke suite:
 
 ```sh
-python3 sshscript.py unittest/dollar_syntax.spy
+(cd src/sshscript && python3 sshscript.py unittest/dollar_syntax.spy)
 ```
+
+Run that command from the public repository root. For the complete,
+layout-aware gate, prefer `python3 tools/run_checks.py`.
 
 It does not load credentials, connect to an SSH server, use an SSH agent, or
 read a private key. See [Contributing and Testing](../../development-and-testing/)
@@ -170,4 +173,4 @@ failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-24 15:50:00

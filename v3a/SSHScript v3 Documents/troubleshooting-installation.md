@@ -10,9 +10,9 @@ nav_order: 5
 SSHScript v3.1 requires Python 3.11 or newer. Use the same Python interpreter
 for installation and execution to avoid most environment problems.
 
-> **Release status:** v3.1 is currently beta source. PyPI presently publishes
-> v2.0.2, so `pip install sshscript` does not install the version documented
-> here. Start with
+> **Release status:** SSHScript 3.1.4 is the current Production/Stable release
+> on PyPI. These instructions cover the supported 3.1.x line and were last
+> verified with 3.1.4. Start with
 > [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/).
 
 ## Confirm the interpreter
@@ -31,13 +31,12 @@ virtual environment.
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install --upgrade pip
-test -f pyproject.toml
-python3 -m pip install -e .
+python3 -m pip install "sshscript==3.1.4"
 ```
 
 A virtual environment avoids system-package permissions and makes the Python
-and `pip` pair explicit. Run the last two commands only from a supplied v3.1
-source tree containing the required packaging metadata.
+and `pip` pair explicit. Use a project requirements or lock file instead of
+typing the version directly when the application already has one.
 
 ## `sshscript: command not found`
 
@@ -45,15 +44,13 @@ First verify that the package is installed for the current interpreter:
 
 ```sh
 python3 -m pip show sshscript
-python3 -m pip install -e .
+python3 -m pip install --force-reinstall "sshscript==3.1.4"
 ```
 
 If the package is present but the command is unavailable, activate the
 virtual environment or add that Python installation's scripts directory to
 `PATH`. Running `python3 -m pip` is safer than assuming `pip` and `python3`
-refer to the same installation. Do not use a PyPI upgrade command to repair a
-v3.1 beta environment; it can replace the checkout with the published v2.0.2
-package.
+refer to the same installation.
 
 ## The wrong version is imported
 
@@ -66,11 +63,15 @@ An older checkout, a local `sshscript.py` file, or another environment can
 shadow the installed package. Run the command outside directories containing
 a conflicting module and inspect `sshscript.__file__`.
 
-For development from the intended checkout:
+For a deliberate editable installation from a trusted source checkout:
 
 ```sh
+test -f pyproject.toml
 python3 -m pip install -e .
 ```
+
+Do not mix an editable checkout and the PyPI package in the same environment
+unless you are intentionally testing import precedence.
 
 ## Dependency or build errors
 
@@ -78,7 +79,7 @@ Upgrade packaging tools, then retry:
 
 ```sh
 python3 -m pip install --upgrade pip setuptools wheel
-python3 -m pip install -e .
+python3 -m pip install --force-reinstall "sshscript==3.1.4"
 ```
 
 If installation still fails, record the Python version, operating system, and
@@ -105,4 +106,4 @@ sshscript --version
 Use `--traceback` only in a protected diagnostic environment because a full
 trace can expose source, commands, paths, or secrets.
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-24 15:36:45

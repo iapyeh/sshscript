@@ -14,7 +14,7 @@ server, account, key, password, or network connection.
 ## Before you begin
 
 Complete [Installation and Verification](../installation-and-verification/).
-Both verification commands must report `3.1.0` from the intended environment.
+Both verification commands must report `3.1.4` from the intended environment.
 
 ## Create a script
 
@@ -139,8 +139,8 @@ stderr—instead. Handle both exceptions and nonzero command results.
 
 ## Next steps
 
-- [Your First SSH Connection](../first-ssh-connection/) is the next onboarding
-  step and is currently marked as a placeholder.
+- [Your First SSH Connection](../first-ssh-connection/) securely moves the same
+  Session model to an SSH host.
 - [Module API Tutorial]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/tutorial/)
   continues through connections,
   privilege contexts, interactive programs, and transfers.
@@ -149,4 +149,4 @@ stderr—instead. Handle both exceptions and nonzero command results.
 - [Failure Model and Production Checklist](../../security-and-operations/failure-model-and-production-checklist/)
   explains how to turn examples into operational code.
 
-Last Updated: 2026-09-18 15:58:44
+Last Updated: 2026-09-25 16:37:52
