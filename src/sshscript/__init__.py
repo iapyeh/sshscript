@@ -26,9 +26,9 @@ Example::
     from sshscript import Session
 
     with Session() as local:
-        stdout, stderr = local("hostname")
+        stdout, stderr, exitcode = local("hostname")
         with local.connect("user@host") as remote:
-            stdout, stderr = remote("uname -s")
+            stdout, stderr, exitcode = remote("uname -s")
             print(stdout.strip())
 
 Use run_file(path) for a script file, run_script(source) for source text,
@@ -49,8 +49,10 @@ else:
     from spyimporter import spy_imports
 
 run_file = sshscript.run_file
+check_file = sshscript.check_file
 run_script = sshscript.run_script
 Session = session.Session
+CommandResult = session.CommandResult
 
 set_logger = errorutils.set_logger
 get_logger = errorutils.get_logger
@@ -73,8 +75,10 @@ SSHScriptException = errorutils.SSHScriptException
 
 __all__ = [
     'run_file',
+    'check_file',
     'run_script',
     'Session',
+    'CommandResult',
     'get_logger',
     'set_logger',
     'spy_imports',

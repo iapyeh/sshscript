@@ -3,11 +3,15 @@ import argparse
 import shutil
 from pathlib import Path
 
-MODULES = '__init__ _version sshscript session patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
+MODULES = '__init__ _version sshscript session commandresult sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
 ROOT_FILES = [
     'pyproject.toml', 'README.md', 'LICENSE.txt', 'RELEASING.md',
     'MANIFEST.in', 'CHANGELOG.md', 'CONTRIBUTING.md', 'EXCEPTIONS.md',
-    'SECURITY.md', 'SUPPORT.md', '.github/dependabot.yml',
+    'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md', '.gitignore',
+    '.github/ISSUE_TEMPLATE/bug_report.yml',
+    '.github/ISSUE_TEMPLATE/config.yml',
+    '.github/ISSUE_TEMPLATE/feature_request.yml',
+    '.github/pull_request_template.md', '.github/dependabot.yml',
     '.github/workflows/ci.yml', '.github/workflows/codeql.yml',
     '.github/workflows/release.yml',
 ]
@@ -16,6 +20,7 @@ TOOLS = [
     'publish_release.py', 'setup_openssh_ci.sh',
 ]
 TESTS = [
+    'test_command_api.py', 'test_ssh_config.py', 'test_check_file.py',
     'check_package_asserts.py', 'dollar_syntax.spy',
     'dollar_syntax_fixture.spy', 'language.spy', 'language_fixture.spy',
     'test_channelgeneric_expect.py', 'test_file_transfer.py',

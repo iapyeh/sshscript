@@ -1,0 +1,57 @@
+name: Feature request
+description: Propose a focused, testable improvement to SSHScript
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Explain the user problem before the proposed API. For usage questions
+        and early design discussion, use GitHub Discussions.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and discussions for this request.
+          required: true
+        - label: This request contains no credentials or private infrastructure detail.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What workflow is difficult today, and who is affected?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Show a small API or `.spy` example when that makes the behavior clearer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe existing SSHScript or Python approaches you tried.
+    validations:
+      required: true
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and security impact
+      description: Note effects on the module API, dollar syntax, platforms, logging, credentials, or host-key handling.
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable behavior that tests and documentation could verify.
+    validations:
+      required: true

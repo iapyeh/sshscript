@@ -57,7 +57,7 @@ class HostKeyPolicyTests(unittest.TestCase):
         parent = Session()
         self.addCleanup(parent.close)
         with patch.object(session_module.paramiko, 'SSHClient', factory):
-            child = parent.connect('example.test', username='user')
+            child = parent.connect('example.test', username='user', ssh_config=False)
 
         self.assertTrue(created[0].loaded_system_keys)
         self.assertIsNone(created[0].policy)
@@ -75,6 +75,7 @@ class HostKeyPolicyTests(unittest.TestCase):
         ):
             child = parent.connect(
                 'example.test',
+                ssh_config=False,
                 username='user',
                 policy=policy,
             )

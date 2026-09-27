@@ -544,7 +544,7 @@ class DollarChanger(ast.NodeTransformer):
                 ## upgrade "try" block one level
                 if isinstance(originNode.value,ast.Try):
                     newnode = originNode.value  
-                    ## eg. stdout,stderr = $hostname
+                    ## eg. stdout,stderr,exitcode = $hostname
                     originNode.value = self._template(self.tmplLineAssignAtBottom.value, node)
                     ## append original assignment to last statement
                     newnode.finalbody.append(originNode)

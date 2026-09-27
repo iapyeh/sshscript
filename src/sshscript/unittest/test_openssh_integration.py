@@ -110,6 +110,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
         parent = self._new_parent()
         remote = parent.connect(
             self.host,
+            ssh_config=False,
             username=self.username,
             port=self.port,
             key_filename=str(self.key_path),
@@ -135,6 +136,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
         with self.assertRaises(paramiko.SSHException):
             unknown_parent.connect(
                 self.host,
+                ssh_config=False,
                 username=self.username,
                 port=self.port,
                 key_filename=str(self.key_path),
@@ -160,6 +162,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
         with self.assertRaises(paramiko.BadHostKeyException):
             mismatch_parent.connect(
                 self.host,
+                ssh_config=False,
                 username=self.username,
                 port=self.port,
                 key_filename=str(self.key_path),
@@ -184,7 +187,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
                 ),
             )
         )
-        stdout, stderr = remote.exec_command(
+        stdout, stderr, exitcode = remote.exec_command(
             command,
             shell=False,
             timeout=10,
@@ -232,7 +235,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
     def test_real_non_pty_and_pty_commands(self):
         remote = self._connect()
 
-        stdout, stderr = remote.exec_command(
+        stdout, stderr, exitcode = remote.exec_command(
             "tty",
             shell=False,
             get_pty=False,
@@ -241,7 +244,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
         self.assertNotEqual(remote.exitcode, 0)
         self.assertIn("not a tty", (str(stdout) + str(stderr)).lower())
 
-        stdout, stderr = remote.exec_command(
+        stdout, stderr, exitcode = remote.exec_command(
             "tty",
             shell=False,
             get_pty=True,

@@ -15,8 +15,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA.
 """Public script runners and command-line entry point.
 
-For commands in ordinary Python, use Session: session(command) returns
-(stdout, stderr), and session.connect(host) creates a remote child session.
+For commands in ordinary Python, use Session: session(command) returns a
+CommandResult supporting stdout/stderr/exitcode unpacking; connect(host) creates a child.
 run_file(path) executes one file; run_script(source) returns its namespace.
 Importing this module does not install .spy import hooks or console logging.
 """
@@ -32,18 +32,20 @@ def warning_on_one_line(message, category, filename, lineno, file=None, line=Non
     return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
 if __package__:
     from ._version import __version__
-    from .session import Session
+    from .session import Session, CommandResult
     from .errorutils import SSHScriptExit, SSHScriptBreak, get_logger, set_logger, SSHScriptException,command_summary
     ## 2025/3/3 v2.0.3 feature: import *.spy file directly
     from . import spyimporter
+    from . import dollarparser
 else:
     ## 2024/8/16, should add mydir into sys.path for python 3.12
     mydir = os.path.abspath(os.path.dirname(__file__))
     if not mydir in sys.path: sys.path.insert(0,mydir)
     from _version import __version__
-    from session import Session
+    from session import Session, CommandResult
     from errorutils import SSHScriptExit, SSHScriptBreak, get_logger, set_logger, SSHScriptException,command_summary
     import spyimporter
+    import dollarparser
     ## 2024/8/16, should remove mydir out of sys.path for python 3.11
     if mydir == sys.path[0]: del sys.path[0]
 
@@ -54,6 +56,21 @@ sshscript_module = sys.modules[__package__ or __name__]
 ## initial logger
 logger = get_logger()
 spy_imports = spyimporter.spy_imports
+
+def check_file(script_path):
+    """Compile one Python/.spy source file without executing it or its imports.
+
+    Return 0 on success. SyntaxError retains the original filename and line.
+    This checks Python/dollar syntax, not shell syntax or remote availability.
+    """
+    import tokenize
+    if not isinstance(script_path, (str, os.PathLike)):
+        raise TypeError('script_path must be str or os.PathLike')
+    path = os.path.abspath(os.fspath(script_path))
+    with tokenize.open(path) as stream:
+        source = stream.read()
+    dollarparser.compile_spy(path, source)
+    return 0
 
 def run_file(
     script_path,
@@ -283,9 +300,11 @@ def main():
                         help='show the installed version')
 
     ## new on v2.0.2
-    parser.add_argument('--check-updates', '--check', dest='checkversion',
+    parser.add_argument('--check-updates', dest='checkversion',
                         action='store_true', default=False,
                         help='check PyPI for a newer compatible stable release (requires internet)')
+    parser.add_argument('--check', action='store_true',
+                        help='check file syntax without execution; without a file, legacy update check')
 
     ## new on v3.1.0
     parser.add_argument(
@@ -329,7 +348,7 @@ def main():
     ## handling starts
     if (args.version):
         print(get_current_version())
-    elif (args.checkversion):
+    elif args.checkversion or (args.check and not args.path):
         sys.exit(_check_updates())
 
     elif args.path:
@@ -346,10 +365,17 @@ def main():
             os.environ['VERBOSE_STDERR'] = '1'
 
         try:
-            exitcode = run_file(
-                args.path,
-                showScript=args.showScript,
-            )
+            if args.check:
+                if unknown:
+                    parser.error('--check accepts exactly one file and no script arguments')
+                if args.showScript:
+                    parser.error('--check and --script cannot be combined')
+                exitcode = check_file(args.path)
+            else:
+                exitcode = run_file(
+                    args.path,
+                    showScript=args.showScript,
+                )
         except SSHScriptExit as e:
             sys.exit(e.errno)
         except SSHScriptException as e:

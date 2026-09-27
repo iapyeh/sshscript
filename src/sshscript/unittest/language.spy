@@ -114,7 +114,7 @@ def test_result_state_and_assignment():
     name = "stdout, stderr, exit code, and assignment"
     case(name)
 
-    stdout, stderr = $python3 -c "import sys; print('out'); sys.stderr.write('err\\n')"
+    stdout, stderr, exitcode = $python3 -c "import sys; print('out'); sys.stderr.write('err\\n')"
     assert stdout.strip() == "out"
     assert stderr.strip() == "err"
     # stdout/stderr are live str-like buffer objects; compare their content.
@@ -304,7 +304,7 @@ def test_function_scope():
         $f'python3 -c "print(\'{value}\')"'
         return $.stdout.strip(), $.stderr, $.exitcode
 
-    stdout, stderr = run_dynamic("python3 -c \"print('from-return')\"")
+    stdout, stderr, exitcode = run_dynamic("python3 -c \"print('from-return')\"")
     assert stdout.strip() == "from-return"
     assert stderr == ""
 

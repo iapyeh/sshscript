@@ -298,7 +298,7 @@ class SessionModuleTests(unittest.TestCase):
                 ),
             ]
         )
-        stdout, stderr = self.session.exec_command(
+        stdout, stderr, exitcode = self.session.exec_command(
             command,
             shell=False,
             timeout=10,
@@ -321,7 +321,7 @@ class SessionModuleTests(unittest.TestCase):
                 ),
             ]
         )
-        stdout, stderr = self.session(
+        stdout, stderr, exitcode = self.session(
             command,
             shell=False,
             input="input-from-test",
@@ -337,7 +337,7 @@ class SessionModuleTests(unittest.TestCase):
         self.assertEqual(self.session.exitcode, 0)
 
     def test_automatic_and_explicit_shell_selection(self):
-        stdout, stderr = self.session.exec_command(
+        stdout, stderr, exitcode = self.session.exec_command(
             "printf 'module-api' | tr a-z A-Z",
             timeout=10,
         )
@@ -348,7 +348,7 @@ class SessionModuleTests(unittest.TestCase):
         self.assertTrue(self.session.dollar.use_shell)
         self.assertIn("pipeline", self.session.dollar.shell_reasons)
 
-        stdout, stderr = self.session.exec_command(
+        stdout, stderr, exitcode = self.session.exec_command(
             "printf 'forced-shell'",
             shell=True,
             timeout=10,
@@ -361,9 +361,9 @@ class SessionModuleTests(unittest.TestCase):
         invalid_calls = (
             (TypeError, lambda: self.session.exec_command(None)),
             (ValueError, lambda: self.session.exec_command("   ")),
-            (TypeError, lambda: self.session.exec_command(["true"])),
-            (TypeError, lambda: self.session.exec_command(("true",), shell=False)),
-            (TypeError, lambda: self.session.exec_command([], shell=True)),
+            (TypeError, lambda: self.session.exec_command(["true", 1])),
+            (ValueError, lambda: self.session.exec_command(("true",), shell=True)),
+            (ValueError, lambda: self.session.exec_command([], shell=True)),
             (TypeError, lambda: self.session.exec_command("true", shell=1)),
             (
                 ValueError,
@@ -451,7 +451,7 @@ class ThreadedLocalModuleTests(unittest.TestCase):
         def run_case(number):
             session = sshscript.Session()
             try:
-                stdout, stderr = session.exec_command(
+                stdout, stderr, exitcode = session.exec_command(
                     shlex.join(
                         [sys.executable, "-c", f"print('worker-{number}')"]
                     ),

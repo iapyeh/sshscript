@@ -61,7 +61,7 @@ def test_result_state_and_assignment():
     name = "assignment, stdout, stderr, and exit code"
     case(name)
 
-    stdout, stderr = $python3 -c "import sys; print('out'); print('err', file=sys.stderr)"
+    stdout, stderr, exitcode = $python3 -c "import sys; print('out'); print('err', file=sys.stderr)"
     assert stdout.strip() == "out"
     assert stderr.strip() == "err"
     assert str($.stdout) == str(stdout)
@@ -132,17 +132,11 @@ def test_explicit_execution_options():
     assert $.stdout.strip() == "['|', 'not-a-pipeline']"
     assert $.dollar.use_shell is False
 
-    for invalid_command in (argv, tuple(argv)):
-        try:
-            $(invalid_command, shell=False, timeout=10)
-        except TypeError as exc:
-            assert str(exc) == (
-                f"command must be str, not {type(invalid_command).__name__}"
-            )
-        else:
-            raise AssertionError(
-                f"{type(invalid_command).__name__} command was accepted"
-            )
+    for command in (argv, tuple(argv)):
+        result = $(command, check=True, timeout=10)
+        assert result.stdout.strip() == "['|', 'not-a-pipeline']"
+        assert result.exitcode == 0
+        assert result.host is None
 
     $("printf forced-shell", shell=True, timeout=10)
     assert $.stdout == "forced-shell"
@@ -156,7 +150,7 @@ def test_function_scope():
     case(name)
 
     def run(command):
-        stdout, stderr = $(command)
+        stdout, stderr, exitcode = $(command)
         return stdout.strip(), str(stderr), $.exitcode
 
     result = run(

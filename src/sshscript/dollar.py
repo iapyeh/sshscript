@@ -66,6 +66,7 @@ class Dollar(object):
         self.for_with = for_with
 
         self.command = command
+        self.argv = None
         self.session = session # Session instance in context
         self.channel = None
         self.use_shell = use_shell
@@ -461,7 +462,7 @@ class Dollar(object):
                 shell_executable = self.shell_executable or '/bin/sh'
                 cpargs = [shell_executable,'-c',self.command]
             else:
-                cpargs = shlex.split(self.command)
+                cpargs = list(self.argv) if self.argv is not None else shlex.split(self.command)
             summary = command_summary(cpargs)
             kw['text'] = False
             ## with_pty is always False
@@ -536,7 +537,7 @@ class Dollar(object):
                 summary = command_summary([shell_executable])
                 argc = None
             else:
-                argv = shlex.split(self.command)
+                argv = self.argv if self.argv is not None else shlex.split(self.command)
                 command = 'exec ' + ' '.join(shlex.quote(str(arg)) for arg in argv)
                 summary = command_summary(argv)
                 argc = summary['arg_count']
