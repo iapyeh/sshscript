@@ -21,6 +21,21 @@ SSHScript 讓你把熟悉的系統指令直接寫進 Python，並以同一套程
 
 這份教學介紹 SSHScript v3.1 選用的 Dollar syntax，範例檔案使用慣例副檔名 `.spy`。新專案建議先從正式的 [Module API Tutorial](tutorial) 開始；當精簡的命令寫法更適合團隊時，再使用本篇的 `.spy` 語法。
 
+## 下一版 API 更新
+
+以下新功能需要更新後的原始碼，PyPI 3.1.4 尚為舊介面。
+單次命令可直接接受字串參數 list／tuple，表示一個命令而非批次。
+回傳 CommandResult，使用 `stdout, stderr, exitcode = result` 解包。
+本機與遠端均支援 `check=True`；持續 shell 的 console 仍回傳兩個 buffer。
+
+本機發起的連線預設讀取 ~/.ssh/config；可用 ssh_config=False 關閉，或指定
+設定檔路徑。支援 Host、HostName、User、Port、IdentityFile、ProxyCommand、
+ProxyJump，可用 Session.resolve_connection() 預覽解析結果而不連線。
+不支援的 Match、Include、canonicalization 會報錯，其他未套用設定會警告。
+
+`sshscript --check 檔案.spy` 只做語法編譯，不執行使用者程式、匯入或命令。
+不帶檔案的 --check 仍是舊版線上更新查詢；更新查詢建議使用 --check-updates。
+
 ## 1. 安裝與執行
 
 安裝或升級 SSHScript：
@@ -152,10 +167,11 @@ print($.stderr)
 print($.exitcode)
 ```
 
-也可以直接接收 stdout 與 stderr：
+也可以解包取得 stdout、stderr、exitcode；單次命令回傳的 CommandResult
+另外保留 host、duration、command，輸出為獨立的文字快照：
 
 ```python
-stdout, stderr = $python3 -c "print('captured')"
+stdout, stderr, exitcode = $python3 -c "print('captured')"
 print(stdout.strip())
 ```
 
@@ -737,10 +753,10 @@ SSHScript v3.1 把 shell 擅長的「直接操作系統」和 Python 擅長的�
 
 本教學中的 `assert` 是示範驗證，使用者 `.spy` 中的 assert 仍保留 Python
 語意。`python -O` 會刪除整個 assert，包括其中的函式呼叫。生產腳本必須
-明確判斷 `session.exitcode` 或 `$.exitcode` 並處理失敗；本機命令也可使用
-`check=True`，但不要把它當作遠端命令的通用選項。
+明確判斷 `session.exitcode` 或 `$.exitcode` 並處理失敗；本機與遠端的
+單次命令均可使用 `check=True`，在保存執行結果後拋出 CalledProcessError。
 
 未連線存取 SFTP 拋出 `SSHScriptException`。完整例外分類請參考
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/)。
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-09-26 16:11:31

@@ -7,6 +7,9 @@ nav_order: 1
 
 # Running Commands and Shell Pipelines
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 Use the regular Python `Session` API to run one-shot commands with preserved
 argument boundaries or through an explicitly selected shell. This is
 SSHScript v3.1's primary interface for applications, libraries, tests, and
@@ -19,7 +22,7 @@ from sshscript import Session
 
 session = Session()
 try:
-    stdout, stderr = session.exec_command("hostname", shell=False)
+    stdout, stderr, exitcode = session.exec_command("hostname", shell=False)
     print(str(stdout).strip())
     print(session.exitcode)
 finally:
@@ -34,26 +37,23 @@ it does not globally patch Python imports, warnings, logging, or
 `session.close_errors`; `close(strict=True)` raises when cleanup could not be
 completed.
 
-## Commands are strings
+## Strings and argument sequences
 
-`Session.exec_command(command)` accepts exactly one non-empty `str`. Lists,
-tuples, and other command types raise `TypeError`.
-
-Build arguments with `shlex.join()` when shell expansion is not required:
+`Session.exec_command(command)` accepts a nonempty string or a nonempty
+list/tuple of string arguments. A sequence represents one command, not a batch.
 
 ```python
-import shlex
-
 arguments = ["python3", "-c", "print('hello world')"]
-command = shlex.join(arguments)
-stdout, stderr = session.exec_command(command, shell=False)
+stdout, stderr, exitcode = session.exec_command(arguments, check=True)
 ```
 
-This keeps spaces and shell metacharacters inside individual arguments. Do
-not pass `arguments` itself to `exec_command()`.
+Sequences bypass shell detection and require `shell=None` or `shell=False`,
+without `shell_executable`. Spaces, quotes, empty arguments, and shell
+metacharacters remain data. Locally the argv is passed directly to the process;
+over SSH it is quoted for a POSIX login shell. A string built with
+`shlex.join(arguments)` and `shell=False` remains valid.
 
-`Session.onedollar()` is a deprecated compatibility alias and follows the
-same string-only rule. New Python code should call `exec_command()`.
+`Session.onedollar()` is deprecated; use `exec_command()` in new code.
 
 ## Shell selection
 
@@ -80,11 +80,11 @@ user shell syntax, but a server-side shell still participates.
 
 ## Results
 
-Every command returns `(stdout, stderr)` and updates the Session's latest
-result:
+Each one-shot command returns an immutable `CommandResult`, which unpacks as
+`(stdout, stderr, exitcode)`, and updates the Session's latest result:
 
 ```python
-stdout, stderr = session.exec_command(
+stdout, stderr, exitcode = session.exec_command(
     "python3 -c \"import sys; print('out'); "
     "sys.stderr.write('err\\n'); sys.exit(7)\""
 )
@@ -94,8 +94,12 @@ print(str(stderr).strip())
 print(session.exitcode)  # 7
 ```
 
-The next command replaces `session.stdout`, `session.stderr`, and
-`session.exitcode`, so keep values needed later in Python variables.
+The next command replaces Session result properties, but the returned text and
+exit code are independent snapshots. Keep the result object to also retain
+`host`, `duration`, and `command`; see
+[Results and Error Model]({{ site.baseurl }}/v3a/concepts/results-and-error-model/).
+`check=True` raises `subprocess.CalledProcessError` on nonzero status locally
+and remotely, after saving `session.last_result` and `exception.result`.
 
 ## Remote Sessions
 
@@ -108,7 +112,7 @@ from sshscript import Session
 local = Session()
 try:
     with local.connect("ops@example.net") as remote:
-        stdout, stderr = remote.exec_command("hostname", shell=False)
+        stdout, stderr, exitcode = remote.exec_command("hostname", shell=False)
         print(str(stdout).strip())
 finally:
     local.close(strict=True)
@@ -144,8 +148,9 @@ enables peer `.spy` imports as well.
 
 ## Runtime validation
 
-Commands must be nonempty strings; wrong types raise `TypeError`, and empty
-commands raise `ValueError`. Persistent commands must contain only one line.
+One-shot commands accept nonempty strings or nonempty lists/tuples of string
+arguments. Wrong types raise `TypeError`; empty commands or invalid shell/argv
+combinations raise `ValueError`. Persistent commands must contain only one line.
 `get_pty` accepts only `None` or bool. The internal `for_with` selector accepts
 only bool. Text matching rejects compiled bytes regular expressions with
 `TypeError`; appended output must be str.
@@ -163,13 +168,13 @@ Paramiko failures retain their original exception and traceback. See
 User-written `assert` statements in `.spy` files retain normal Python semantics.
 `python -O` removes them, including calls inside the assertion. They are useful
 for illustrative tests, but production scripts must explicitly inspect
-`session.exitcode` (or `$.exitcode`) and handle nonzero status. Local
-`Session.exec_command(..., check=True)` raises `subprocess.CalledProcessError`;
-this is not a portable remote-command option. SSH, timeout, and transport
-failures remain exceptions regardless of optimization.
+`session.exitcode` (or `$.exitcode`) and handle nonzero status, or use
+`Session.exec_command(..., check=True)` on local or remote Sessions to raise
+`subprocess.CalledProcessError` after preserving the completed result. SSH,
+timeout, and transport failures remain exceptions regardless of optimization.
 
 `AssertionError` was never a supported SSHScript API contract. Package runtime
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

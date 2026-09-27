@@ -8,6 +8,9 @@ permalink: /v3a/reference/session-and-console-api/
 
 # Session and Console API Reference
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 This page defines the supported core Session and Console API for the SSHScript
 v3.1 Production/Stable line, verified with 3.1.4. Examples that teach a
 workflow belong in the tutorials and how-to guides; this page focuses on
@@ -74,7 +77,8 @@ A closed Session cannot create a new connection.
 | `host`, `username`, `port` | Connection identity; `None` for a new local Session. |
 | `local_session` | The root local Session in a nested connection chain. |
 | `sftp` | Lazily opened Paramiko SFTP client; requires an active SSH connection. |
-| `stdout`, `stderr`, `exitcode` | Result of the latest command. |
+| `stdout`, `stderr`, `exitcode` | Latest command buffers and status. |
+| `last_result` | Latest completed one-shot CommandResult, or None before completion. |
 | `logger` | SSHScript's configured logger. |
 | `close_errors` | Tuple of `(operation, exception)` cleanup failures. |
 
@@ -85,18 +89,22 @@ result exists.
 
 ```python
 session.exec_command(
-    cmd: str,
+    cmd: str | list[str] | tuple[str, ...],
     *,
     shell=None,
     shell_executable=None,
+    check=False,
     **backend_options,
-) -> tuple[stdout, stderr]
+) -> CommandResult  # unpack stdout, stderr, exitcode
 
 session(cmd, ...)  # alias
 ```
 
-`cmd` must be one non-empty `str`. Lists, tuples, and other types raise
-`TypeError`; an empty or whitespace-only string raises `ValueError`.
+`cmd` is one nonempty string or a nonempty list/tuple of string arguments, not
+a batch of commands. Argv permits empty data arguments but not an empty
+executable or NUL. Sequences require `shell=None`/`False` with no
+`shell_executable`; wrong types raise `TypeError`, invalid values or
+combinations raise `ValueError`. `check` must be bool.
 
 ### Shell selection
 
@@ -111,13 +119,13 @@ A string-valued `shell` is shorthand for `shell=True` with that executable.
 Supplying both a string-valued `shell` and `shell_executable` raises
 `ValueError`.
 
-Use `shlex.join(arguments)` with `shell=False` for dynamic argument lists:
+Pass dynamic argument lists directly, or retain `shlex.join()` with `shell=False`:
 
 ```python
 import shlex
 
 command = shlex.join(["printf", "%s\\n", "hello world"])
-stdout, stderr = session.exec_command(command, shell=False)
+stdout, stderr, exitcode = session.exec_command(command, shell=False)
 ```
 
 The local and remote implementations therefore preserve the same argument
@@ -126,20 +134,22 @@ shell process participates.
 
 ### Results
 
-The method returns `(stdout, stderr)` and stores the same objects on the
-Session. `exitcode` stores the process status. A nonzero status does not raise
-by default.
+`CommandResult` supports three-value unpacking/indexing: stdout, stderr, exitcode.
+Output is an immutable text snapshot. It also stores `host`, `duration`, and
+`command`; see [Results and Error Model](../../concepts/results-and-error-model/)
+for their exact definitions. The Session retains the result as `last_result`,
+as well as its existing latest-output buffer properties.
 
-The two output objects are live, string-like buffers rather than immutable
-Python strings. Use `str(stdout)` for a stable snapshot. Iteration can yield
-received chunks and should not be assumed to produce exactly one complete
-line per item.
+`check=True` is handled by SSHScript on both backends. Nonzero status raises
+`subprocess.CalledProcessError` after result capture; the exception's `result`
+contains the snapshot. Its `stdout`/`stderr` are text and its `cmd` is the
+normalized string or argv tuple. `check=False` returns nonzero status as data.
 
 ### Backend options
 
 Applicable keyword arguments are forwarded to the execution backend. Local
 execution supports relevant `subprocess.run()` options such as `input`,
-`timeout`, `env`, and `check`. Remote execution forwards relevant options to
+`timeout` and `env`. SSHScript consumes `check` before backend dispatch. Remote execution forwards relevant options to
 Paramiko's `SSHClient.exec_command()`; SSHScript translates `env` to
 Paramiko's `environment` option.
 
@@ -149,11 +159,17 @@ it is **not** a wall-clock command deadline and does not guarantee termination
 of the remote process. Enforce an overall remote workflow deadline outside the
 Session and reconcile the target's state after any ambiguous timeout.
 
-These options are not perfectly symmetric. In particular, local `check=True`
-can raise `subprocess.CalledProcessError`; do not treat it as a portable
-local/remote contract. Local and remote string input also differ in newline
-handling. Code that must work on both backends should inspect `exitcode` and
-test its input protocol explicitly.
+The `check` policy is symmetric; backend timeout and input behavior are not.
+Local and remote string input differ in newline handling. Test protocol-sensitive
+input on each backend.
+
+## Compile-only script validation
+
+`sshscript.check_file(path)` compiles one Python/`.spy` file and returns 0.
+It does not create a Session, execute user code, import user modules, or connect.
+Syntax errors retain the original file/line/source; filesystem errors propagate.
+This does not validate shell syntax, import availability, or remote behavior.
+Use `sshscript --check file.spy` for the equivalent CLI check.
 
 ## SSH connections
 
@@ -162,8 +178,10 @@ session.connect(
     host,
     username=None,
     password=None,
-    port=22,
+    port=None,
     policy=None,
+    *,
+    ssh_config=None,
     **connect_options,
 ) -> Session
 ```
@@ -193,6 +211,17 @@ parent, enabling bastion workflows. `proxyCommand=...` is supported only from
 a local parent; combining it with a nested connection raises
 `NotImplementedError`. Direct proxy connections default their connection,
 banner, and authentication timeouts to 30 seconds unless overridden.
+
+Local connections read `~/.ssh/config` by default. Set `ssh_config=False` to
+opt out, or supply a path. Explicit arguments override config; `port=None`
+means unspecified and falls back to 22. Nested connections skip local config
+unless a file is explicitly selected. `Session.resolve_connection(...)`
+previews effective settings without connecting. It accepts `host`, `username`,
+`port`, `ssh_config`, and connection options, and returns a dict of effective
+Paramiko arguments plus `proxyCommand` when needed.
+
+Supported config keys and ProxyJump prerequisites are documented in
+[Connections, Authentication, and Bastions]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Basic/connect/).
 
 `pkey_path=...` loads an RSA private key from the parent Session's host.
 Supplying both `pkey_path` and `pkey` raises `ValueError`. The
@@ -463,8 +492,9 @@ code.
 
 ## Runtime validation
 
-Commands must be nonempty strings; wrong types raise `TypeError`, and empty
-commands raise `ValueError`. Persistent commands must contain only one line.
+One-shot commands accept nonempty strings or nonempty lists/tuples of string
+arguments. Wrong types raise `TypeError`; empty commands or invalid shell/argv
+combinations raise `ValueError`. Persistent commands must contain only one line.
 `get_pty` accepts only `None` or bool. The internal `for_with` selector accepts
 only bool. Text matching rejects compiled bytes regular expressions with
 `TypeError`; appended output must be str.
@@ -477,4 +507,4 @@ Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
 Paramiko failures retain their original exception and traceback. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-24 15:36:45
+Last Updated: 2026-09-26 16:11:31

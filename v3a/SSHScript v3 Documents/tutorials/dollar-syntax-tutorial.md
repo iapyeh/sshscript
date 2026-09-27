@@ -8,6 +8,9 @@ permalink: /v3a/tutorials/dollar-syntax/
 
 # Dollar Syntax Tutorial
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 Dollar syntax is an optional notation for command-oriented `.spy` files. It is
 a concise layer over the Session model, not a separate execution engine. Learn
 the Module API first and keep reusable application logic in ordinary Python.
@@ -59,8 +62,9 @@ name = "world"
 $f"printf 'hello %s\n' {shlex.quote(name)}"
 ```
 
-The parenthesized form accepts an expression and keyword options. Its value must
-be one non-empty string; a list or tuple raises `TypeError`.
+Outside persistent consoles, the parenthesized form accepts a nonempty string
+or a nonempty list/tuple of string arguments plus keyword options. A sequence
+is one direct command, not a command batch; shell mode is not accepted with argv.
 
 For dynamic arguments, build a list in Python, convert it with `shlex.join()`,
 and use direct mode:
@@ -83,10 +87,11 @@ requested executable or operation is authorized.
 
 ## Read and retain results
 
-A Dollar command returns stdout and stderr and updates the active Session:
+A one-shot Dollar command returns CommandResult and updates the active Session.
+Unpack its stdout, stderr, and exitcode:
 
 ```python
-stdout, stderr = $python3 -c "import sys; print('out'); print('err', file=sys.stderr)"
+stdout, stderr, exitcode = $python3 -c "import sys; print('out'); print('err', file=sys.stderr)"
 
 print(str(stdout).strip())
 print(str(stderr).strip())
@@ -140,7 +145,7 @@ arguments = [
     "|",
     "not-a-pipeline",
 ]
-$(shlex.join(arguments), shell=False)
+$(arguments, check=True)
 ```
 
 Force a shell when intent or shell choice must be explicit:
@@ -208,7 +213,7 @@ after its block.
 
 ```python
 def run_checked(command):
-    stdout, stderr = $(command, shell=False)
+    stdout, stderr, exitcode = $(command, shell=False)
     if $.exitcode != 0:
         raise RuntimeError(
             f"command failed with exit status {$.exitcode}"
@@ -263,4 +268,4 @@ for lookup and
 [How `.spy` Transformation Works](../../concepts/how-spy-transformation-works/)
 when debugging transformed code.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

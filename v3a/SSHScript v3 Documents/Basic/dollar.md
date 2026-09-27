@@ -7,6 +7,9 @@ nav_order: 2
 
 # Dollar Syntax Reference
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 Dollar syntax is SSHScript v3.1's optional shorthand for `.spy` files. It
 uses the same Session implementation as the primary Python API, but lets an
 automation script place `$` before a command.
@@ -28,10 +31,10 @@ print($.stderr.strip())  # problem
 ```
 
 Each command updates `$.stdout`, `$.stderr`, and `$.exitcode`. Capture the
-two output streams when the values must survive a later command:
+output and status when the values must survive a later command:
 
 ```python
-stdout, stderr = $python3 -c "import sys; print('out'); sys.stderr.write('err\\n')"
+stdout, stderr, exitcode = $python3 -c "import sys; print('out'); sys.stderr.write('err\\n')"
 ```
 
 ## Command forms
@@ -48,8 +51,11 @@ name = "SSHScript"
 $f'printf "Hello, %s\\n" {name}'
 ```
 
-The value passed to `$(...)` must be a non-empty string. Lists and tuples
-raise `TypeError`, just as they do with `Session.exec_command()`.
+Outside persistent consoles, `$(...)` accepts a nonempty string or a list/tuple
+of string arguments, just like `Session.exec_command()`. It returns
+CommandResult, unpacked as stdout, stderr, exitcode. `check=True` works locally
+and remotely. Persistent console commands remain one-line strings and return
+two buffers with status on the console.
 
 Quote dynamic values before inserting them into a shell command:
 
@@ -60,12 +66,11 @@ folder = "/tmp/a folder"
 $f'mkdir -p {shlex.quote(folder)}'
 ```
 
-For argument-preserving execution, assemble an argument list with
-`shlex.join()` and use `shell=False`:
+For argument-preserving one-shot execution, pass an argument list directly:
 
 ```python
 arguments = ["printf", "%s\n", "hello world"]
-$(shlex.join(arguments), shell=False)
+$(arguments, check=True)
 ```
 
 ## Automatic shell selection
@@ -164,13 +169,13 @@ for the unittest wrapper, full release gate, and language integration modes.
 User-written `assert` statements in `.spy` files retain normal Python semantics.
 `python -O` removes them, including calls inside the assertion. They are useful
 for illustrative tests, but production scripts must explicitly inspect
-`session.exitcode` (or `$.exitcode`) and handle nonzero status. Local
-`Session.exec_command(..., check=True)` raises `subprocess.CalledProcessError`;
-this is not a portable remote-command option. SSH, timeout, and transport
-failures remain exceptions regardless of optimization.
+`session.exitcode` (or `$.exitcode`) and handle nonzero status, or use
+`Session.exec_command(..., check=True)` on local or remote Sessions to raise
+`subprocess.CalledProcessError` after preserving the completed result. SSH,
+timeout, and transport failures remain exceptions regardless of optimization.
 
 `AssertionError` was never a supported SSHScript API contract. Package runtime
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-24 15:50:00
+Last Updated: 2026-09-26 16:11:31

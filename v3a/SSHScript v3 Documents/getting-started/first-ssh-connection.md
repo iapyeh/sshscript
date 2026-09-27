@@ -8,6 +8,9 @@ permalink: /v3a/getting-started/first-ssh-connection/
 
 # Your First SSH Connection
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 This guide starts from the verified local installation and runs one
 deterministic command through SSH. It uses the regular Python Module API, the
 recommended interface for applications, libraries, tests, and long-lived
@@ -45,7 +48,7 @@ try:
         banner_timeout=10,
         auth_timeout=10,
     ) as remote:
-        stdout, stderr = remote.exec_command(
+        stdout, stderr, exitcode = remote.exec_command(
             "printf 'sshscript-ok\n'",
             shell=False,
             timeout=10,
@@ -86,9 +89,10 @@ the application's responsibility. The `except` branch preserves a work
 failure while recording cleanup failure; the `else` branch makes cleanup
 strict after successful work.
 
-`exec_command()` accepts one non-empty command string. Lists and tuples are not
-accepted. The returned stdout and stderr objects are live, string-like buffers;
-use `str(stdout)` when a stable string snapshot is required.
+`exec_command()` accepts a nonempty string or a list/tuple of string arguments.
+It returns CommandResult, unpacked as stdout, stderr, exitcode; output is text
+that remains stable after later commands. Use `check=True` to raise on nonzero
+status after preserving the result.
 
 ## Select an authentication source
 
@@ -115,7 +119,7 @@ try:
         banner_timeout=10,
         auth_timeout=10,
     ) as remote:
-        stdout, stderr = remote.exec_command(
+        stdout, stderr, exitcode = remote.exec_command(
             "hostname",
             shell=False,
             timeout=10,
@@ -163,13 +167,13 @@ an authentication or host-key failure into a blind retry.
 Use argument-preserving execution for a single program invocation:
 
 ```python
-stdout, stderr = remote.exec_command("uname -a", shell=False)
+stdout, stderr, exitcode = remote.exec_command("uname -a", shell=False)
 ```
 
 SSHScript can detect common shell constructs when `shell=None`:
 
 ```python
-stdout, stderr = remote.exec_command(
+stdout, stderr, exitcode = remote.exec_command(
     "printf 'alpha\nbeta\n' | grep beta",
 )
 ```
@@ -177,7 +181,7 @@ stdout, stderr = remote.exec_command(
 For unusual or shell-specific grammar, state the intent:
 
 ```python
-stdout, stderr = remote.exec_command(
+stdout, stderr, exitcode = remote.exec_command(
     "set -o pipefail; generate-report | upload-report",
     shell="bash",
 )
@@ -205,4 +209,4 @@ with
 Before production use, read
 [Host Keys, Credentials, and Command Injection](../../security-and-operations/host-keys-credentials-and-command-injection/).
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

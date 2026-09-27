@@ -8,6 +8,9 @@ permalink: /v3a/security-and-operations/failure-model-and-production-checklist/
 
 # Failure Model and Production Checklist
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 SSHScript automation is reliable only when code distinguishes command results,
 operational exceptions, and cleanup failures. This page provides that model
 and a review checklist for production use.
@@ -29,7 +32,7 @@ By default, a command that returns status 7 is a completed command, not a
 Python exception:
 
 ```python
-stdout, stderr = session.exec_command(command, shell=False)
+stdout, stderr, exitcode = session.exec_command(command, shell=False)
 
 if session.exitcode != 0:
     raise RuntimeError(
@@ -41,10 +44,10 @@ Include a short operation name, host, and exit status in logs. Avoid logging
 the complete command or stderr when either can contain passwords, tokens,
 private paths, customer data, or command-line secrets.
 
-Local execution can use `check=True`, which may raise
-`subprocess.CalledProcessError`. It is not a portable local/remote policy.
-Explicit `exitcode` handling gives both backends the same application-level
-decision point.
+Both local and remote one-shot execution support `check=True`, raising
+`subprocess.CalledProcessError` after capture. Its `result` preserves output,
+status, and metadata. Explicit `exitcode` handling remains available with the
+default `check=False`.
 
 ## Exceptions are operational failures
 
@@ -82,7 +85,7 @@ with local.connect(
     banner_timeout=10,
     auth_timeout=10,
 ) as remote:
-    stdout, stderr = remote.exec_command(
+    stdout, stderr, exitcode = remote.exec_command(
         "systemctl is-active nginx",
         timeout=20,  # Paramiko channel I/O timeout, not a total deadline
     )
@@ -184,7 +187,7 @@ import shlex
 
 arguments = ["install", "-m", "0644", source, destination]
 command = shlex.join(arguments)
-stdout, stderr = remote.exec_command(command, shell=False)
+stdout, stderr, exitcode = remote.exec_command(command, shell=False)
 ```
 
 Use shell mode only when the operation actually requires a pipeline,
@@ -294,13 +297,13 @@ controlled diagnostic environment, and review all output before sharing it.
 User-written `assert` statements in `.spy` files retain normal Python semantics.
 `python -O` removes them, including calls inside the assertion. They are useful
 for illustrative tests, but production scripts must explicitly inspect
-`session.exitcode` (or `$.exitcode`) and handle nonzero status. Local
-`Session.exec_command(..., check=True)` raises `subprocess.CalledProcessError`;
-this is not a portable remote-command option. SSH, timeout, and transport
-failures remain exceptions regardless of optimization.
+`session.exitcode` (or `$.exitcode`) and handle nonzero status, or use
+`Session.exec_command(..., check=True)` on local or remote Sessions to raise
+`subprocess.CalledProcessError` after preserving the completed result. SSH,
+timeout, and transport failures remain exceptions regardless of optimization.
 
 `AssertionError` was never a supported SSHScript API contract. Package runtime
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-24 15:36:45
+Last Updated: 2026-09-26 16:11:31

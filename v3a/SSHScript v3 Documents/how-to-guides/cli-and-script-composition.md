@@ -8,10 +8,23 @@ permalink: /v3a/how-to-guides/cli-and-script-composition/
 
 # CLI and Script Composition
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 The SSHScript CLI and `run_file()` deliberately execute one file at a time.
 Compose a larger program with ordinary Python modules and scoped `.spy`
 imports. Keep the entry point responsible for input, lifetime, and process
 status; keep reusable policy in testable `.py` functions.
+
+## Check a script before running it
+
+Run `sshscript --check automation.spy` to compile one file without running its
+Python, imports, or commands. A successful check exits 0; syntax/read errors
+exit 1 and invalid CLI usage exits 2. Source-located diagnostics refer to the
+original `.spy` file. Use `sshscript.check_file(path)` from Python.
+This is a syntax check, not a shell-command or import-availability check.
+`--check` without a file retains the old online update check; use
+`--check-updates` explicitly for that purpose.
 
 ## Choose an entry point
 
@@ -82,7 +95,7 @@ import shlex
 
 def run_checked(session, arguments, *, timeout=20):
     command = shlex.join(arguments)
-    stdout, stderr = session.exec_command(
+    stdout, stderr, exitcode = session.exec_command(
         command,
         shell=False,
         timeout=timeout,
@@ -276,4 +289,4 @@ for the option reference and
 [How `.spy` Transformation Works](../../concepts/how-spy-transformation-works/)
 for importer and transformation details.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

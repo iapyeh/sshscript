@@ -8,6 +8,9 @@ permalink: /v3a/getting-started/installation-and-verification/
 
 # Installation and Verification
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 This page installs the supported SSHScript release and verifies the command-line
 program, Python import, and dependency set before any SSH connection is made.
 
@@ -147,7 +150,7 @@ site-specific validation.
 sshscript --check-updates
 ```
 
-`--check-updates` (with `--check` as an alias) queries stable releases on
+`--check-updates` (or legacy `--check` without a file) queries stable releases on
 PyPI that are compatible with the current Python version. It does not install
 anything. Verify the installed version and import path separately as shown
 above.
@@ -173,4 +176,4 @@ credential-free command. See
 if the
 version or import path is not what you expect.
 
-Last Updated: 2026-09-24 15:36:45
+Last Updated: 2026-09-26 16:11:31

@@ -7,6 +7,9 @@ nav_order: 3
 
 # CLI and Environment Variables
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 SSHScript v3.1 can run a regular Python file or a `.spy` file from the
 command line. The CLI deliberately accepts one script file at a time.
 
@@ -46,7 +49,8 @@ through `sys.argv`.
 | `--traceback` | Show the full exception traceback. |
 | `--version` | Print the installed SSHScript version. |
 | `--check-updates` | Check the latest compatible stable PyPI release; this requires Internet access. |
-| `--check` | Alias for `--check-updates`. |
+| `--check FILE` | Compile Python/dollar syntax without executing user code, imports, or commands. |
+| `--check` without a file | Legacy alias for `--check-updates`; this accesses PyPI. |
 
 For ordinary runtime exceptions, the default error record avoids printing
 command payloads. Syntax errors are different: even without `--traceback`,
@@ -56,6 +60,22 @@ and review every diagnostic before sharing it.
 
 Normal completion returns status 0. `$.break(code)` becomes the CLI process
 status, while `$.exit(code)` exits with the requested status.
+
+## Validate syntax without execution
+
+```sh
+sshscript --check automation.spy
+```
+
+The check accepts one file and returns 0 on success, 1 for syntax/read failure,
+and 2 for invalid CLI usage. It does not connect or execute user imports. It
+checks Python/dollar grammar, not shell syntax or import/host availability.
+Errors display the original filename, line, source, and caret without an
+internal traceback. `--script` remains the generated-source inspection option;
+it cannot be combined with `--check FILE`.
+
+The Python equivalent is `sshscript.check_file(path)`: it returns 0 on success
+and raises source-located SyntaxError or filesystem errors on failure.
 
 ## Run from Python
 
@@ -129,4 +149,4 @@ only by the CLI.
 See [Contributing and Testing](../development-and-testing/) for the
 credential-free release gate and isolated integration-test guidance.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

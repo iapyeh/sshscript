@@ -8,6 +8,9 @@ permalink: /v3a/getting-started/module-api-or-dollar-syntax/
 
 # Module API or Dollar Syntax?
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 SSHScript provides two interfaces to the same Session execution model:
 
 1. the regular Python Module API; and
@@ -36,7 +39,7 @@ from sshscript import Session
 
 session = Session()
 try:
-    stdout, stderr = session.exec_command(
+    stdout, stderr, exitcode = session.exec_command(
         "python3 --version",
         shell=False,
     )
@@ -57,9 +60,9 @@ The Module API is the better default when code must be imported, packaged,
 checked by standard Python tooling, embedded in another program, or tested with
 ordinary mocks and fixtures.
 
-`exec_command()` and its callable alias, `session(...)`, accept one non-empty
-command string. They do not accept an argv list. Use `shlex.join()` to turn an
-argument list into one correctly quoted string.
+`exec_command()` and `session(...)` accept a nonempty command string or
+a list/tuple of string arguments for one command. Sequences bypass shell
+detection. Both return CommandResult, unpacked as stdout, stderr, exitcode.
 
 ## Optional Dollar syntax
 
@@ -102,11 +105,11 @@ transfer, and cleanup implementation:
 Equivalent expression forms are:
 
 ```python
-stdout, stderr = session.exec_command(command, shell=False)
+stdout, stderr, exitcode = session.exec_command(command, shell=False)
 ```
 
 ```python
-stdout, stderr = $(command, shell=False)
+stdout, stderr, exitcode = $(command, shell=False)
 ```
 
 ## One `$` includes shell capability
@@ -159,4 +162,4 @@ Python.
 - For a mixed command-line project, use
   [CLI and Script Composition](../../how-to-guides/cli-and-script-composition/).
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

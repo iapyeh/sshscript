@@ -7,6 +7,9 @@ nav_order: 8
 
 # Concurrency and Threading
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 SSHScript v3.1 does not replace the process-wide `threading.Thread` class.
 Regular Python code should make Session ownership explicit. Transformed
 `.spy` files additionally provide scoped Session inheritance for recognized
@@ -26,7 +29,7 @@ def remote_hostname(host):
     local = Session()
     try:
         with local.connect(host) as remote:
-            stdout, stderr = remote.exec_command(
+            stdout, stderr, exitcode = remote.exec_command(
                 "hostname",
                 shell=False,
             )
@@ -101,4 +104,4 @@ python3 -m unittest discover -v -s unittest -p 'test_*.py'
 See [Contributing and Testing](../../development-and-testing/) for the complete
 release gate and the separate manual integration modes.
 
-Last Updated: 2026-09-17 12:13:56
+Last Updated: 2026-09-26 16:11:31

@@ -8,6 +8,9 @@ permalink: /v3a/security-and-operations/runtime-troubleshooting/
 
 # Runtime Troubleshooting
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 Use this page after the package imports correctly and reports the expected
 version. For installation, environment, and shadowed-import problems, start
 with
@@ -35,7 +38,7 @@ from sshscript import Session
 local = Session()
 try:
     command = shlex.join([sys.executable, "-c", "print('ok')"])
-    stdout, stderr = local.exec_command(
+    stdout, stderr, exitcode = local.exec_command(
         command,
         shell=False,
         timeout=10,
@@ -98,7 +101,7 @@ execution mode explicitly:
 ```python
 arguments = ["tool", "--target", user_value]
 command = shlex.join(arguments)
-stdout, stderr = remote.exec_command(command, shell=False, timeout=20)
+stdout, stderr, exitcode = remote.exec_command(command, shell=False, timeout=20)
 ```
 
 Local `shell=False` uses direct process execution. Remote `shell=False` safely
@@ -112,8 +115,8 @@ sensitive code says `shell=False`, `shell=True`, or `shell="bash"`. If a
 pipeline works locally and fails remotely, compare shell implementation,
 utility versions, locale, working directory, environment, and quoting.
 
-The next command replaces `session.stdout`, `session.stderr`, and
-`session.exitcode`. Save `str(stdout)` and `str(stderr)` before issuing another
+The next command replaces Session result properties. A saved CommandResult
+already holds independent text and status snapshots; keep it before issuing another
 command when the earlier result is needed.
 
 ## Interactive and PTY problems
@@ -195,4 +198,4 @@ consult the [Session and Console API Reference](../../reference/session-and-cons
 and open a report using the project's
 [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md).
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31
