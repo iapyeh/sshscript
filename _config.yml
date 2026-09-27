@@ -44,19 +44,21 @@ defaults:
     values:
       layout: "default"
       nav_enabled: true
+      nav_exclude: false
+      search_exclude: false
 
   - scope:
-      path: "v1/"
+      path: "v1"
     values:
       nav_exclude: true
       search_exclude: true
   - scope:
-      path: "v2/"
+      path: "v2"
     values:
       nav_exclude: true
       search_exclude: true
   - scope:
-      path: "v3/"
+      path: "v3"
     values:
       nav_exclude: true
       search_exclude: true
