@@ -7,6 +7,9 @@ nav_order: 2
 
 # SSHScript v3.1 Release Notes
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 SSHScript 3.1.4 was published on 2026-09-24 as the first Production/Stable
 release in the supported v3.1 line. Install it from
 [PyPI](https://pypi.org/project/sshscript/3.1.4/) or review the corresponding
@@ -14,6 +17,28 @@ release in the supported v3.1 line. Install it from
 
 The release requires Python 3.11 or newer and supports Python 3.11–3.14 on
 Linux and macOS.
+
+## Next release — source changes
+
+These changes are available in the updated source checkout; the published
+3.1.4 wheel retains its original behavior.
+
+- One-shot commands accept argv lists/tuples or command strings. Sequences
+  preserve argument boundaries and reject shell mode.
+- Results are immutable CommandResult objects with stdout, stderr, exitcode,
+  host, duration, and command. Unpacking/indexing yields three values:
+  stdout, stderr, exitcode. Update callers that previously unpacked two.
+- `check=True` works locally and remotely after output/status capture. The
+  exception carries text output and the completed `result`.
+- Local connections resolve common SSH config settings, ProxyCommand, and
+  ProxyJump. Explicit overrides, config opt-out, and a no-connection preview
+  are available. Unsupported config rules are diagnosed explicitly.
+- `--check FILE` and `check_file(path)` validate Python/dollar syntax without
+  execution; tokenizer indentation errors map to the original file.
+- Persistent console commands retain their two-buffer/prompt contract.
+  Editor integration is deferred.
+
+The following sections record the already published 3.1.4 release.
 
 ## Production hardening
 
@@ -95,4 +120,4 @@ Provenance establishes the origin and integrity of an artifact; it does not
 replace source review or validation against the target organization's SSH,
 PAM, `sudoers`, network, and host-key policies.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

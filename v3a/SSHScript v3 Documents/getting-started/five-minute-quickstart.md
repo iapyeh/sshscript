@@ -8,13 +8,17 @@ permalink: /v3a/getting-started/quickstart/
 
 # 5-Minute Quickstart
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 This quickstart proves the v3.1 Module API on localhost. It requires no SSH
 server, account, key, password, or network connection.
 
 ## Before you begin
 
 Complete [Installation and Verification](../installation-and-verification/).
-Both verification commands must report `3.1.4` from the intended environment.
+Use an environment containing the updated source checkout for the next-release
+API shown here. The released 3.1.4 wheel still has the earlier return contract.
 
 ## Create a script
 
@@ -35,7 +39,7 @@ try:
         "print('hello from SSHScript')",
     ])
 
-    stdout, stderr = session.exec_command(command, shell=False)
+    stdout, stderr, exitcode = session.exec_command(command, shell=False)
 
     print("stdout:", str(stdout).strip())
     print("stderr:", repr(str(stderr)))
@@ -63,32 +67,27 @@ output streams, inspected the process status, and closed every resource.
 
 ## What the example establishes
 
-`Session.exec_command()` accepts one non-empty command string and returns
-`(stdout, stderr)`. It also updates the Session's latest result:
+`exec_command()` accepts one nonempty command string or a list/tuple of string
+arguments and returns an immutable CommandResult. Unpack exactly three values:
+stdout, stderr, exitcode. The Session also updates its latest-result properties.
 
 ```python
-session.stdout
-session.stderr
-session.exitcode
+result = session.exec_command(["printf", "%s", "hello"], check=True)
+stdout, stderr, exitcode = result
+print(result.host, result.duration)
 ```
 
-The output objects are live, string-like buffers. Use `str(stdout)` or
-`str(stderr)` when you need a stable string snapshot. The next command
-replaces the Session's latest result, so retain returned values that must be
-used later.
-
-The example begins with an argument list because dynamic arguments are often
-safer to reason about in that form. `shlex.join()` converts the arguments to
-one correctly quoted string. On this local Session, `shell=False` executes
-the resulting argument vector without a shell. Never pass the list itself to
-`exec_command()`; v3.1 raises `TypeError`.
+Output is captured text. Keep the result to retain output, status, and metadata
+after subsequent commands. Argument sequences execute directly, without shell
+detection; `shlex.join()` plus `shell=False` remains a valid string-based form.
+See [Results and Error Model](../../concepts/results-and-error-model/) for details.
 
 ## Use a shell feature deliberately
 
 Add the following before the `finally` block:
 
 ```python
-    stdout, stderr = session.exec_command(
+    stdout, stderr, exitcode = session.exec_command(
         "printf 'alpha\\nbeta\\n' | grep beta"
     )
     print("pipeline:", str(stdout).strip())
@@ -107,7 +106,8 @@ syntax, prefer a string assembled with `shlex.join()` and `shell=False`.
 ## Handle a nonzero command status
 
 A command that starts and exits with a nonzero status does not normally raise
-an exception. Check `exitcode` explicitly:
+an exception. Pass `check=True` to raise on either backend, or inspect the
+returned `exitcode` explicitly:
 
 ```python
     failing_command = shlex.join([
@@ -115,7 +115,7 @@ an exception. Check `exitcode` explicitly:
         "-c",
         "import sys; sys.exit(7)",
     ])
-    stdout, stderr = session.exec_command(
+    stdout, stderr, exitcode = session.exec_command(
         failing_command,
         shell=False,
     )
@@ -149,4 +149,4 @@ stderr—instead. Handle both exceptions and nonzero command results.
 - [Failure Model and Production Checklist](../../security-and-operations/failure-model-and-production-checklist/)
   explains how to turn examples into operational code.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

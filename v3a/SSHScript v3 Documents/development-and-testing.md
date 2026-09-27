@@ -6,6 +6,9 @@ nav_order: 9
 
 # Contributing and Testing
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 SSHScript v3.1 separates credential-free release checks and public disposable
 OpenSSH integration from manual, site-specific SSH tests. The default gate must
 work on a clean developer machine without a network connection, SSH agent,
@@ -75,7 +78,7 @@ runtime dependencies. No separate test framework is required.
 by `python3 tools/run_checks.py` from the public repository root.
 
 It covers bare, string, raw-string, expression, and f-string command forms;
-result properties; automatic shell selection; string-only command
+result properties; automatic shell selection; string/argv command
 validation; function bodies; persistent shell contexts; and imports between
 `.spy` files.
 
@@ -180,4 +183,13 @@ retained with the release assets. Manual upload is an emergency-only path;
 it must verify the recorded hashes and use credentials supplied by an external
 secret manager.
 
-Last Updated: 2026-09-24 15:36:45
+## New command/config/check regression coverage
+
+The credential-free suite covers argv boundaries (empty arguments, quotes,
+newlines, and shell metacharacters), three-value unpacking/indexing, immutable
+results after subsequent commands, local/fake-SSH failure capture, configuration
+overrides and proxy command construction, and compile-only scripts with no user
+code or import side effects. Source mapping tests include functions, multiline
+expressions, imported `.spy` modules, and tokenizer indentation failures.
+
+Last Updated: 2026-09-26 16:11:31

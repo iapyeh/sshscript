@@ -5,6 +5,9 @@ nav_exclude: true
 
 # SSHScript v3.1
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 SSHScript brings local commands, SSH automation, and Python control flow into
 one programming model. Its primary interface is the regular Python `Session`
 API, while the optional Dollar syntax offers concise notation for standalone
@@ -25,8 +28,9 @@ applications.
 
 SSHScript v3.1 emphasizes predictable and secure automation:
 
-- commands are explicit non-empty strings;
-- dynamic argument lists can be safely assembled with `shlex.join()`;
+- one-shot commands accept nonempty strings or argv lists/tuples;
+- argument sequences preserve data boundaries without caller-side quoting;
+- results unpack as stdout, stderr, exitcode and retain per-command metadata;
 - SSH host keys are verified by default; and
 - imports, threads, and script execution remain scoped instead of changing
   process-wide Python behavior.
@@ -70,4 +74,4 @@ under the MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

@@ -7,6 +7,9 @@ nav_order: 3
 
 # Accounts
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 This collection starts with a read-only account audit. Add future account cases
 as separate Gallery pages; state the executing identity, target identity,
 privilege, audit record, rollback, and secret-handling contract for each one.
@@ -70,7 +73,7 @@ def main():
             banner_timeout=10,
             auth_timeout=10,
         ) as remote:
-            stdout, stderr = remote.exec_command(
+            stdout, stderr, exitcode = remote.exec_command(
                 command,
                 shell=False,
                 timeout=20,
@@ -141,4 +144,4 @@ target, least-privilege rule, before/after audit evidence, idempotent behavior,
 secret handling, rollback, and a test on the site's actual directory/PAM
 stack.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

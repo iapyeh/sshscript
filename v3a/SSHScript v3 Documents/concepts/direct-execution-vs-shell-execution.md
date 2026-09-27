@@ -8,12 +8,15 @@ permalink: /v3a/concepts/direct-execution-vs-shell-execution/
 
 # Direct Execution vs Shell Execution
 
-`Session.exec_command()` always accepts one non-empty command string. The
-`shell` option determines whether SSHScript preserves that string as an
-argument vector or asks a shell to interpret it.
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
+`Session.exec_command()` accepts a nonempty command string or a list/tuple of
+string arguments. Sequences always use direct mode and disallow shell mode.
+For strings, `shell` selects argument-preserving execution or shell parsing.
 
 ```python
-stdout, stderr = session.exec_command(
+stdout, stderr, exitcode = session.exec_command(
     command,
     shell=None,
     shell_executable=None,
@@ -35,7 +38,8 @@ depends on the mode.
 
 ## Direct execution
 
-Build a command from arguments with `shlex.join()` and force direct mode:
+Pass the argument sequence directly; quoting it with `shlex.join()` and
+forcing `shell=False` also remains supported:
 
 ```python
 import shlex
@@ -49,11 +53,11 @@ arguments = [
 ]
 command = shlex.join(arguments)
 
-stdout, stderr = session.exec_command(command, shell=False)
+stdout, stderr, exitcode = session.exec_command(command, shell=False)
 ```
 
-Locally, SSHScript parses the string with `shlex.split()` and passes the
-resulting argument vector to `subprocess.run()`.
+Locally, SSHScript passes argv directly to `subprocess.run()`. When a caller
+supplies a string with `shell=False`, it first parses it with `shlex.split()`.
 
 The SSH protocol accepts a command string, not an argument array. Over SSH,
 SSHScript parses locally, quotes each argument, and sends an `exec ...` command
@@ -145,10 +149,10 @@ shell. Use an explicit mode when semantics depend on interpretation.
 | Shell mode | Selected executable with `-c` | Quoted selected executable with `-c` |
 | Missing direct executable | Usually raises `FileNotFoundError` | Usually returns a nonzero status |
 | `env=` | Merged with the local process environment | Requested as SSH environment values; server policy may reject them |
-| `check=True` | Supported by `subprocess.run()` | Not a portable remote option |
+| `check=True` | CalledProcessError after result capture | Same policy after result capture |
 
-Portable local/remote code should inspect `session.exitcode` instead of relying
-on `check=True`.
+Both backends return CommandResult (stdout, stderr, exitcode when unpacked).
+Choose `check=True` for automatic failure exceptions or inspect the saved status.
 
 String `input=` also differs slightly: remote string input receives a trailing
 newline when absent, then the SSH write side closes. Test protocol-sensitive
@@ -158,7 +162,7 @@ programs on both backends.
 
 ```python
 session.exec_command("cd /tmp", shell=True)
-stdout, stderr = session.exec_command("pwd", shell=False)
+stdout, stderr, exitcode = session.exec_command("pwd", shell=False)
 # The second command is a new process and need not print /tmp.
 ```
 
@@ -188,7 +192,7 @@ directly.
 $printf 'alpha\nbeta\n' | grep beta
 
 arguments = ["printf", "%s", external_value]
-$(shlex.join(arguments), shell=False)
+$(arguments, check=True)
 
 $('printf "%s\n" "$HOME"', shell=True)
 $('printf "%s\n" "$BASH_VERSION"', shell="bash")
@@ -203,4 +207,4 @@ for task-oriented examples and
 [Host Keys, Credentials, and Command Injection](../../security-and-operations/host-keys-credentials-and-command-injection/)
 for security review.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

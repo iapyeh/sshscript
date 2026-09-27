@@ -7,6 +7,9 @@ nav_order: 2
 
 # Connections, Authentication, and Bastions
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 `Session.connect()` creates a connected child Session. Commands use the same
 `exec_command()` method locally and remotely, and the connection closes when
 its context exits.
@@ -19,7 +22,7 @@ from sshscript import Session
 local = Session()
 try:
     with local.connect("ops@example.net") as remote:
-        stdout, stderr = remote.exec_command("hostname", shell=False)
+        stdout, stderr, exitcode = remote.exec_command("hostname", shell=False)
         print(str(stdout).strip())
 
     with local.connect("ops@example.net", port=2222) as remote:
@@ -30,6 +33,67 @@ finally:
 
 The `user@host` form supplies both the username and host. Separate
 `host="example.net"` and `username="ops"` arguments are also accepted.
+
+## Reuse SSH config and preview settings
+
+Local connections read `~/.ssh/config` if present. Supported settings are
+`Host` patterns, `HostName`, `User`, `Port`, `IdentityFile`, `ProxyCommand`, and
+`ProxyJump`. Explicit API arguments override config, which overrides defaults.
+`port=None` means unspecified; `port=22` explicitly overrides a configured port.
+Explicit `pkey`, `pkey_path`, or `key_filename` overrides identity files.
+
+```text
+Host production
+    HostName server.example.net
+    User deploy
+    Port 2222
+    IdentityFile ~/.ssh/deploy_key
+    ProxyJump bastion.example.net
+```
+
+```python
+from sshscript import Session
+
+settings = Session.resolve_connection("production")  # no connection or proxy
+with Session() as local:
+    with local.connect("production") as remote:
+        result = remote.exec_command(["uname", "-s"], check=True)
+        stdout, stderr, exitcode = result
+```
+
+`resolve_connection()` returns effective Paramiko arguments plus `proxyCommand`
+when needed. It does no network operations. `ssh_config=False` disables config;
+a file path selects a config file that must exist. Nested connections skip
+local config unless an explicit file is supplied. `session.host` and saved
+`result.host` use the resolved HostName, not the remote `hostname` command.
+
+Identity paths and configured proxy commands expand `%h`, `%n`, `%p`, `%r`,
+`%u`, `%d`, and `%%` after explicit overrides. Unknown tokens fail clearly.
+`HostName` accepts `%h`, `%n`, and `%%`; `~` expands in identity paths.
+Explicit `proxyCommand` keeps its verbatim behavior and does not expand tokens.
+Use `proxyCommand=None` to disable configured proxies.
+
+`Match`, `Include`, and hostname canonicalization are rejected before lookup.
+Other unapplied settings produce a warning; this is a subset of OpenSSH config,
+not full equivalence. Alternate known-hosts files and identity-agent settings
+are not imported into Paramiko. Existing target host-key verification remains
+in force. Config is trusted local input: connecting can execute proxy programs.
+
+## ProxyJump
+
+Use config or an explicit `proxyJump="user@bastion:2222"`. Comma-separated
+chains and bracketed IPv6 hosts are accepted. SSHScript uses the local `ssh`
+executable to forward to the target, and Paramiko authenticates and verifies
+the target connection. The forwarding command uses batch authentication and
+strict host-key checking; provision verified keys and noninteractive jump-host
+authentication beforehand. OpenSSH manages earlier hops in a chain according
+to its SSH configuration. Custom config files are passed to `ssh` as well.
+
+When ProxyCommand and ProxyJump are both active, choose one explicitly or
+remove the conflict; this implementation does not reproduce OpenSSH's
+first-proxy-wins behavior. Nested Sessions already tunnel through their parent
+and reject additional proxy options. Proxy connections default connect,
+banner, and authentication timeouts to 30 seconds, unless overridden.
 
 ## Authentication
 
@@ -132,7 +196,7 @@ A top-level connection may use `proxyCommand`:
 ```python
 with local.connect(
     "ops@private.example.net",
-    proxyCommand="ssh -W %h:%p jump.example.net",
+    proxyCommand="ssh -o StrictHostKeyChecking=yes -W private.example.net:22 jump.example.net",
 ) as remote:
     remote.exec_command("hostname", shell=False)
 ```
@@ -157,4 +221,4 @@ with $.connect("ops@example.net"):
 Nested `$.connect()` blocks and the host-key policy follow the same Session
 API behavior.
 
-Last Updated: 2026-09-17 12:13:56
+Last Updated: 2026-09-26 16:11:31

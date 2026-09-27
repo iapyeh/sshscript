@@ -7,6 +7,9 @@ nav_order: 1
 
 # Module API Tutorial
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 This tutorial introduces SSHScript v3.1 through its primary Python
 `Session` API. The optional Dollar syntax is shown only after the module
 workflow.
@@ -26,7 +29,7 @@ from sshscript import Session
 
 session = Session()
 try:
-    stdout, stderr = session.exec_command("hostname", shell=False)
+    stdout, stderr, exitcode = session.exec_command("hostname", shell=False)
     print(str(stdout).strip())
     print(session.exitcode)
 finally:
@@ -39,8 +42,9 @@ properties.
 
 ## Build a command safely
 
-`exec_command()` accepts exactly one non-empty string. Use `shlex.join()` to
-quote a dynamic argument list, then request argument-preserving execution:
+`exec_command()` accepts a nonempty string or a list/tuple of string arguments.
+Pass argv directly for argument-preserving execution; `shlex.join()` with
+`shell=False` remains valid when an existing caller uses a string:
 
 ```python
 import shlex
@@ -82,7 +86,7 @@ from sshscript import Session
 local = Session()
 try:
     with local.connect("ops@example.net") as remote:
-        stdout, stderr = remote.exec_command("hostname", shell=False)
+        stdout, stderr, exitcode = remote.exec_command("hostname", shell=False)
         print(str(stdout).strip())
 finally:
     local.close(strict=True)
@@ -191,4 +195,4 @@ In v3.1, one `$` handles both direct commands and shell features. The former
 `$$` form is deprecated. See the [Dollar Syntax Reference](../Basic/dollar/)
 if this notation suits the project.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

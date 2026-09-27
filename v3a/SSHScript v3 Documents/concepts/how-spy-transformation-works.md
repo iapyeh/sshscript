@@ -8,12 +8,28 @@ permalink: /v3a/concepts/how-spy-transformation-works/
 
 # How .spy Transformation Works
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 SSHScript does not teach Python's parser to understand `$command` directly. It
 converts Dollar syntax into a Python abstract syntax tree, compiles that tree
 with original source locations, and executes it with an active Session context.
 
 Application code should depend on documented Dollar behavior, not on the exact
 generated Python.
+
+## Compile without execution
+
+```sh
+sshscript --check automation.spy
+```
+
+`sshscript.check_file(path)` exposes the same parse/transform/compile path.
+Neither form executes user Python, imports, or commands. Syntax and tokenizer
+indentation errors use the original filename and line. Runtime source mapping
+is retained for interpolation, commands inside functions, multiline expressions,
+and imported `.spy` files. `--script` shows generated Python for inspection.
+The checker does not resolve imported modules or validate shell/remote behavior.
 
 ## Transformation pipeline
 
@@ -224,4 +240,4 @@ closes afterward.
 Continue with the [Dollar Syntax Tutorial](../../tutorials/dollar-syntax/) or
 the [Session Lifecycle](../session-lifecycle/) concept.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

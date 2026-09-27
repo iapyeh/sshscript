@@ -7,6 +7,9 @@ nav_order: 2
 
 # Networking
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 This collection starts with a single-endpoint TCP probe from a remote host. Add
 future networking cases as separate Gallery pages, with an explicit target,
 authorization, timeout, data-capture, and cleanup policy.
@@ -93,7 +96,7 @@ def main():
             banner_timeout=10,
             auth_timeout=10,
         ) as remote:
-            stdout, stderr = remote.exec_command(
+            stdout, stderr, exitcode = remote.exec_command(
                 command,
                 shell=False,
                 timeout=args.connect_timeout + 5,
@@ -155,4 +158,4 @@ inspection, packet capture, and firewall changes have different permissions
 and data exposure; publish each as its own case with protocol-specific
 verification and cleanup.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

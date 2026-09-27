@@ -8,6 +8,9 @@ permalink: /v3a/security-and-operations/host-keys-credentials-and-command-inject
 
 # Host Keys, Credentials, and Command Injection
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 A successful login is not enough to make an SSH automation trustworthy. The
 client must authenticate the server, the server must authenticate the intended
 account, and every value that reaches a command must retain its intended
@@ -135,9 +138,9 @@ protocol and failure cases.
 
 ## Preserve argument boundaries
 
-`Session.exec_command()` accepts one non-empty command string. When a command
-does not need shell syntax, build an argument list in Python, convert it with
-`shlex.join()`, and request `shell=False`:
+`Session.exec_command()` accepts strings or argument sequences. When shell
+syntax is unnecessary, pass a list/tuple directly. A string assembled with
+`shlex.join()` and `shell=False` is also supported:
 
 ```python
 import shlex
@@ -145,7 +148,7 @@ import shlex
 
 arguments = ["install", "-m", "0644", source_path, destination_path]
 command = shlex.join(arguments)
-stdout, stderr = remote.exec_command(command, shell=False, timeout=30)
+stdout, stderr, exitcode = remote.exec_command(command, shell=False, timeout=30)
 
 if remote.exitcode != 0:
     raise RuntimeError(
@@ -153,7 +156,7 @@ if remote.exitcode != 0:
     )
 ```
 
-Do not pass the list itself; v3.1 raises `TypeError`. `shlex.join()` preserves
+Passing the list directly or using `shlex.join()` with `shell=False` preserves
 argument boundaries, including spaces and metacharacters. It does not decide
 whether an executable, flag, account name, path, or operation is authorized.
 Validate those values against the application's policy as well.
@@ -179,7 +182,7 @@ command = (
     f"journalctl --since {safe_since} "
     f"| grep -F -- {safe_text}"
 )
-stdout, stderr = remote.exec_command(command, shell=True, timeout=30)
+stdout, stderr, exitcode = remote.exec_command(command, shell=True, timeout=30)
 ```
 
 Avoid accepting an entire command from a web request, message, inventory field,
@@ -224,4 +227,4 @@ a narrowly scoped privileged command to install it. Remove the staged copy in a
 Continue with [Timeouts, Retries, and Cleanup](../timeouts-retries-and-cleanup/)
 and the [Failure Model and Production Checklist](../failure-model-and-production-checklist/).
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

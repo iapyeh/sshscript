@@ -46,17 +46,17 @@ defaults:
       nav_enabled: true
 
   - scope:
-      path: "v1"
+      path: "v1/"
     values:
       nav_exclude: true
       search_exclude: true
   - scope:
-      path: "v2"
+      path: "v2/"
     values:
       nav_exclude: true
       search_exclude: true
   - scope:
-      path: "v3"
+      path: "v3/"
     values:
       nav_exclude: true
       search_exclude: true

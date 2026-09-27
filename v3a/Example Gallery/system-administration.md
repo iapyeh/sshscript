@@ -7,6 +7,9 @@ nav_order: 1
 
 # System Administration
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 This collection starts with a read-only host-health snapshot. Add future system
 administration cases as separate Gallery pages so each script can state its own
 privilege, side effects, rollback, and verification contract.
@@ -57,7 +60,7 @@ CHECKS = {
 def collect(remote):
     report = {}
     for name, arguments in CHECKS.items():
-        stdout, stderr = remote.exec_command(
+        stdout, stderr, exitcode = remote.exec_command(
             shlex.join(arguments),
             shell=False,
             timeout=20,
@@ -138,4 +141,4 @@ target platform. Give each command its own stable name and status policy. For a
 state-changing operation, create a separate Gallery page with preconditions,
 backup, idempotency, verification, rollback, and partial-failure behavior.
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

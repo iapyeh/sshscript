@@ -7,6 +7,9 @@ has_toc: false
 
 # SSHScript v3.1 Documentation
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 The v3.1 documentation is organized by reader intent. Start with a verified,
 credential-free success; move to task-oriented guides; use concepts to
 understand behavior; and use reference pages for exact contracts.
@@ -29,8 +32,9 @@ sidebar. The Example Gallery uses an append-only, one-page-per-case structure
 so future scripts can be published without reorganizing established links.
 
 > **Version notice:** SSHScript 3.1.4 is the current Production/Stable release
-> on PyPI. These documents cover the supported 3.1.x line and were last
-> verified with 3.1.4. Begin with
+> on PyPI. Pages marked **Next-release API** describe the updated source
+> checkout, including argv, three-value results, unified check, SSH config,
+> and compile-only checking. Those changes require the updated source. Begin with
 > [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/).
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

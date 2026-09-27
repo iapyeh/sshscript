@@ -93,6 +93,8 @@ Run the repository validator:
 python3 tools/check_docs.py
 python3 tools/check_docs.py --check-mtime
 git diff --check
+# After Jekyll generates _site:
+python3 tools/check_built_docs.py _site
 ```
 
 The documentation workflow repeats source validation and performs a Jekyll
@@ -101,6 +103,9 @@ equality, navigation relationships, internal links, placeholder visibility,
 release-truth guardrails, and `Last Updated` format. The local
 `--check-mtime` mode additionally enforces the filesystem timestamp rule;
 CI omits it because Git checkouts do not preserve source mtimes.
+The post-build check verifies rendered pages, sidebar entries, search records,
+local assets, links, and anchors. Historical defaults use directory paths such
+as `v3/`: a bare `v3` prefix also matches `v3a` and hides the current docs.
 
 Before publishing, also review examples for current v3.1 behavior, credentials,
 internal infrastructure details, and unsafe defaults. Changes pushed to
@@ -118,4 +123,4 @@ SSHScript source code, releases, and issue tracking are available in the
 [iapyeh/sshscript repository](https://github.com/iapyeh/sshscript).
 SSHScript is released under the MIT License.
 
-Last Updated: 2026-09-24 16:00:00
+Last Updated: 2026-09-27 07:06:54

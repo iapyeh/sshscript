@@ -8,6 +8,9 @@ permalink: /v3a/migration-and-releases/migrating-to-v3-1/
 
 # Migrating to v3.1
 
+> **Next-release API:** This page describes the updated source checkout.
+> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+
 This guide updates v3.0 and earlier code to the supported v3.1 contract. Make the
 changes in a branch, run credential-free tests first, and validate SSH and
 privileged workflows only against isolated test systems.
@@ -17,7 +20,10 @@ Version 3.1.4 is the current Production/Stable release on PyPI.
 
 ## Migration checklist
 
-- [ ] Replace list or tuple commands with one safely quoted string.
+- [ ] Use argument lists/tuples for direct commands, or explicit shell strings.
+- [ ] Change one-shot unpacking to stdout, stderr, exitcode.
+- [ ] Account for automatic SSH config lookup, or set ssh_config=False.
+- [ ] Use --check FILE for compile-only validation.
 - [ ] Prefer `exec_command()` or `session(...)` over dollar-named Module API
       aliases.
 - [ ] Replace `$$` in `.spy` files with the v3.1 single-dollar form.
@@ -29,29 +35,37 @@ Version 3.1.4 is the current Production/Stable release on PyPI.
 - [ ] Make Session ownership and thread failure propagation explicit.
 - [ ] Observe cleanup failures and test CLI exit behavior.
 
-## Commands must be strings
+## Next-release command contract
 
-`Session.exec_command()` and its `session(...)` alias now require one
-non-empty `str`. Lists and tuples raise `TypeError`.
-
-Before:
-
-```python
-session.exec_command(["printf", "%s\\n", value])
-```
-
-v3.1:
+The updated source accepts command strings and nonempty lists/tuples of string
+arguments. Lists represent one argv, never a batch. They bypass shell detection
+and reject shell mode. Earlier 3.1.4 code using shlex.join() remains valid.
 
 ```python
-import shlex
-
-command = shlex.join(["printf", "%s\\n", value])
-stdout, stderr = session.exec_command(command, shell=False)
+result = session.exec_command(["printf", "%s\n", value], check=True)
+stdout, stderr, exitcode = result
 ```
 
-This preserves argument boundaries while keeping a single command-string
-contract for local and remote Sessions. Audit wrappers, fixtures, and examples
-as well as application code.
+Unpack three values, not two. The result is a CommandResult, not a plain tuple;
+indexing, slicing, and tuple(result) expose the same three-value order. Output
+is text snapshots rather than live buffers. Buffer-dependent code should use
+session.stdout/session.stderr explicitly. The object also retains host,
+duration, and command.
+
+Both local and remote one-shot commands accept check=True. CalledProcessError
+now contains text output, a normalized string/argv tuple in cmd, and the full
+snapshot in result. Earlier local exceptions carried raw subprocess bytes/argv.
+Persistent consoles retain their two-buffer/prompt contract.
+
+Local connect() now reads ~/.ssh/config; explicit API arguments win. Use
+ssh_config=False to retain configuration-independent connections. A nested
+connection skips local config by default. Common Host settings, ProxyCommand,
+and ProxyJump are supported; Match, Include, and canonicalization fail clearly.
+See [Connections, Authentication, and Bastions]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Basic/connect/)
+for the exact subset and jump-host requirements.
+
+`sshscript --check FILE` compiles without execution. Without a file, `--check`
+retains the legacy PyPI update behavior; prefer `--check-updates` for updates.
 
 ## Shell behavior and Dollar syntax
 
@@ -187,7 +201,7 @@ def inspect_host(host):
     local = Session()
     try:
         with local.connect(host) as remote:
-            stdout, stderr = remote.exec_command(
+            stdout, stderr, exitcode = remote.exec_command(
                 "hostname",
                 shell=False,
             )
@@ -238,7 +252,7 @@ The canonical update command is:
 sshscript --check-updates
 ```
 
-`--check` remains an alias. The command queries stable, non-yanked PyPI
+`--check` without a file remains an alias; `--check FILE` validates syntax. The command queries stable, non-yanked PyPI
 artifacts compatible with the current Python version. It never installs an
 update and does not replace verifying the installed version and import path.
 
@@ -272,7 +286,7 @@ try:
         "-c",
         "print('v3.1-ready')",
     ])
-    stdout, stderr = session.exec_command(command, shell=False)
+    stdout, stderr, exitcode = session.exec_command(command, shell=False)
     assert str(stdout).strip() == "v3.1-ready"
     assert str(stderr) == ""
     assert session.exitcode == 0
@@ -310,13 +324,13 @@ SFTP access raises SSHScriptException in every optimization mode.
 User-written `assert` statements in `.spy` files retain normal Python semantics.
 `python -O` removes them, including calls inside the assertion. They are useful
 for illustrative tests, but production scripts must explicitly inspect
-`session.exitcode` (or `$.exitcode`) and handle nonzero status. Local
-`Session.exec_command(..., check=True)` raises `subprocess.CalledProcessError`;
-this is not a portable remote-command option. SSH, timeout, and transport
-failures remain exceptions regardless of optimization.
+`session.exitcode` (or `$.exitcode`) and handle nonzero status, or use
+`Session.exec_command(..., check=True)` on local or remote Sessions to raise
+`subprocess.CalledProcessError` after preserving the completed result. SSH,
+timeout, and transport failures remain exceptions regardless of optimization.
 
 `AssertionError` was never a supported SSHScript API contract. Package runtime
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-09-26 16:11:31

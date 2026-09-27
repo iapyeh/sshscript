@@ -45,3 +45,6 @@ jobs:
           test -f _site/index.html
           test -f _site/404.html
           test -f _site/v3a/index.html
+
+      - name: Verify generated navigation, search, and links
+        run: python3 tools/check_built_docs.py _site
