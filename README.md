@@ -61,7 +61,7 @@ targets branch-level publishing files such as this README or `_config.yml`.
 - Do not duplicate the sidebar with a manually maintained child-page table of
   contents.
 - End each maintained v3a Markdown document with
-  `Last Updated: YYYY-MM-DD HH:MM:SS` and keep it equal to the file's mtime.
+  `Last Updated: 2026-09-27 14:35:49
 
 ## Sidebar navigation
 
@@ -104,8 +104,9 @@ release-truth guardrails, and `Last Updated` format. The local
 `--check-mtime` mode additionally enforces the filesystem timestamp rule;
 CI omits it because Git checkouts do not preserve source mtimes.
 The post-build check verifies rendered pages, sidebar entries, search records,
-local assets, links, and anchors. Historical defaults use directory paths such
-as `v3/`: a bare `v3` prefix also matches `v3a` and hides the current docs.
+local assets, links, and anchors. The current `v3a` scope explicitly enables navigation and search, overriding
+the historical `v3` prefix under Jekyll 4 while remaining compatible with
+GitHub Pages (Jekyll 3).
 
 Before publishing, also review examples for current v3.1 behavior, credentials,
 internal infrastructure details, and unsafe defaults. Changes pushed to
@@ -123,4 +124,4 @@ SSHScript source code, releases, and issue tracking are available in the
 [iapyeh/sshscript repository](https://github.com/iapyeh/sshscript).
 SSHScript is released under the MIT License.
 
-Last Updated: 2026-09-27 07:06:54
+Last Updated: 2026-09-27 14:35:49
