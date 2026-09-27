@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://iapyeh.github.io/sshscript/v3a/
+    about: Read installation, tutorials, how-to guides, and reference material.
+  - name: Usage questions and design discussion
+    url: https://github.com/iapyeh/sshscript/discussions
+    about: Ask for help or discuss an idea before opening an issue.
+  - name: Report a security vulnerability privately
+    url: https://github.com/iapyeh/sshscript/security/advisories/new
+    about: Do not disclose a suspected vulnerability in a public issue.

@@ -8,6 +8,15 @@ dynamic = ["version"]
 description = "Python automation for local processes, SSH, and SSHScript .spy files"
 readme = "README.md"
 requires-python = ">=3.11"
+keywords = [
+  "automation",
+  "paramiko",
+  "remote-execution",
+  "sftp",
+  "ssh",
+  "subprocess",
+  "system-administration",
+]
 license = "MIT"
 license-files = ["LICENSE.txt"]
 authors = [
@@ -30,9 +39,14 @@ dependencies = [
 ]
 
 [project.urls]
+Homepage = "https://github.com/iapyeh/sshscript"
 Documentation = "https://iapyeh.github.io/sshscript/v3a/"
+Changelog = "https://github.com/iapyeh/sshscript/blob/release/CHANGELOG.md"
+Releases = "https://github.com/iapyeh/sshscript/releases"
 Source = "https://github.com/iapyeh/sshscript"
 Issues = "https://github.com/iapyeh/sshscript/issues"
+Security = "https://github.com/iapyeh/sshscript/security/policy"
+Support = "https://github.com/iapyeh/sshscript/discussions"
 
 [project.scripts]
 sshscript = "sshscript.sshscript:main"

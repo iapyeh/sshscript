@@ -1,0 +1,109 @@
+name: Bug report
+description: Report a reproducible problem in a supported SSHScript release
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve SSHScript. Do not include credentials,
+        private host details, or production output. Report suspected
+        vulnerabilities through GitHub private vulnerability reporting instead.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I reproduced this with the latest SSHScript 3.1.x release.
+          required: true
+        - label: I searched existing issues and discussions for this problem.
+          required: true
+        - label: This report contains no password, key, token, or private infrastructure detail.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+
+  - type: input
+    id: sshscript-version
+    attributes:
+      label: SSHScript version
+      description: Paste the output of `sshscript --version`.
+      placeholder: "3.1.4"
+    validations:
+      required: true
+
+  - type: input
+    id: python-paramiko
+    attributes:
+      label: Python and Paramiko versions
+      placeholder: "Python 3.12.7; Paramiko 4.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and SSH server
+      description: Include the SSH server implementation/version when relevant.
+      placeholder: "Ubuntu 24.04; OpenSSH_9.6p1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - Python module API
+        - Dollar syntax (.spy)
+        - Both
+        - Command-line interface
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operation
+    attributes:
+      label: Operation
+      options:
+        - Local command
+        - Direct SSH command
+        - Nested SSH command
+        - Persistent or interactive console
+        - sudo or su
+        - Upload or download
+        - Import or source transformation
+        - Installation or packaging
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Use a disposable host or credential-free example and include exact steps.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the exit status and a redacted traceback or error message.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add sanitized details that are necessary to understand the issue.

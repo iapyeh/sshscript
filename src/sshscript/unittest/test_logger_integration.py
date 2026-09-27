@@ -49,7 +49,7 @@ class LoggerIntegrationTests(unittest.TestCase):
         session = Session()
         self.addCleanup(session.close)
 
-        stdout, stderr = session.exec_command(command, shell=False, timeout=10)
+        stdout, stderr, exitcode = session.exec_command(command, shell=False, timeout=10)
 
         self.assertEqual(str(stdout), 'logger-integration-ok\n')
         self.assertEqual(str(stderr), '')
@@ -78,6 +78,7 @@ class LoggerIntegrationTests(unittest.TestCase):
             with self.assertRaisesRegex(TimeoutError, 'simulated timeout'):
                 session.connect(
                     'example.invalid',
+                    ssh_config=False,
                     username='test-user',
                     password='test-password',
                 )

@@ -37,8 +37,11 @@ import asyncio
 import warnings
 import subprocess
 import socket
+import shlex
 from select import select
 if __package__:
+    from .commandresult import CommandResult
+    from .sshconfig import resolve_connection
     from .dollar import Dollar
     from .sessionwrapper import SessionWrapper,SudoConsole,SuConsole
     from .errorutils import get_logger, SSHScriptExit, SSHScriptBreak, SSHScriptException, dumpScript, listRightIndex
@@ -46,6 +49,8 @@ if __package__:
     from . import dollarparser
 
 else:
+    from commandresult import CommandResult
+    from sshconfig import resolve_connection
     ## called directly from the same folder
     ## see above "try" block for details
     from dollar import Dollar
@@ -277,7 +282,8 @@ class Session(object):
     successful block, or attached as a note to an exception from the block. A
     local session remains reusable.
 
-    session(command) aliases exec_command() and returns (stdout, stderr).
+    session(command) aliases exec_command() and returns a CommandResult that
+    supports three-value stdout/stderr/exitcode unpacking.
     Read session.exitcode for the last command status. Use shell() when commands
     must share a working directory or environment, enter() for interactive
     programs, and sudo()/su() for a console under another user.
@@ -285,9 +291,9 @@ class Session(object):
     Example::
 
         with Session() as local:
-            stdout, stderr = local("hostname")
+            stdout, stderr, exitcode = local("hostname")
             with local.connect("user@host") as remote:
-                stdout, stderr = remote("uname -s")
+                stdout, stderr, exitcode = remote("uname -s")
 
     In .spy files, $command executes in the active session or console, and
     $.connect(), $.shell(), $.enter(), $.upload(), and $.download() provide the
@@ -349,6 +355,7 @@ class Session(object):
         ## this value was stored, so user can access its stdout, stderr and exitcode
         ## by self.stdout and self.stderr, self.exitcode
         self._lastDollar = None
+        self.last_result = None
         self._attached_stack = None
     ## added in v2.0.3
     ## always return the session which is not connected to execute commands by subprocess at localhost
@@ -566,7 +573,7 @@ class Session(object):
         raise SSHScriptExit(message,code)
 
     @export2Dollar
-    def connect(self,host,username=None,password=None,port=22,policy=None,**kw):
+    def connect(self,host,username=None,password=None,port=None,policy=None,*,ssh_config=None,**kw):
         """Return a connected child session, optionally through this session's SSH link.
 
         Use with session.connect("user@host") as remote to scope the connection.
@@ -575,6 +582,10 @@ class Session(object):
 
         host may include the username; connect("user@host", password) is supported.
         pkey_path loads an RSA key from this session's host (local for a new Session).
+        Local connections read ~/.ssh/config by default; ssh_config=False opts
+        out, and a path selects a config file. Explicit parameters win. Nested
+        connections skip local config unless a path is explicitly supplied.
+        resolve_connection() previews effective settings without connecting.
         Other connection keywords are forwarded to SSHClient.connect().
 
         Unknown and changed host keys are rejected by default. policy may explicitly
@@ -588,13 +599,26 @@ class Session(object):
             raise RuntimeError('cannot connect from a closed session')        
         
         ## host might be in format of "username@hostname"
-        if '@' in host:
+        if isinstance(host, str) and '@' in host:
             if username and password is None:
                 password = username
-            username,host = host.split('@')
+                username = None
+            embedded_username,host = host.rsplit('@', 1)
+            if username is None:
+                username = embedded_username
+
+        is_nested = self._client is not None
+        effective = resolve_connection(
+            host, username, port,
+            ssh_config=False if is_nested and ssh_config is None else ssh_config,
+            **kw,
+        )
+        host = effective.pop('hostname')
+        username = effective.pop('username')
+        port = effective.pop('port')
+        kw = effective
 
         has_proxy = 'proxyCommand' in kw
-        is_nested = self._client is not None
         logger.debug(
             'Opening SSH connection (host=%s, port=%s, username=%s, nested=%s, proxy=%s)',
             host,
@@ -719,6 +743,8 @@ class Session(object):
                     type(cleanup_exc).__name__,
                 )
             raise
+
+    resolve_connection = staticmethod(resolve_connection)
 
     ## alias of connect, would be removed later
     @export2Dollar
@@ -1013,14 +1039,19 @@ class Session(object):
         if self._lastDollar: self._lastDollar.clear()
 
 
-    def exec_command(self,cmd:str,*,shell=None,shell_executable=None,
+    def exec_command(self,cmd,*,shell=None,shell_executable=None,check=False,
                      _legacy_twodollars=False,**kw):
-        """Execute one command and return (stdout, stderr); also available as session(cmd).
+        """Execute one command and return a CommandResult; also session(cmd).
 
         Wait for completion on this session's host. stdout, stderr, and exitcode
         remain available on the session as the latest command result. Check exitcode
-        for command failure; execution/transport errors propagate. Local execution
-        also accepts check=True to raise for a nonzero command status.
+        for command failure; execution/transport errors propagate. check=True
+        raises CalledProcessError on either backend, after saving last_result.
+        Unpacking yields stdout and stderr text snapshots plus the exit code.
+
+        cmd is a command string or a nonempty list/tuple of string arguments.
+        Argument sequences bypass shell detection and require shell=None/False.
+        Remote sequences are quoted for a POSIX login shell; they are not batches.
 
         shell=None automatically detects shell syntax. shell=False forces direct
         execution; shell=True uses a POSIX shell; shell="bash" selects a named shell.
@@ -1032,11 +1063,31 @@ class Session(object):
 
         Example::
 
-            stdout, stderr = session("cat", input="hello")
+            stdout, stderr, exitcode = session("cat", input="hello")
             status = session.exitcode
         """
-        if not isinstance(cmd,str):
-            raise TypeError(f'command must be str, not {type(cmd).__name__}')
+        if self.closed:
+            raise RuntimeError('cannot execute on a closed session')
+        if self._client is not None and not self.connected:
+            raise BrokenPipeError('SSH transport is not active')
+        if not isinstance(check, bool):
+            raise TypeError('check must be bool')
+        argv = None
+        if isinstance(cmd, (list, tuple)):
+            if not cmd:
+                raise ValueError('argument sequence must not be empty')
+            if not all(isinstance(arg, str) for arg in cmd):
+                raise TypeError('every command argument must be str')
+            if not cmd[0] or any('\x00' in arg for arg in cmd):
+                raise ValueError('executable must be nonempty and arguments cannot contain NUL')
+            if ((shell is not None and shell is not False)
+                    or shell_executable is not None or _legacy_twodollars):
+                raise ValueError('argument sequences require shell=None or shell=False')
+            argv = tuple(cmd)
+            cmd = shlex.join(argv)
+            shell = False
+        elif not isinstance(cmd,str):
+            raise TypeError(f'command must be str, list, or tuple, not {type(cmd).__name__}')
         cmd = cmd.strip()
         if not cmd:
             raise ValueError('command must not be empty')
@@ -1057,7 +1108,7 @@ class Session(object):
             )
             shell = True
 
-        self._lastDollar = Dollar(
+        execution = Dollar(
             self,
             cmd,
             for_with=False,
@@ -1065,8 +1116,26 @@ class Session(object):
             shell_executable=shell_executable,
             **kw,
         )
-        self._lastDollar()
-        return self._lastDollar.stdout,self._lastDollar.stderr
+        # Keep actual argv for local exec; the SSH protocol only carries strings.
+        execution.argv = argv
+        self._lastDollar = execution
+        self.last_result = None
+        host = self.host
+        started = time.monotonic()
+        execution()
+        result = CommandResult(
+            str(execution.stdout), str(execution.stderr), execution.exitcode,
+            host, time.monotonic() - started, argv if argv is not None else cmd,
+        )
+        self.last_result = result
+        if check and result.exitcode != 0:
+            error = subprocess.CalledProcessError(
+                result.exitcode, result.command,
+                output=result.stdout, stderr=result.stderr,
+            )
+            error.result = result
+            raise error
+        return result
 
     ## Compatibility aliases for code generated by older parsers.
     def onedollar(self,cmd,**kw):

@@ -1,0 +1,42 @@
+.DS_Store
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environments
+.venv/
+venv/
+env/
+
+# Packaging output
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Coverage and local tooling
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local configuration and credentials
+.env
+.env.*
+*.pem
+*.key
+*secret*
+*credential*
+*password*

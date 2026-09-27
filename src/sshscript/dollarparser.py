@@ -145,6 +145,10 @@ def parse(script_path, spyscript):
         token_script = tokenparser.convert(spyscript)
     except tokenize.TokenError as error:
         raise _token_syntax_error(error, script_path, spyscript) from None
+    except SyntaxError as error:
+        # tokenize also raises IndentationError/TabError with '<tokenize>' as
+        # filename; keep these diagnostics attached to the actual .spy file.
+        raise _source_syntax_error(error, script_path, spyscript) from None
 
     try:
         tree = ast.parse(token_script, filename=script_path)
