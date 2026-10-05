@@ -16,9 +16,13 @@
 
 """Public console operations over a channel shared by shell and interactive contexts."""
 
+import subprocess
+
 if __package__:
+    from .sessionsettings import UNSET
     from . import patching
 else:
+    from sessionsettings import UNSET
     import patching
 
 if __package__:
@@ -108,14 +112,37 @@ class SessionWrapper(object):
         #result.result()
         return result
 
-    def send_line(self,s,**expections):
+    def set(self, **settings):
+        """Configure the owning Session, including from $.set inside a shell."""
+        self.channel.owner.session.set(**settings)
+
+    def get(self, name=None):
+        return self.channel.owner.session.get(name)
+
+    def send_line(self,s,*,check=UNSET,**expections):
         """Execute a shell command and return (stdout, stderr); also console(command).
 
+        check inherits the Session policy unless explicitly supplied.
         command_timeout bounds command completion (default 60 seconds). Other keyword
         names are expected patterns and their values are reply strings.
         In an enter() context this delegates to input() and returns its status.
         """
-        return self.channel.send_line(s,**expections)
+        session = self.channel.owner.session
+        enabled = session.check if check is UNSET else check
+        if not isinstance(enabled, bool):
+            raise TypeError('check must be bool')
+        # Interactive input is not a command exit-status boundary.
+        if self.channel.hijacked:
+            return self.channel.send_line(s, **expections)
+        settings = session.get()
+        self.channel.dump2sys = (int(settings['verbose']), int(settings['verbose'] or settings['verbose_stderr']))
+        self.channel.logger.settings = settings
+        result = self.channel.send_line(s, **expections)
+        if enabled and self.channel.exitcode != 0:
+            stdout, stderr = result
+            raise subprocess.CalledProcessError(self.channel.exitcode, s,
+                                                output=str(stdout), stderr=str(stderr))
+        return result
     ## alias for sendline
     __call__ = send_line
     exec_command = send_line

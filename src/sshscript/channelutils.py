@@ -48,6 +48,7 @@ class InnerConsole(GenericConsole):
 
         ## instance of SSHScriptChannel
         self.channel = wcw.channel
+        self.logger = self.channel.logger
         self.command = command
         self.exit_command = exit
         self.password = password
@@ -81,7 +82,7 @@ class InnerConsole(GenericConsole):
                 ## test if we got a prompt asking for password
                 m = self.channel.expect(self.loginExpect,timeout=5,silent=True)
                 if m:
-                    logger.debug(
+                    self.logger.debug(
                         'Authentication prompt detected; sending password input '
                         '(length=%d)',
                         len(self.password),
@@ -89,21 +90,25 @@ class InnerConsole(GenericConsole):
                     self.channel.clear()
                     self.channel.touchIO(True)
                     self.channel.send(self.password+'\n')
+
                     ## reconfirm login is ok
-                    m = self.channel.expect(self.loginExpect,timeout=2,silent=True)
+                    #self.channel.wait_for_silent(1)
+                    m = self.channel.expect([self.loginExpect,re.compile('sorry',re.I)],timeout=2,silent=True)
                     if m:
                         ## Chances is MOT like this:
                         ##    Time to change your password? Type "passwd" and follow the prompts.
                         ##		    -- Dru <genesis@istar.ca>
-                        raise PermissionError(f'"{self.loginExpect}" prompted again')
-                    login_success = True
+                        #raise PermissionError(f'"{self.loginExpect}" prompted again')
+                        pass
+                    else:
+                        login_success = True
                 else:
-                    logger.debug(
+                    self.logger.debug(
                         'Authentication prompt was not detected; password was not sent'
                     )
             else:                
                 ## has password, but no prompt have to wait
-                logger.debug(
+                self.logger.debug(
                     'No authentication prompt is configured; sending password input '
                     '(length=%d)',
                     len(self.password),
@@ -127,9 +132,9 @@ class InnerConsole(GenericConsole):
         else:
             try:
                 self.channel._stdout.splitlines()[-1]
-                logger.debug('Shell prompt detected')
+                self.logger.debug('Shell prompt detected')
             except IndexError:
-                logger.debug('Shell prompt was not detected')
+                self.logger.debug('Shell prompt was not detected')
         
         if self.initials is None:
             ## shell, su, sudo

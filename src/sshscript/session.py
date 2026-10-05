@@ -23,6 +23,7 @@ else:
     import patching
 
 import ast
+import contextvars
 import threading
 import paramiko
 import stat
@@ -38,8 +39,11 @@ import warnings
 import subprocess
 import socket
 import shlex
+import weakref
 from select import select
 if __package__:
+    from .sessionsettings import UNSET, validate, root_defaults, SessionLogger
+    from .commandjob import CommandJob, CommandTimeoutError, JobResult
     from .commandresult import CommandResult
     from .sshconfig import resolve_connection
     from .dollar import Dollar
@@ -49,6 +53,8 @@ if __package__:
     from . import dollarparser
 
 else:
+    from sessionsettings import UNSET, validate, root_defaults, SessionLogger
+    from commandjob import CommandJob, CommandTimeoutError, JobResult
     from commandresult import CommandResult
     from sshconfig import resolve_connection
     ## called directly from the same folder
@@ -59,6 +65,7 @@ else:
     import dollarparser
 
 ## setup logger
+_COMMAND_TIMEOUT_UNSET = object()
 logger = get_logger()
 SSHScriptExportedNames = set(['sftp','client','logger']) # default to exposed properties
 SSHScriptExportedNamesByAlias = {}
@@ -350,13 +357,35 @@ class Session(object):
         self.lineNumberCount = 0
 
 
-        self.logger = logger
+        self._settings = parent.get() if parent is not None else root_defaults()
+        self.logger = SessionLogger(self._settings)
         ## when exec_command() or withdollar() was called,
         ## this value was stored, so user can access its stdout, stderr and exitcode
         ## by self.stdout and self.stderr, self.exitcode
         self._lastDollar = None
         self.last_result = None
+        self._jobs = weakref.WeakSet()
         self._attached_stack = None
+    @export2Dollar
+    def set(self, **settings):
+        """Atomically update this Session's validated execution policy."""
+        values = validate(settings)
+        self._settings.update(values)
+
+    @export2Dollar
+    def get(self, name=None):
+        """Return a setting, or an independent copy of all effective settings."""
+        if name is None:
+            return dict(self._settings)
+        if name not in self._settings:
+            raise ValueError(f'unknown Session setting: {name}')
+        return self._settings[name]
+
+    check = property(lambda self: self.get('check'), lambda self, v: self.set(check=v))
+    verbose = property(lambda self: self.get('verbose'), lambda self, v: self.set(verbose=v))
+    verbose_stderr = property(lambda self: self.get('verbose_stderr'), lambda self, v: self.set(verbose_stderr=v))
+    log_level = property(lambda self: self.get('log_level'), lambda self, v: self.set(log_level=v))
+
     ## added in v2.0.3
     ## always return the session which is not connected to execute commands by subprocess at localhost
     @property
@@ -564,12 +593,12 @@ class Session(object):
         return p
     @export2Dollar('break')
     def _break(self,code=0,message=''):
-        logger.debug('Script requested break (exit_code=%s)', code)
+        self.logger.debug('Script requested break (exit_code=%s)', code)
         raise SSHScriptBreak(message,code)
 
     @export2Dollar
     def exit(self,code=0,message=''):
-        logger.debug('Script requested exit (exit_code=%s)', code)
+        self.logger.debug('Script requested exit (exit_code=%s)', code)
         raise SSHScriptExit(message,code)
 
     @export2Dollar
@@ -619,7 +648,7 @@ class Session(object):
         kw = effective
 
         has_proxy = 'proxyCommand' in kw
-        logger.debug(
+        self.logger.debug(
             'Opening SSH connection (host=%s, port=%s, username=%s, nested=%s, proxy=%s)',
             host,
             port,
@@ -640,7 +669,7 @@ class Session(object):
                 try:
                     client.close()
                 except BaseException as cleanup_exc:
-                    logger.warning(
+                    self.logger.warning(
                         'Unable to close SSH client after connection failure '
                         '(host=%s, exception_type=%s)',
                         host,
@@ -676,7 +705,7 @@ class Session(object):
         try:
             if is_nested:
                 ## a nested connection
-                logger.debug(
+                self.logger.debug(
                     'Opening nested SSH transport (host=%s, port=%s, username=%s)',
                     host,
                     port,
@@ -688,7 +717,7 @@ class Session(object):
                 subsession._sock = self._client.get_transport().open_channel("direct-tcpip", dest_addr, local_addr)
                 subsession._client = connect_client(host,username,password,port,policy,sock=subsession._sock,**kw)
             elif has_proxy:
-                logger.debug(
+                self.logger.debug(
                     'Opening SSH connection through proxy command '
                     '(host=%s, port=%s, username=%s)',
                     host,
@@ -702,7 +731,7 @@ class Session(object):
                 kw.setdefault('auth_timeout', 30)                
                 subsession._client = connect_client(host,username,password,port,policy,sock=subsession._sock,**kw)
             else:
-                logger.debug(
+                self.logger.debug(
                     'Opening direct SSH transport (host=%s, port=%s, username=%s)',
                     host,
                     port,
@@ -716,7 +745,7 @@ class Session(object):
                     keepAliveInterval
                 )
                     
-            logger.debug(
+            self.logger.debug(
                 'Configured SSH keepalive (host=%s, interval_seconds=%s)',
                 host,
                 keepAliveInterval,
@@ -736,7 +765,7 @@ class Session(object):
             try:
                 subsession.close()
             except BaseException as cleanup_exc:
-                logger.warning(
+                self.logger.warning(
                     'Unable to clean up failed SSH connection '
                     '(host=%s, exception_type=%s)',
                     host,
@@ -984,6 +1013,7 @@ class Session(object):
             raise TimeoutError('Timed out waiting for the script execution lock')
         
         
+        execution_context = contextvars.copy_context()
         def runner(*args):
             runSession = f"{self.host}:{threading.current_thread().native_id}"
             started_at = time.monotonic()
@@ -992,7 +1022,7 @@ class Session(object):
             exception_type = None
             ret = {}
             try:
-                ret['value'] = executeScript(*args)
+                ret['value'] = execution_context.run(executeScript, *args)
             except SystemExit as e:
                 ret['system_exit'] = e
                 outcome = 'system_exit'
@@ -1008,7 +1038,7 @@ class Session(object):
                 outcome = 'error'
                 exception_type = type(e).__name__
             finally:
-                logger.debug(
+                self.logger.debug(
                     'Script execution finished '
                     '(session=%s, outcome=%s, exit_code=%s, exception_type=%s, duration_ms=%d)',
                     runSession,
@@ -1039,9 +1069,62 @@ class Session(object):
         if self._lastDollar: self._lastDollar.clear()
 
 
-    def exec_command(self,cmd,*,shell=None,shell_executable=None,check=False,
+    @export2Dollar
+    def start(self, cmd, *, shell=None, shell_executable=None, timeout=None,
+              stop_timeout=3, capture_limit=1024 * 1024, check=UNSET,
+              input=None, env=None, get_pty=False):
+        """Start an owned command; use its context manager, stop(), and wait().
+
+        timeout is a total command budget on both backends, None is unlimited.
+        Capture retains bounded output tails. iter_stdout() streams text chunks.
+        start() does not change Session.last_result or the legacy output buffers.
+        Local PTYs are unsupported here; use enter() for interactive local tools.
+        """
+        if check is UNSET:
+            check = self.check
+        if self.closed:
+            raise RuntimeError('cannot execute on a closed session')
+        if self._client is not None and not self.connected:
+            raise BrokenPipeError('SSH transport is not active')
+        argv = None
+        if isinstance(cmd, (list, tuple)):
+            if not cmd or not all(isinstance(arg, str) for arg in cmd):
+                if not cmd:
+                    raise ValueError('argument sequence must be nonempty')
+                raise TypeError('every command argument must be str')
+            if not cmd[0] or any('\x00' in arg for arg in cmd):
+                raise ValueError('executable must be nonempty and arguments cannot contain NUL')
+            if (shell is not None and shell is not False) or shell_executable is not None:
+                raise ValueError('argument sequences require shell=None or shell=False')
+            argv = tuple(cmd)
+            cmd = shlex.join(argv)
+            shell = False
+        elif not isinstance(cmd, str):
+            raise TypeError('command must be str, list, or tuple')
+        if not cmd.strip() or '\x00' in cmd:
+            raise ValueError('command must be nonempty and cannot contain NUL')
+        if isinstance(shell, str):
+            if shell_executable is not None:
+                raise ValueError('use either shell="name" or shell_executable, not both')
+            shell_executable, shell = shell, True
+        elif shell is not None and not isinstance(shell, bool):
+            raise TypeError('shell must be None, bool, or a shell executable name')
+        execution = Dollar(self, cmd, use_shell=shell, shell_executable=shell_executable)
+        execution.argv = argv
+        job = CommandJob(self, execution, timeout=timeout, stop_timeout=stop_timeout,
+                         capture_limit=capture_limit, check=check, input=input,
+                         env=env, get_pty=get_pty)
+        self._jobs.add(job)
+        return job._launch()
+
+    def exec_command(self,cmd,*,shell=None,shell_executable=None,check=UNSET,
+                     command_timeout=_COMMAND_TIMEOUT_UNSET,
                      _legacy_twodollars=False,**kw):
         """Execute one command and return a CommandResult; also session(cmd).
+
+        command_timeout opts into a total deadline on both backends (None means
+        unlimited), bounded capture and CommandTimeoutError. Legacy timeout keeps
+        its subprocess/Paramiko meaning; specifying both is an error.
 
         Wait for completion on this session's host. stdout, stderr, and exitcode
         remain available on the session as the latest command result. Check exitcode
@@ -1066,6 +1149,26 @@ class Session(object):
             stdout, stderr, exitcode = session("cat", input="hello")
             status = session.exitcode
         """
+        if check is UNSET:
+            check = self.check
+        if command_timeout is not _COMMAND_TIMEOUT_UNSET:
+            if 'timeout' in kw:
+                raise ValueError('use command_timeout or legacy timeout, not both')
+            if _legacy_twodollars:
+                shell = True
+            job = self.start(cmd, shell=shell, shell_executable=shell_executable,
+                             timeout=command_timeout, check=check, **kw)
+            self._lastDollar = job
+            self.last_result = None
+            try:
+                with job:
+                    result = job.wait()
+            except subprocess.CalledProcessError as exc:
+                self.last_result = exc.result
+                raise
+            self.last_result = result
+            return result
+
         if self.closed:
             raise RuntimeError('cannot execute on a closed session')
         if self._client is not None and not self.connected:
@@ -1330,6 +1433,17 @@ class Session(object):
             return not close_errors
 
         cleanup_errors = []
+        for job in tuple(getattr(self, '_jobs', ())):
+            if not job.done:
+                try:
+                    result = job.stop()
+                    if result.termination_status == 'unknown':
+                        cleanup_errors.append(('stop command', RuntimeError('command termination is unconfirmed')))
+                except CommandTimeoutError as exc:
+                    if exc.termination_status == 'unknown':
+                        cleanup_errors.append(('stop command', exc))
+                except Exception as exc:
+                    cleanup_errors.append(('stop command', exc))
         transport = None
         
         for subsession in reversed(tuple(self.subsessions)):
@@ -1364,7 +1478,7 @@ class Session(object):
                 self._client.close()
             except Exception as exc:
                 cleanup_errors.append(('close SSH client', exc))
-                logger.debug(
+                self.logger.debug(
                     'Unable to close SSH client cleanly '
                     '(host=%s, exception_type=%s)',
                     self.host,
@@ -1397,7 +1511,7 @@ class Session(object):
                         ))
 
                     if forced_kill:
-                        logger.warning(
+                        self.logger.warning(
                             'Proxy command required forced termination '
                             '(host=%s, pid=%s)',
                             self.host,
@@ -1415,7 +1529,7 @@ class Session(object):
                         self._sock = None                
             except Exception as exc:
                 cleanup_errors.append(('clean up SSH socket', exc))
-                logger.debug(
+                self.logger.debug(
                     'Unable to close SSH socket cleanly '
                     '(host=%s, exception_type=%s)',
                     self.host,
@@ -1426,7 +1540,7 @@ class Session(object):
 
 
         if self.host is not None:
-            logger.debug(
+            self.logger.debug(
                 'SSH connection closed (host=%s, port=%s, username=%s)',
                 self.host,
                 self.port,
@@ -1444,14 +1558,14 @@ class Session(object):
             try:
                 self.parent.subsessions.remove(self)
             except ValueError:
-                logger.debug(
+                self.logger.debug(
                     'Session is not registered with its parent '
                     '(session=%s, parent=%s)',
                     self,
                     self.parent,
                 )
             else:
-                logger.debug(
+                self.logger.debug(
                     'Removed session from its parent session (session=%s, parent=%s)',
                     self,
                     self.parent,
@@ -1460,7 +1574,7 @@ class Session(object):
 
         self.close_errors = tuple(cleanup_errors)
         for operation, exc in self.close_errors:
-            logger.warning(
+            self.logger.warning(
                 'Session cleanup step failed '
                 '(operation=%s, exception_type=%s)',
                 operation,

@@ -3,6 +3,68 @@
 This project records user-visible changes here. Release artifacts and their
 provenance are available from the linked GitHub Release and PyPI pages.
 
+## Unreleased
+
+- Add a canonical version-profiled API guide whose examples execute in CI,
+  plus shipped PEP 561 declarations and checked public typing examples.
+
+- Add Session set/get and validated check/verbose/log_level properties, child
+  snapshots, context-local CLI defaults, and per-command check overrides
+  including persistent shell commands. Session log levels are independent.
+
+- Add `Session.start()` and managed `CommandJob` lifetimes, streaming stdout,
+  bounded capture, user cancellation, and explicit termination status.
+- Add opt-in `exec_command(command_timeout=...)` with the same total deadline
+  as `start(timeout=...)` on local and SSH backends. Legacy timeout is unchanged.
+- Add `JobResult` and `CommandTimeoutError` with partial output and truncation
+  metadata. Local cancellation uses SIGINT then SIGKILL on an owned process
+  group; remote cancellation never treats channel closure as proof of a kill.
+- Document unlimited tcpdump capture, Ctrl-C, bounded stop grace, and migration.
+
+## [3.1.5] - 2026-09-27
+
+### Command API and SSH configuration
+
+- Accept argv lists/tuples for a single command, with local direct execution
+  and POSIX quoting over SSH; shell mode remains explicit for strings.
+- Return immutable CommandResult snapshots with stdout, stderr, exitcode,
+  host, duration, and command. Unpacking/indexing now yields three values:
+  stdout, stderr, exitcode. Two-value unpacking must be updated.
+  Output values are now strings rather than live buffer objects.
+- Apply check=True consistently to local and remote one-shot commands after
+  preserving results; CalledProcessError carries text output and result.
+- Resolve common ~/.ssh/config settings with explicit API overrides; add
+  config opt-out, alternate files, and a connection-free settings preview.
+  Support ProxyCommand and ProxyJump (the latter uses local OpenSSH).
+- Reject unsupported Match/Include/canonicalization rules; warn about other
+  unapplied config settings. ProxyJump requires noninteractive authentication
+  and verified jump-host keys. Existing host-key checks remain enabled.
+
+### Script validation
+
+- Add check_file(path) and --check FILE to compile Python/dollar syntax without
+  executing user code, imports, or commands. The no-file --check update alias
+  remains compatible; --check-updates is the explicit update command.
+- Map tokenizer indentation errors to the original source file; retain source
+  mapping coverage for nested commands, interpolation, multiline expressions,
+  and imported .spy modules. Editor integration is deferred.
+
+### Documentation and community
+
+- Reorganize the README around installation, secure first use, compatibility,
+  support, and release provenance.
+- Add structured issue forms, a pull request template, and a Code of Conduct.
+- Clarify supported environments, security boundaries, and public test paths.
+
+## [3.1.4] - 2026-09-24
+
+First Production/Stable release in the 3.1 line. Published through
+[PyPI Trusted Publishing](https://pypi.org/project/sshscript/3.1.4/) with
+verified artifacts in the
+[GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v3.1.4).
+This project records user-visible changes here. Release artifacts and their
+provenance are available from the linked GitHub Release and PyPI pages.
+
 ## [3.1.5] - 2026-09-27
 
 ### Command API and SSH configuration
@@ -96,6 +158,9 @@ verified artifacts in the
 - Add packaging metadata, license, contributor guidance, and CI configuration.
 - Add a disposable loopback OpenSSH integration gate covering host keys, SFTP,
   PTY behavior, sudo/su, and timeout handling.
+
+[Unreleased]: https://github.com/iapyeh/sshscript/compare/v3.1.4...release
+[3.1.4]: https://github.com/iapyeh/sshscript/releases/tag/v3.1.4
 
 [Unreleased]: https://github.com/iapyeh/sshscript/compare/v3.1.4...release
 [3.1.4]: https://github.com/iapyeh/sshscript/releases/tag/v3.1.4

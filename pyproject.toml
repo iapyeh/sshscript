@@ -58,3 +58,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.dynamic]
 version = {attr = "sshscript._version.__version__"}
+
+[tool.setuptools.package-data]
+sshscript = ["py.typed", "*.pyi"]

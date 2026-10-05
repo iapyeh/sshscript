@@ -20,6 +20,7 @@ Translated .spy code uses context_thread() to inherit a snapshot of the active
 session stack. Ordinary Python threads do not implicitly inherit that context.
 """
 
+import contextvars
 import functools
 import threading
 import weakref
@@ -160,6 +161,7 @@ def context_thread(
     registered only for its run and discarded in finally; this does not patch
     threading.Thread or close the inherited sessions.
     """
+    execution_context = contextvars.copy_context()
     parent_stack = peek_thread_stack()
     initial_stack = (
         parent_stack.snapshot() if parent_stack is not None else []
@@ -176,7 +178,7 @@ def context_thread(
             )
             set_thread_stack(stack)
             try:
-                return target(*target_args, **target_kwargs)
+                return execution_context.run(target, *target_args, **target_kwargs)
             finally:
                 clear_thread_stack()
 
