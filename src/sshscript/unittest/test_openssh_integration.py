@@ -16,7 +16,7 @@ import uuid
 
 import paramiko
 
-from sshscript import Session
+from sshscript import Session, CommandTimeoutError
 
 
 ENABLED = os.environ.get("SSHSCRIPT_OPENSSH_TESTS") == "1"
@@ -129,6 +129,29 @@ class OpenSSHIntegrationTests(unittest.TestCase):
                 shell=True,
                 timeout=10,
             )
+
+    def test_managed_deadline_and_pty_stop(self):
+        remote = self._connect()
+        started = time.monotonic()
+        with self.assertRaises(CommandTimeoutError) as caught:
+            remote.exec_command(
+                ["sh", "-c", "while :; do echo tick; sleep 0.05; done"],
+                command_timeout=0.5, stop_timeout=0.2,
+            )
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertIn("tick", caught.exception.stdout)
+        self.assertEqual(caught.exception.termination_status, "unknown")
+        # POSIX terminal job control is exercised against a real OpenSSH PTY.
+        with remote.start(
+            ["sh", "-c", "trap 'echo flushed; exit 0' INT; echo ready; while :; do sleep 0.1; done"],
+            get_pty=True, timeout=10, stop_timeout=2,
+        ) as job:
+            self.assertIn("ready", next(job.iter_stdout()))
+            result = job.stop()
+            self.assertEqual(result.termination_status, "confirmed")
+            self.assertEqual(result.stop_reason, "cancelled")
+            self.assertIn("flushed", result.stdout)
+        self.assertEqual(remote.exec_command(["printf", "alive"], command_timeout=3).stdout, "alive")
 
     def test_host_key_reject_trust_and_mismatch(self):
         self.known_hosts.write_text("", encoding="utf-8")

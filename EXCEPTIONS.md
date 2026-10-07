@@ -9,7 +9,9 @@ The following contract applies with and without `python -O`.
 | Invalid session, console, or channel lifecycle state | `RuntimeError` |
 | Operation on a closed channel or transport | `BrokenPipeError` |
 | Channel ends while waiting | `EOFError` |
-| Timeout | `TimeoutError` |
+| Legacy timeout | Original backend timeout (`subprocess.TimeoutExpired` locally; Paramiko/socket timeout remotely) |
+| Managed command deadline | `CommandTimeoutError` (subclass of `TimeoutError`), with partial `JobResult` |
+| Managed stdout iterator overflow | `BufferError` |
 | Disconnected `Session.sftp`, upload, or download | `SSHScriptException` |
 | Filesystem failure | Appropriate `OSError` subclass |
 | Paramiko failure | Original Paramiko exception and traceback |
@@ -52,3 +54,19 @@ The runner locates the package and tests under `src/sshscript/`, then executes
 normal and optimized test suites, the dollar-syntax smoke suite, compile checks,
 and the package-assertion gate. CI runs these checks on Python 3.11–3.14 on
 Linux and macOS. The AST gate scans package runtime modules and excludes tests.
+
+## Managed execution (unreleased)
+
+`Session.start(timeout=...)` and `exec_command(command_timeout=...)` share a
+monotonic total command budget. None means unlimited; finite values must be
+positive. The legacy exec_command timeout remains backend-specific and cannot
+be combined with command_timeout. Timeout always raises, regardless of check.
+CommandTimeoutError carries command, host, timeout, elapsed, stdout, stderr,
+termination_status and result. Missing exit status is None, not success.
+JobResult subclasses CommandResult and adds stop_reason, termination_status,
+stdout_truncated and stderr_truncated. Managed output retains bounded tails;
+start() owns its result independently from Session.last_result. Deliberate stop
+returns a cancellation result, even with check=True; natural failures still
+raise CalledProcessError. Remote channel closure alone is not confirmation of
+process termination. Unconfirmed active-job termination is reported by
+Session.close() as a cleanup error. See the timeout guide for the full contract.

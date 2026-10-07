@@ -3,9 +3,9 @@ import argparse
 import shutil
 from pathlib import Path
 
-MODULES = '__init__ _version sshscript session commandresult sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
+MODULES = '__init__ _version sshscript session sessionsettings commandresult commandjob sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
 ROOT_FILES = [
-    'pyproject.toml', 'README.md', 'LICENSE.txt', 'RELEASING.md',
+    'API_GUIDE.md', 'pyproject.toml', 'README.md', 'LICENSE.txt', 'RELEASING.md',
     'MANIFEST.in', 'CHANGELOG.md', 'CONTRIBUTING.md', 'EXCEPTIONS.md',
     'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md', '.gitignore',
     '.github/ISSUE_TEMPLATE/bug_report.yml',
@@ -16,11 +16,11 @@ ROOT_FILES = [
     '.github/workflows/release.yml',
 ]
 TOOLS = [
-    'prepare_release.py', 'check_release.py', 'run_checks.py',
+    'check_baseline_examples.py', 'sync_api_guide.py', 'check_public_types.py', 'prepare_release.py', 'check_release.py', 'run_checks.py',
     'publish_release.py', 'setup_openssh_ci.sh',
 ]
 TESTS = [
-    'test_command_api.py', 'test_ssh_config.py', 'test_check_file.py',
+    'test_recommended_examples.py', 'test_public_types.py', 'test_session_settings.py', 'test_command_job.py', 'test_command_api.py', 'test_ssh_config.py', 'test_check_file.py',
     'check_package_asserts.py', 'dollar_syntax.spy',
     'dollar_syntax_fixture.spy', 'language.spy', 'language_fixture.spy',
     'test_channelgeneric_expect.py', 'test_file_transfer.py',
@@ -42,6 +42,7 @@ def prepare(source, destination):
     pairs += [(source / 'tools' / p, destination / 'tools' / p) for p in TOOLS]
     pairs += [(package / (p + '.py'), destination / 'src/sshscript' / (p + '.py')) for p in MODULES]
     pairs += [(package / 'unittest' / p, destination / 'src/sshscript/unittest' / p) for p in TESTS]
+    pairs += [(package / p, destination / 'src/sshscript' / p) for p in ('py.typed', '__init__.pyi', 'session.pyi', 'sessionwrapper.pyi', 'commandjob.pyi', 'commandresult.pyi')]
     missing = [str(src) for src, _ in pairs if not src.is_file()]
     if missing:
         raise FileNotFoundError('Missing release inputs: ' + ', '.join(missing))

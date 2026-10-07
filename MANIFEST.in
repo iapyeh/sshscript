@@ -5,3 +5,7 @@ include tools/setup_openssh_ci.sh
 include .github/dependabot.yml
 recursive-include .github/workflows *.yml
 recursive-include src/sshscript/unittest *.py *.spy
+
+include API_GUIDE.md
+include src/sshscript/py.typed
+recursive-include src/sshscript *.pyi

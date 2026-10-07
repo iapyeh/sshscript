@@ -89,11 +89,14 @@ class RemoteEnvironmentTests(unittest.TestCase):
         sshchannel = channelssh.SSHChannel.__new__(channelssh.SSHChannel)
         owner = Mock()
         owner.command = ''
+        owner.session = Session()
+        self.addCleanup(owner.session.close)
         owner.session.host = 'example.test'
         owner._parameters_to_execute = {
             'environment': explicit_environment or {},
         }
         sshchannel.owner = owner
+        sshchannel.logger = owner.session.logger
         sshchannel.wait_for_silent = Mock()
         remote_channel = Mock()
         client = Mock()
@@ -175,7 +178,8 @@ class RemoteCommandIOTests(unittest.TestCase):
         stderr = Stream(b'err', remote_channel)
         client = Mock()
         client.exec_command.return_value = stdin, stdout, stderr
-        remote_session = Mock()
+        remote_session = Session()
+        self.addCleanup(remote_session.close)
         remote_session.host = 'example.test'
         remote_session._client = client
 
@@ -235,8 +239,8 @@ class RemoteCommandIOTests(unittest.TestCase):
             Stream(b'host-name\n'),
             Stream(b''),
         )
-        remote_session = Mock()
-        remote_session.connected = True
+        remote_session = Session()
+        self.addCleanup(remote_session.close)
         remote_session.host = 'example.test'
         remote_session._client = client
 
