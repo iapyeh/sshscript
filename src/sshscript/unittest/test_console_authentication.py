@@ -227,9 +227,14 @@ class ConsoleAuthenticationTests(unittest.TestCase):
 
     def test_initials_share_the_authentication_deadline(self):
         with self.session.shell() as parent:
+            # Leave enough time for a cold interpreter/PTY on CI to reach
+            # authentication. The combined delay exceeds the entry budget,
+            # while initials alone would fit a separately restarted budget.
+            context = self.console(parent, delay=0.5, timeout=3,
+                                   initials=["sleep 2.7"])
             with self.assertRaises(TimeoutError):
-                self.console(parent, delay=0.1, timeout=0.3,
-                             initials=["sleep 0.4"]).__enter__()
+                context.__enter__()
+            self.assertIsNotNone(context._auth_identity)
             stdout, _, exitcode = parent("printf recovered")
             self.assertIn("recovered", str(stdout))
 
