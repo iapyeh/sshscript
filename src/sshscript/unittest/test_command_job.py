@@ -308,14 +308,37 @@ class CommandJobTests(unittest.TestCase):
     def test_continuous_output_does_not_reset_deadline(self):
         for session in (self.local(), self.remote()):
             with self.subTest(host=session.host):
-                start = time.monotonic()
-                with self.assertRaises(CommandTimeoutError) as caught:
-                    session(self.command('import time\nwhile True:\n print("tick"); time.sleep(.01)'), command_timeout=.3, stop_timeout=.1)
-                self.assertLess(time.monotonic() - start, 2)
-                self.assertIn('tick', caught.exception.stdout)
-                self.assertEqual(caught.exception.result.stop_reason, 'timeout')
-                self.assertIsNone(session.last_result)
-                self.assertEqual(caught.exception.termination_status, 'confirmed' if session.host is None else 'unknown')
+                # Isolate the deadline contract from interpreter/SSH startup:
+                # hold only the job clock until output is actually observed.
+                clock = Mock(wraps=time)
+                origin = time.monotonic()
+                clock.monotonic.return_value = origin
+                with patch('commandjob.time', clock):
+                    job = session.start(self.command(
+                        'import time\nwhile True:\n print("tick"); time.sleep(.01)'),
+                        timeout=.3, stop_timeout=.1)
+                    try:
+                        with job._condition:
+                            self.assertTrue(job._condition.wait_for(
+                                lambda: 'tick' in job.stdout or job.done, timeout=5),
+                                'continuous-output process did not become ready')
+                        self.assertIn('tick', job.stdout)
+                        ready_at = time.monotonic()
+                        clock.monotonic.side_effect = lambda: origin + time.monotonic() - ready_at
+                        self.assertTrue(job._done.wait(2), 'output reset the total deadline')
+                        with self.assertRaises(CommandTimeoutError) as caught:
+                            job.wait()
+                        self.assertIn('tick', caught.exception.stdout)
+                        self.assertEqual(caught.exception.result.stop_reason, 'timeout')
+                        self.assertIsNone(session.last_result)
+                        self.assertEqual(caught.exception.termination_status,
+                                         'confirmed' if session.host is None else 'unknown')
+                        self.assert_job_released(job)
+                    finally:
+                        try:
+                            job.stop()
+                        except CommandTimeoutError:
+                            pass
 
     def test_silent_command_and_unconsumed_stdin_are_bounded(self):
         for session in (self.local(), self.remote()):
