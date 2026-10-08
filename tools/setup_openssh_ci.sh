@@ -131,7 +131,10 @@ StrictModes yes
 UseDNS no
 PrintMotd no
 X11Forwarding no
-AllowTcpForwarding no
+AllowTcpForwarding local
+AllowStreamLocalForwarding no
+PermitOpen ${HOST}:${PORT}
+PermitListen none
 PermitTunnel no
 PermitUserEnvironment no
 Subsystem sftp internal-sftp

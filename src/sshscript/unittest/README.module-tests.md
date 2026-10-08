@@ -78,6 +78,10 @@ or every possible server/network failure.
 
 ## Real OpenSSH and dependency evidence
 
+The disposable CI server permits local TCP forwarding only to its own loopback
+SSH endpoint for nested SSH and ProxyJump checks. Other destinations and remote
+listeners remain prohibited; the integration suite verifies that restriction.
+
 `test_openssh_integration.py` also exercises more than 4 MiB of input with
 3 MiB on each output stream before input is read, EOF, execution-time transport
 loss, nested SSH, and ProxyJump with strict host-key checks. It verifies nested

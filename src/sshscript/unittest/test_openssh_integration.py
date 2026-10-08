@@ -192,6 +192,16 @@ class OpenSSHIntegrationTests(unittest.TestCase):
         with self.assertRaises(BrokenPipeError):
             remote.exec_command(['printf', 'must-not-run-locally'])
 
+    def test_ci_forwarding_rejects_other_destinations(self):
+        if not os.environ.get('SSHSCRIPT_OPENSSH_CONFIG'):
+            self.skipTest('restricted forwarding applies to the disposable CI fixture')
+        parent = self._connect()
+        with self.assertRaises(paramiko.ChannelException) as caught:
+            parent._client.get_transport().open_channel(
+                'direct-tcpip', (self.host, self.port + 1), ('127.0.0.1', 0))
+        self.assertEqual(caught.exception.code, 1)  # administratively prohibited
+        self.assertEqual(parent.exec_command(['printf', 'parent'], command_timeout=5).stdout, 'parent')
+
     def test_real_nested_ssh_closes_child_and_preserves_parent(self):
         parent = self._connect()
         with parent.connect(self.host, username=self.username, port=self.port,
