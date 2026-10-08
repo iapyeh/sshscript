@@ -185,8 +185,12 @@ class ConsoleAuthenticationTests(unittest.TestCase):
 
     def test_timeout_is_not_success_and_interrupt_restores_pty_parent(self):
         with self.session.shell() as parent:
+            context = self.console(parent, mode="hang", timeout=3)
             with self.assertRaises(TimeoutError):
-                self.console(parent, mode="hang", timeout=0.3).__enter__()
+                context.__enter__()
+            # Prove the fixture reached the unresolved authentication dialogue,
+            # rather than timing out while the cold CI interpreter was starting.
+            self.assertEqual(self.count.read_text().splitlines(), ["input"])
             self.assertFalse(parent.channel.executing_lock.locked())
             stdout, _, exitcode = parent("printf recovered")
             self.assertIn("recovered", str(stdout))
@@ -240,8 +244,12 @@ class ConsoleAuthenticationTests(unittest.TestCase):
 
     def test_unconfirmed_pipe_recovery_blocks_further_commands(self):
         with self.session.shell(get_pty=False) as parent:
+            context = self.console(parent, mode="hang", timeout=3)
             with self.assertRaises(TimeoutError):
-                self.console(parent, mode="hang", timeout=0.3).__enter__()
+                context.__enter__()
+            # Prove the fixture reached the unresolved authentication dialogue,
+            # rather than timing out while the cold CI interpreter was starting.
+            self.assertEqual(self.count.read_text().splitlines(), ["input"])
             self.assertFalse(parent.channel.executing_lock.locked())
             with self.assertRaisesRegex(RuntimeError, "recovery is unconfirmed"):
                 parent("printf must-not-run")
