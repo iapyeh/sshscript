@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch
 import paramiko
 from session import Session, CommandTimeoutError
 import sshscript
+from commandjob import CommandJob
 
 
 class Server(paramiko.ServerInterface):
@@ -144,6 +145,23 @@ class CommandJobTests(unittest.TestCase):
                 session(self.command('import time; time.sleep(10)'), command_timeout=.15,
                         stop_timeout=.1, input=b'x' * 4_000_000)
             self.assertLess(time.monotonic() - start, 2)
+
+    def test_signal_permission_error_requires_confirmed_child_exit(self):
+        for status in (None, -signal.SIGINT):
+            with self.subTest(status=status):
+                job = object.__new__(CommandJob)
+                job._process = Mock(pid=123, poll=Mock(return_value=status))
+                job._channel = None
+                job._signal_lock = threading.Lock()
+                job._sent_local_signals = set()
+                with patch('commandjob.os.killpg', side_effect=PermissionError):
+                    if status is None:
+                        with self.assertRaises(PermissionError):
+                            job._signal()
+                        self.assertEqual(job._sent_local_signals, set())
+                    else:
+                        job._signal()
+                        self.assertEqual(job._sent_local_signals, {signal.SIGINT})
 
     def test_local_stop_allows_sigint_handler_to_flush(self):
         source = 'import signal,time,sys\ndef stop(*args):\n print("flushed"); sys.exit(0)\nsignal.signal(signal.SIGINT,stop)\nprint("ready")\nwhile True: time.sleep(.1)'

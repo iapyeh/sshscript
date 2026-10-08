@@ -187,6 +187,12 @@ class CommandJob:
                         os.killpg(process.pid, sig)
                     except ProcessLookupError:
                         pass
+                    except PermissionError:
+                        # The worker may have already reaped the group leader
+                        # while the watcher was sending its final signal. Only
+                        # accept that race when child exit is actually confirmed.
+                        if process.poll() is None:
+                            raise
                     self._sent_local_signals.add(sig)
         if channel is not None:
             if force or not self._pty:

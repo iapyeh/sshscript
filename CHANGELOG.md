@@ -5,6 +5,9 @@ provenance are available from the linked GitHub Release and PyPI pages.
 
 ## Unreleased
 
+- Preserve confirmed child exit when a concurrent final cancellation signal
+  reports a permission error; still expose signal failures for live processes.
+
 - After an explicit authentication rejection, wait for the bounded return
   marker before probing the parent shell. Avoid a Ctrl-C race that can cancel
   the parent return marker on Linux; reject reuse if recovery remains unknown.
