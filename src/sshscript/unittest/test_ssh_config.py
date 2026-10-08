@@ -5,6 +5,7 @@ import shlex
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
+import paramiko
 
 from session import Session
 
@@ -122,6 +123,41 @@ Host *
         self.assertEqual(child.host, 'nested')
         parent._client.get_transport.return_value.open_channel.assert_called_once_with(
             'direct-tcpip', ('nested', 22), (None, None))
+
+    def test_policy_precedence_and_nested_snapshot(self):
+        parent = Session()
+        self.addCleanup(parent.close)
+        inherited = paramiko.AutoAddPolicy()
+        override = paramiko.RejectPolicy()
+        parent.set(policy=inherited)
+        clients = [Mock() for _ in range(5)]
+        with patch('session.paramiko.SSHClient', side_effect=clients):
+            remote = parent.connect('first', ssh_config=False)
+            overridden = parent.connect('override', policy=override, ssh_config=False)
+            defaulted = parent.connect('default', policy=None, ssh_config=False)
+            parent.policy = None
+            remote.connect('nested')
+            parent.connect('later', ssh_config=False)
+        clients[0].set_missing_host_key_policy.assert_called_once_with(inherited)
+        clients[1].set_missing_host_key_policy.assert_called_once_with(override)
+        clients[2].set_missing_host_key_policy.assert_not_called()
+        clients[3].set_missing_host_key_policy.assert_called_once_with(inherited)
+        clients[4].set_missing_host_key_policy.assert_not_called()
+        self.assertIs(remote.policy, inherited)
+        self.assertIs(overridden.policy, inherited)
+        self.assertIs(defaulted.policy, inherited)
+
+    def test_policy_class_and_legacy_zero_override(self):
+        parent = Session()
+        self.addCleanup(parent.close)
+        parent.policy = paramiko.AutoAddPolicy
+        clients = [Mock(), Mock()]
+        with patch('session.paramiko.SSHClient', side_effect=clients):
+            parent.connect('first', ssh_config=False)
+            with self.assertWarns(DeprecationWarning):
+                parent.connect('legacy', policy=0, ssh_config=False)
+        clients[0].set_missing_host_key_policy.assert_called_once_with(paramiko.AutoAddPolicy)
+        clients[1].set_missing_host_key_policy.assert_not_called()
 
 
 if __name__ == '__main__':

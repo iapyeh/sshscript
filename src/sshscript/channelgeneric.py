@@ -18,6 +18,7 @@
 
 import threading, os, sys, re
 import time
+import uuid
 import logging
 import paramiko
 import asyncio
@@ -67,6 +68,7 @@ class GenericChannel(object):
         
         ## an instance of Dollar
         self.owner = owner
+        self.logger = getattr(owner, "logger", logger)
 
         ## see hijack() for details
         self.hijacked = False
@@ -80,12 +82,13 @@ class GenericChannel(object):
         ## 如果沒有，則送出一個dumyEcho
         #self._exitcode_session_id = 0
         #self._command_session_id = 0
-        if os.environ.get('VERBOSE'):
+        settings = getattr(owner, 'settings', {})
+        if settings.get('verbose', bool(os.environ.get('VERBOSE'))):
             ## verbose-related
             self.dump2sys = (1,1)
             self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','🟩').encode('utf8')
             self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🟨').encode('utf8')
-        elif os.environ.get('VERBOSE_STDERR'):
+        elif settings.get('verbose_stderr', bool(os.environ.get('VERBOSE_STDERR'))):
             self.dump2sys = (0,1)
             self.stdoutPrefix = b''
             self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🟨').encode('utf8')
@@ -286,7 +289,7 @@ class GenericChannel(object):
         basetime = self.lastIOAtTime[:]
         timeouttime = (time.time() + timeout) if timeout else 0
         ret = True
-        logger.debug(
+        self.logger.debug(
             '%s Waiting for channel output (timeout=%s, silent=%s)',
             self.prefixOfLog,
             timeout or None,
@@ -314,7 +317,7 @@ class GenericChannel(object):
                 else:
                     raise TimeoutError(f'wait_for_output exceeded {timeout}')
 
-        logger.debug(
+        self.logger.debug(
             '%s Channel output wait completed (received=%s)',
             self.prefixOfLog,
             ret,
@@ -395,7 +398,7 @@ class GenericChannel(object):
         """Return the recorded status, fetching it if needed; -1 while interactive."""
         if self.hijacked:
             #raise ValueError('exitcode is not available in current state')
-            logger.warning(
+            self.logger.warning(
                 '%s Exit status is unavailable while the channel is in interactive mode',
                 self.prefixOfLog,
             )
@@ -410,7 +413,7 @@ class GenericChannel(object):
         """Log with channel context, preserving format arguments and logging keywords."""
         if isinstance(level, int) and 0 < level < logging.DEBUG:
             level = logging.DEBUG
-        logger.log(level, f'{self.prefixOfLog} {msg}', *args, **kwargs)
+        getattr(self, 'logger', logger).log(level, f'{self.prefixOfLog} {msg}', *args, **kwargs)
 
     def expect(
         self,
@@ -1401,7 +1404,7 @@ class GenericChannel(object):
         
         :text: Text to send as input
         """
-        logger.debug(
+        self.logger.debug(
             '%s Sending channel input (length=%d, interactive=%s)',
             self.prefixOfLog,
             len(text),
@@ -1724,6 +1727,8 @@ class GenericChannel(object):
         stdout = None
         stderr = None
         completed = threading.Event()
+        stderr_completed = threading.Event()
+        stderr_marker = None
 
         try:
             self._exitcode = EXITCODE_DEFAULT
@@ -1754,9 +1759,16 @@ class GenericChannel(object):
                     '-@_@-',
                 )
 
+                # Separate pipe readers can observe stdout completion before
+                # earlier stderr has been drained. Fence both streams before
+                # returning a completed command's buffers to the public wrapper.
+                trailer = 'echo _TT$?_-@_@-'
+                if not self.owner.get_pty:
+                    stderr_marker = '-@stderr-' + uuid.uuid4().hex + '\n'
+                    stderr.set_callback(stderr_completed.set, stderr_marker)
+                    trailer += "; printf '%s\\n' " + repr(stderr_marker.rstrip('\n')) + ' >&2'
                 self.send(
-                    f'{{ {command}; }} ; '
-                    'echo _TT$?_-@_@-\n',
+                    f'{{ {command}; }} ; ' + trailer + '\n',
                     timeout=self._remaining(deadline),
                 )
 
@@ -1794,9 +1806,12 @@ class GenericChannel(object):
                 'command completion',
             )
 
+            if stderr_marker is not None:
+                self._wait_event(stderr_completed, deadline, 'stderr completion')
+
             if not self.prompt:
                 match = re.compile(
-                    r'_TT(\d+)_'
+                    r'_TT(\d+)_\r?\n?$'
                 ).search(str(stdout))
 
                 if match is None:
@@ -1826,7 +1841,7 @@ class GenericChannel(object):
 
         :return: Tuple of (stdout, stderr)
         """
-        logger.debug(
+        self.logger.debug(
             '%s Dispatching command (interactive=%s, expectations=%d) %s',
             self.prefixOfLog,
             bool(self.prompt),
@@ -1874,7 +1889,7 @@ class GenericChannel(object):
                 if m:
                     self._exitcode = int(m.group(1))
                 else:
-                    logger.warning(
+                    self.logger.warning(
                         '%s Unable to parse command exit status',
                         self.prefixOfLog,
                     )
@@ -1891,7 +1906,7 @@ class GenericChannel(object):
             ## so that when next line is getting $.exitcode, it would get the corrent exitcode
             ## not the exitcode of our modified command.
             while self.executing_lock.locked(): time.sleep(0.01)
-        logger.debug(
+        self.logger.debug(
             '%s Command completed (interactive=%s, exit_status=%s)',
             self.prefixOfLog,
             bool(self.prompt),
@@ -2000,13 +2015,23 @@ class GenericChannel(object):
                             await handler[x](newbytes)
                         self._dumpBuf.clear()
             except Exception:
-                logger.exception('%s Channel output forwarding failed', self.prefixOfLog)
+                self.logger.exception('%s Channel output forwarding failed', self.prefixOfLog)
                 raise
     async def _dump_stdout_err(self):
         handler = [self._dump_stdout,self._dump_stderr]
         for x,newbytes in self._dumpBuf:
             await handler[x](newbytes)
         self._dumpBuf.clear()
+        # One-shot completion must also forward a final unterminated line.
+        for name, stream, prefix in (
+            ('_stdoutDumpBuf', sys.stdout, self.stdoutPrefix),
+            ('_stderrDumpBuf', sys.stderr, self.stderrPrefix),
+        ):
+            pending = getattr(self, name)
+            if pending:
+                stream.buffer.write(prefix + self._native_id.encode() + b':' + pending)
+                stream.buffer.flush()
+                setattr(self, name, b'')
     
     def reset_buffer(self,reason=None):
         """Replace the current stdout/stderr pair; return (new_pair, previous_pair)."""

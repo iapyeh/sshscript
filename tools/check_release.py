@@ -8,8 +8,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tarfile
 import venv
-from prepare_release import prepare
+from prepare_release import prepare, verify_sdist_tests
 
 def run(*args, cwd, env=None):
     subprocess.run([str(a) for a in args], cwd=cwd, env=env, check=True)
@@ -30,6 +31,16 @@ def main():
         artifacts = sorted(dist.glob('*'))
         if len(list(dist.glob('*.whl'))) != 1 or len(list(dist.glob('*.tar.gz'))) != 1:
             raise RuntimeError('Expected exactly one wheel and one sdist')
+        sdist = next(dist.glob('*.tar.gz'))
+        verify_sdist_tests(stage, sdist)
+        unpacked = root / 'sdist'
+        with tarfile.open(sdist, 'r:gz') as archive:
+            # The filter API is absent in early Python 3.11 patch releases.
+            # This archive was built above from our regular-file staging tree.
+            options = {'filter': 'data'} if hasattr(tarfile, 'data_filter') else {}
+            archive.extractall(unpacked, **options)
+        restored = next(unpacked.iterdir())
+        run(sys.executable, restored / 'tools/run_checks.py', cwd=restored)
         run(sys.executable, '-m', 'twine', 'check', '--strict', *artifacts, cwd=root)
         venv.EnvBuilder(with_pip=True, symlinks=True).create(root / 'venv')
         python = root / 'venv/bin/python'

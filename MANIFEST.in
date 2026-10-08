@@ -2,6 +2,52 @@ include README.md LICENSE.txt RELEASING.md
 include CHANGELOG.md CODE_OF_CONDUCT.md CONTRIBUTING.md EXCEPTIONS.md SECURITY.md SUPPORT.md
 recursive-include tools *.py
 include tools/setup_openssh_ci.sh
+include .gitignore
+include .github/ISSUE_TEMPLATE/bug_report.yml
+include .github/ISSUE_TEMPLATE/config.yml
+include .github/ISSUE_TEMPLATE/feature_request.yml
+include .github/pull_request_template.md
 include .github/dependabot.yml
 recursive-include .github/workflows *.yml
-recursive-include src/sshscript/unittest *.py *.spy
+include src/sshscript/unittest/README.console-authentication.md
+include src/sshscript/unittest/README.console-results.md
+include src/sshscript/unittest/README.dollar-syntax-tests.md
+include src/sshscript/unittest/README.module-tests.md
+include src/sshscript/unittest/check_package_asserts.py
+include src/sshscript/unittest/dollar_syntax.spy
+include src/sshscript/unittest/dollar_syntax_fixture.spy
+include src/sshscript/unittest/language_fixture.spy
+include src/sshscript/unittest/test_channelgeneric_expect.py
+include src/sshscript/unittest/test_check_file.py
+include src/sshscript/unittest/test_command_api.py
+include src/sshscript/unittest/test_command_job.py
+include src/sshscript/unittest/test_console_authentication.py
+include src/sshscript/unittest/test_native_console_authentication.py
+include src/sshscript/unittest/test_native_auth_runner.py
+include src/sshscript/unittest/test_console_results.py
+include src/sshscript/unittest/test_dollar_command_escapes.py
+include src/sshscript/unittest/test_file_transfer.py
+include src/sshscript/unittest/test_logger_api.py
+include src/sshscript/unittest/test_logger_integration.py
+include src/sshscript/unittest/test_openssh_integration.py
+include src/sshscript/unittest/test_production_contract.py
+include src/sshscript/unittest/test_public_types.py
+include src/sshscript/unittest/test_python_version.py
+include src/sshscript/unittest/test_release_inputs.py
+include src/sshscript/unittest/test_recommended_examples.py
+include src/sshscript/unittest/test_session_close_reporting.py
+include src/sshscript/unittest/test_session_proxy_cleanup.py
+include src/sshscript/unittest/test_session_settings.py
+include src/sshscript/unittest/test_spy_source_mapping.py
+include src/sshscript/unittest/test_spy_thread_session.py
+include src/sshscript/unittest/test_ssh_config.py
+include src/sshscript/unittest/test_ssh_security.py
+include src/sshscript/unittest/test_sshscript_dollar_syntax.py
+include src/sshscript/unittest/test_sshscript_module.py
+include src/sshscript/unittest/test_stdio_dynamic_string.py
+include src/sshscript/unittest/test_syntax_error.spy
+include src/sshscript/unittest/test_update_check.py
+
+include API_GUIDE.md
+include src/sshscript/py.typed
+recursive-include src/sshscript *.pyi

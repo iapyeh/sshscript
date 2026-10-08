@@ -23,6 +23,7 @@ else:
     import patching
 
 import ast
+import contextvars
 import threading
 import paramiko
 import stat
@@ -38,27 +39,36 @@ import warnings
 import subprocess
 import socket
 import shlex
+import weakref
+from functools import wraps
 from select import select
 if __package__:
+    from .sessionsettings import UNSET, validate, root_defaults, SessionLogger
+    from .commandjob import CommandJob, CommandTimeoutError, JobResult
     from .commandresult import CommandResult
     from .sshconfig import resolve_connection
     from .dollar import Dollar
     from .sessionwrapper import SessionWrapper,SudoConsole,SuConsole
+    from .channelutils import _validate_enter_timeout
     from .errorutils import get_logger, SSHScriptExit, SSHScriptBreak, SSHScriptException, dumpScript, listRightIndex
     ## v2.0.3 changes from sshscriptparserng to dollarparser
     from . import dollarparser
 
 else:
+    from sessionsettings import UNSET, validate, root_defaults, SessionLogger
+    from commandjob import CommandJob, CommandTimeoutError, JobResult
     from commandresult import CommandResult
     from sshconfig import resolve_connection
     ## called directly from the same folder
     ## see above "try" block for details
     from dollar import Dollar
     from sessionwrapper import SessionWrapper,SudoConsole,SuConsole
+    from channelutils import _validate_enter_timeout
     from errorutils import get_logger, SSHScriptException, SSHScriptExit, SSHScriptBreak, dumpScript, listRightIndex
     import dollarparser
 
 ## setup logger
+_COMMAND_TIMEOUT_UNSET = object()
 logger = get_logger()
 SSHScriptExportedNames = set(['sftp','client','logger']) # default to exposed properties
 SSHScriptExportedNamesByAlias = {}
@@ -177,6 +187,15 @@ class _IdempotentProxyCommand(paramiko.ProxyCommand):
                 exc.strerror or str(exc),
             )
 
+def _console_factory(method):
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        with self._lifecycle_lock:
+            self._ensure_open()
+            return method(self, *args, **kwargs)
+    return guarded
+
+
 class ConsoleWrapper:
     """Own the outer shell channel and expose a SessionWrapper in a with block.
 
@@ -204,24 +223,57 @@ class ConsoleWrapper:
         self.kwargs = kwargs
         self.wrapper = SessionWrapper(self)
         self.enter_count = 0
+        self.session = self.channel.owner.session
+        self.session._console_channels.add(self.channel)
+
     def __enter__(self):
+        self.session._activate_console(self)
+        try:
+            return self._enter_console()
+        except BaseException:
+            self.session._deactivate_console(self)
+            raise
+
+    def _enter_console(self):
         ## could enter many times.
         ## eg.
         ## with $.su(...) as console:
         ##        with console:
         ##            ...
-        if self.parentWrapper and self.parentWrapper.enter_count == 0:
+        parent_opened = bool(self.parentWrapper and self.parentWrapper.enter_count == 0)
+        if parent_opened:
             self.parentWrapper.__enter__()
         self.enter_count += 1
         self.wrapper.__enter__()
-        self.channel.__enter__()
-        ## call EnterConsole, SuConsole,...
-        self.innerConsole = getattr(self.wrapper,self.funcname)(*self.args,**self.kwargs)
-        self.innerConsole.__enter__()
+        try:
+            self.channel.__enter__()
+            self.innerConsole = getattr(self.wrapper,self.funcname)(*self.args,**self.kwargs)
+            self.innerConsole.__enter__()
+        except BaseException:
+            self.enter_count -= 1
+            failure = sys.exc_info()
+            self.wrapper.__exit__(*failure)
+            if parent_opened:
+                try:
+                    self.parentWrapper.__exit__(*failure)
+                except BaseException:
+                    self.channel.logger.debug('Unable to close implicit parent after entry failure')
+            elif self.parentWrapper is None:
+                try:
+                    self.channel.close()
+                except BaseException:
+                    self.channel.logger.debug('Unable to close console after entry failure')
+            raise
         return self.wrapper
     enter = __enter__
 
-    def __exit__(self,exc_type, exc_value, _traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return self._exit_console(exc_type, exc_value, traceback)
+        finally:
+            self.session._deactivate_console(self)
+
+    def _exit_console(self,exc_type, exc_value, _traceback):
         """Exit this console; only the outermost wrapper closes the shared channel."""
         
         #if exc_value is not None:
@@ -229,29 +281,26 @@ class ConsoleWrapper:
 
         #assert self.enter_count >= 1
         self.enter_count -= 1
-        ## EnterConsole.__exit__ etc.
-        self.innerConsole.__exit__(exc_type, exc_value, _traceback)
-        self.wrapper.__exit__(exc_value, _traceback)
-        self.wrapper = None
-        if self.parentWrapper is None:
-            self.channel.__exit__(exc_type, exc_value, _traceback)
-            self.channel.close()
-            #if self.channel.interaction_thread:
-            #    self.channel.interaction_loop.call_soon_threadsafe(self.channel.interaction_loop.stop) 
-            #    self.channel.interaction_thread.join()
-
-            ## close event loop
-            #event_loop = self.channel.owner.event_loop
-            #tasks = asyncio.all_tasks(event_loop)
-            #if tasks:          
-            #    for task in tasks:
-            #        task.cancel()
-            #    event_loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
-            #if event_loop.is_running():
-            #    event_loop.call_soon_threadsafe(event_loop.stop) 
-            self.channel.owner.call_thread.join()
-        else:
-            return self.parentWrapper.__exit__(exc_type, exc_value, _traceback)
+        try:
+            self.innerConsole.__exit__(exc_type, exc_value, _traceback)
+        finally:
+            # Entry/exit failures must not leave the console on the thread stack
+            # or keep its owning channel open. Preserve a propagating exception.
+            failure = sys.exc_info()
+            effective = failure if failure[1] is not None else (exc_type, exc_value, _traceback)
+            self.wrapper.__exit__(*effective)
+            self.wrapper = None
+            try:
+                if self.parentWrapper is None:
+                    self.channel.__exit__(*effective)
+                    self.channel.close()
+                    self.channel.owner.call_thread.join()
+                else:
+                    self.parentWrapper.__exit__(*effective)
+            except BaseException:
+                if effective[1] is None:
+                    raise
+                self.channel.logger.debug('Unable to finish console cleanup after an exception')
 
     def exit(self):
         return self.__exit__(None,None,None)
@@ -350,13 +399,66 @@ class Session(object):
         self.lineNumberCount = 0
 
 
-        self.logger = logger
+        # A child shares its tree lock; independent roots do not block each other.
+        self._lifecycle_lock = parent._lifecycle_lock if parent is not None else threading.RLock()
+        self._settings = parent.get() if parent is not None else root_defaults()
+        self.logger = SessionLogger(self._settings)
         ## when exec_command() or withdollar() was called,
         ## this value was stored, so user can access its stdout, stderr and exitcode
         ## by self.stdout and self.stderr, self.exitcode
         self._lastDollar = None
         self.last_result = None
+        self._jobs = weakref.WeakSet()
+        self._console_channels = weakref.WeakSet()
+        self._active_consoles = {}
         self._attached_stack = None
+    def _ensure_open(self):
+        if self.closed:
+            raise RuntimeError('cannot operate on a closed session')
+
+    def _activate_console(self, console):
+        with self._lifecycle_lock:
+            self._ensure_open()
+            self._active_consoles[console] = self._active_consoles.get(console, 0) + 1
+
+    def _deactivate_console(self, console):
+        with self._lifecycle_lock:
+            count = self._active_consoles[console]
+            if count == 1:
+                del self._active_consoles[console]
+            else:
+                self._active_consoles[console] = count - 1
+
+    def _check_close_allowed(self):
+        if self._active_consoles:
+            raise RuntimeError(
+                'Cannot close Session while a console context is active. '
+                'Leave the shell/su/sudo/enter context before closing the Session.'
+            )
+        for child in tuple(self.subsessions):
+            child._check_close_allowed()
+
+    @export2Dollar
+    def set(self, **settings):
+        """Atomically update this Session's validated settings."""
+        values = validate(settings)
+        self._settings.update(values)
+
+    @export2Dollar
+    def get(self, name=None):
+        """Return a setting, or an independent copy of all effective settings."""
+        if name is None:
+            return dict(self._settings)
+        if name not in self._settings:
+            raise ValueError(f'unknown Session setting: {name}')
+        return self._settings[name]
+
+    check = property(lambda self: self.get('check'), lambda self, v: self.set(check=v))
+    verbose = property(lambda self: self.get('verbose'), lambda self, v: self.set(verbose=v))
+    verbose_stderr = property(lambda self: self.get('verbose_stderr'), lambda self, v: self.set(verbose_stderr=v))
+    log_level = property(lambda self: self.get('log_level'), lambda self, v: self.set(log_level=v))
+    policy = property(lambda self: self.get('policy'), lambda self, v: self.set(policy=v))
+
     ## added in v2.0.3
     ## always return the session which is not connected to execute commands by subprocess at localhost
     @property
@@ -405,6 +507,7 @@ class Session(object):
 
     @property
     def sftp(self):
+        self._ensure_open()
         if not self.connected:
             raise SSHScriptException('sftp requires an active SSH connection')
         if self._sftp is not None:
@@ -417,6 +520,7 @@ class Session(object):
 
     @property
     def console_info(self):
+        self._ensure_open()
         try:
             if self._console_info_locker: self._console_info_locker.acquire()
             if self._console_info is None:
@@ -513,6 +617,7 @@ class Session(object):
             return f'<Session {self.id}>'
 
     def __enter__(self):
+        self._ensure_open()
         current_thread = threading.current_thread()
         with self.enteringThreadsLocker:
             patching.get_thread_stack(current_thread).append(self)
@@ -564,16 +669,16 @@ class Session(object):
         return p
     @export2Dollar('break')
     def _break(self,code=0,message=''):
-        logger.debug('Script requested break (exit_code=%s)', code)
+        self.logger.debug('Script requested break (exit_code=%s)', code)
         raise SSHScriptBreak(message,code)
 
     @export2Dollar
     def exit(self,code=0,message=''):
-        logger.debug('Script requested exit (exit_code=%s)', code)
+        self.logger.debug('Script requested exit (exit_code=%s)', code)
         raise SSHScriptExit(message,code)
 
     @export2Dollar
-    def connect(self,host,username=None,password=None,port=None,policy=None,*,ssh_config=None,**kw):
+    def connect(self,host,username=None,password=None,port=None,policy=UNSET,*,ssh_config=None,**kw):
         """Return a connected child session, optionally through this session's SSH link.
 
         Use with session.connect("user@host") as remote to scope the connection.
@@ -588,8 +693,11 @@ class Session(object):
         resolve_connection() previews effective settings without connecting.
         Other connection keywords are forwarded to SSHClient.connect().
 
-        Unknown and changed host keys are rejected by default. policy may explicitly
-        supply a missing-host-key policy. proxyCommand is supported only on a local
+        Unknown and changed host keys are rejected by default. Omitted policy uses
+        this Session's policy setting; an explicit policy overrides it for this
+        connection only. Explicit None uses Paramiko's default RejectPolicy.
+        Children inherit the parent's settings, including policy; changing a
+        setting affects future connections only. proxyCommand is supported only on a local
         parent; its connect/banner/auth timeouts default to 30 seconds and may be
         overridden. KEEPALIVE_INTERVAL sets keepalive seconds (default 60; 0 disables).
         Connection failures propagate.
@@ -597,6 +705,9 @@ class Session(object):
         
         if self.closed:
             raise RuntimeError('cannot connect from a closed session')        
+
+        if policy is UNSET:
+            policy = self.policy
         
         ## host might be in format of "username@hostname"
         if isinstance(host, str) and '@' in host:
@@ -619,7 +730,7 @@ class Session(object):
         kw = effective
 
         has_proxy = 'proxyCommand' in kw
-        logger.debug(
+        self.logger.debug(
             'Opening SSH connection (host=%s, port=%s, username=%s, nested=%s, proxy=%s)',
             host,
             port,
@@ -640,7 +751,7 @@ class Session(object):
                 try:
                     client.close()
                 except BaseException as cleanup_exc:
-                    logger.warning(
+                    self.logger.warning(
                         'Unable to close SSH client after connection failure '
                         '(host=%s, exception_type=%s)',
                         host,
@@ -676,7 +787,7 @@ class Session(object):
         try:
             if is_nested:
                 ## a nested connection
-                logger.debug(
+                self.logger.debug(
                     'Opening nested SSH transport (host=%s, port=%s, username=%s)',
                     host,
                     port,
@@ -688,7 +799,7 @@ class Session(object):
                 subsession._sock = self._client.get_transport().open_channel("direct-tcpip", dest_addr, local_addr)
                 subsession._client = connect_client(host,username,password,port,policy,sock=subsession._sock,**kw)
             elif has_proxy:
-                logger.debug(
+                self.logger.debug(
                     'Opening SSH connection through proxy command '
                     '(host=%s, port=%s, username=%s)',
                     host,
@@ -702,7 +813,7 @@ class Session(object):
                 kw.setdefault('auth_timeout', 30)                
                 subsession._client = connect_client(host,username,password,port,policy,sock=subsession._sock,**kw)
             else:
-                logger.debug(
+                self.logger.debug(
                     'Opening direct SSH transport (host=%s, port=%s, username=%s)',
                     host,
                     port,
@@ -716,7 +827,7 @@ class Session(object):
                     keepAliveInterval
                 )
                     
-            logger.debug(
+            self.logger.debug(
                 'Configured SSH keepalive (host=%s, interval_seconds=%s)',
                 host,
                 keepAliveInterval,
@@ -730,13 +841,15 @@ class Session(object):
                 has_proxy,
             )
             # 所有步驟成功後，正式交給 parent 管理。
-            self.subsessions.append(subsession)
+            with self._lifecycle_lock:
+                self._ensure_open()
+                self.subsessions.append(subsession)
             return subsession
         except BaseException:
             try:
                 subsession.close()
             except BaseException as cleanup_exc:
-                logger.warning(
+                self.logger.warning(
                     'Unable to clean up failed SSH connection '
                     '(host=%s, exception_type=%s)',
                     host,
@@ -760,6 +873,7 @@ class Session(object):
         A connected session reads via SFTP; a local session reads a local file.
         The returned key can be passed to connect(pkey=...), or use pkey_path there.
         """
+        self._ensure_open()
         if self.connected:
             # Read through SFTP instead of interpolating the path into a remote
             # shell command.  Besides handling arbitrary valid filenames, this
@@ -793,6 +907,7 @@ class Session(object):
         overwrite=False uses exclusive creation. Success returns (src, dst);
         failures raise exceptions without changing command results such as exitcode.
         """
+        self._ensure_open()
         if not self.connected:
             raise SSHScriptException('upload() requires an active SSH connection')
         src = os.path.abspath(os.path.normpath(src))
@@ -877,6 +992,7 @@ class Session(object):
         existing directory receives the source basename. Existing files are replaced.
         Return (src, dst); failures raise without changing command results.
         """
+        self._ensure_open()
         if not self.connected:
             raise SSHScriptException('download() requires an active SSH connection')
         if dst is None:
@@ -916,6 +1032,7 @@ class Session(object):
         return self.run_in_eventloop(script,vars,showScript)
 
     def run_in_eventloop(self,script,vars=None,showScript=False):
+        self._ensure_open()
         execution_stack = patching.get_thread_stack()
         execution_stack.append(self)
         try:
@@ -984,6 +1101,7 @@ class Session(object):
             raise TimeoutError('Timed out waiting for the script execution lock')
         
         
+        execution_context = contextvars.copy_context()
         def runner(*args):
             runSession = f"{self.host}:{threading.current_thread().native_id}"
             started_at = time.monotonic()
@@ -992,7 +1110,7 @@ class Session(object):
             exception_type = None
             ret = {}
             try:
-                ret['value'] = executeScript(*args)
+                ret['value'] = execution_context.run(executeScript, *args)
             except SystemExit as e:
                 ret['system_exit'] = e
                 outcome = 'system_exit'
@@ -1008,7 +1126,7 @@ class Session(object):
                 outcome = 'error'
                 exception_type = type(e).__name__
             finally:
-                logger.debug(
+                self.logger.debug(
                     'Script execution finished '
                     '(session=%s, outcome=%s, exit_code=%s, exception_type=%s, duration_ms=%d)',
                     runSession,
@@ -1039,9 +1157,64 @@ class Session(object):
         if self._lastDollar: self._lastDollar.clear()
 
 
-    def exec_command(self,cmd,*,shell=None,shell_executable=None,check=False,
+    @export2Dollar
+    def start(self, cmd, *, shell=None, shell_executable=None, timeout=None,
+              stop_timeout=3, capture_limit=1024 * 1024, check=UNSET,
+              input=None, env=None, get_pty=False):
+        """Start an owned command; use its context manager, stop(), and wait().
+
+        timeout is a total command budget on both backends, None is unlimited.
+        Capture retains bounded output tails. iter_stdout() streams text chunks.
+        start() does not change Session.last_result or the legacy output buffers.
+        Local PTYs are unsupported here; use enter() for interactive local tools.
+        """
+        if check is UNSET:
+            check = self.check
+        if self.closed:
+            raise RuntimeError('cannot execute on a closed session')
+        if self._client is not None and not self.connected:
+            raise BrokenPipeError('SSH transport is not active')
+        argv = None
+        if isinstance(cmd, (list, tuple)):
+            if not cmd or not all(isinstance(arg, str) for arg in cmd):
+                if not cmd:
+                    raise ValueError('argument sequence must be nonempty')
+                raise TypeError('every command argument must be str')
+            if not cmd[0] or any('\x00' in arg for arg in cmd):
+                raise ValueError('executable must be nonempty and arguments cannot contain NUL')
+            if (shell is not None and shell is not False) or shell_executable is not None:
+                raise ValueError('argument sequences require shell=None or shell=False')
+            argv = tuple(cmd)
+            cmd = shlex.join(argv)
+            shell = False
+        elif not isinstance(cmd, str):
+            raise TypeError('command must be str, list, or tuple')
+        if not cmd.strip() or '\x00' in cmd:
+            raise ValueError('command must be nonempty and cannot contain NUL')
+        if isinstance(shell, str):
+            if shell_executable is not None:
+                raise ValueError('use either shell="name" or shell_executable, not both')
+            shell_executable, shell = shell, True
+        elif shell is not None and not isinstance(shell, bool):
+            raise TypeError('shell must be None, bool, or a shell executable name')
+        execution = Dollar(self, cmd, use_shell=shell, shell_executable=shell_executable)
+        execution.argv = argv
+        job = CommandJob(self, execution, timeout=timeout, stop_timeout=stop_timeout,
+                         capture_limit=capture_limit, check=check, input=input,
+                         env=env, get_pty=get_pty)
+        with self._lifecycle_lock:
+            self._ensure_open()
+            self._jobs.add(job)
+            return job._launch()
+
+    def exec_command(self,cmd,*,shell=None,shell_executable=None,check=UNSET,
+                     command_timeout=_COMMAND_TIMEOUT_UNSET,
                      _legacy_twodollars=False,**kw):
         """Execute one command and return a CommandResult; also session(cmd).
+
+        command_timeout opts into a total deadline on both backends (None means
+        unlimited), bounded capture and CommandTimeoutError. Legacy timeout keeps
+        its subprocess/Paramiko meaning; specifying both is an error.
 
         Wait for completion on this session's host. stdout, stderr, and exitcode
         remain available on the session as the latest command result. Check exitcode
@@ -1066,6 +1239,26 @@ class Session(object):
             stdout, stderr, exitcode = session("cat", input="hello")
             status = session.exitcode
         """
+        if check is UNSET:
+            check = self.check
+        if command_timeout is not _COMMAND_TIMEOUT_UNSET:
+            if 'timeout' in kw:
+                raise ValueError('use command_timeout or legacy timeout, not both')
+            if _legacy_twodollars:
+                shell = True
+            job = self.start(cmd, shell=shell, shell_executable=shell_executable,
+                             timeout=command_timeout, check=check, **kw)
+            self._lastDollar = job
+            self.last_result = None
+            try:
+                with job:
+                    result = job.wait()
+            except subprocess.CalledProcessError as exc:
+                self.last_result = exc.result
+                raise
+            self.last_result = result
+            return result
+
         if self.closed:
             raise RuntimeError('cannot execute on a closed session')
         if self._client is not None and not self.connected:
@@ -1163,6 +1356,7 @@ class Session(object):
     ## v2.0 added feature
     ## eg. "with $.shell('bash') as bash:"
     ## eg. "with $python3" => with $.shell('python3')
+    @_console_factory
     def shell(self,command=None,funcname='shell',get_pty=True,*args,**kw):
         """Open a persistent shell context on this session's host (default: bash -i).
 
@@ -1175,6 +1369,7 @@ class Session(object):
         get_pty requests a PTY. In .spy files, use with $.shell() as sh.
         funcname is an internal selector used by the other console factories.
         """
+        self._ensure_open()
         ## sudo,su,enter should set get_pty when calling this function
         if not isinstance(funcname, str):
             raise TypeError('console funcname must be str')
@@ -1206,49 +1401,60 @@ class Session(object):
     withdollar = shell
 
     ## v2.0 added feature
-    def su(self,username,password=None,expect=None,initials=None,shell:bool=True,login=True,get_pty=True):
+    @_console_factory
+    def su(self,username,password=None,expect=None,initials=None,shell:bool=True,login=True,get_pty=True,enter_timeout=10):
         """Open a console as username using su; use as a with context.
 
         password and expect handle authentication; initials runs setup commands.
         login selects a login shell. shell=True starts a base shell first;
         shell=False starts su directly. get_pty requests a PTY.
+        enter_timeout bounds authentication, readiness, and initials in __enter__
+        (default 10 seconds). Failure recovery has a separate two-second budget.
         The SSH connection account, including SFTP permissions, is unchanged.
         """
+        self._ensure_open()
         if get_pty is not None and not isinstance(get_pty, bool):
             raise TypeError('get_pty must be None or bool')
+        _validate_enter_timeout(enter_timeout)
         command = SuConsole.get_command(self,username,login,get_pty)
         if shell:
             self.shell(None,get_pty=get_pty)
-            self._lastDollar = ConsoleWrapper(self._lastDollar,'su',username,password=password,expect=expect,initials=initials,login=login,command=command)
+            self._lastDollar = ConsoleWrapper(self._lastDollar,'su',username,password=password,expect=expect,initials=initials,login=login,command=command,enter_timeout=enter_timeout)
         else:
             dollar = Dollar(self,command,for_with=True)
             dollar(get_pty=get_pty)
-            self._lastDollar = ConsoleWrapper(dollar,'su',username,password=password,expect=expect,initials=initials,login=login,command=False)
+            self._lastDollar = ConsoleWrapper(dollar,'su',username,password=password,expect=expect,initials=initials,login=login,command=False,enter_timeout=enter_timeout,_auth_token=command.auth_token)
 
         return self._lastDollar
     ## v2.0 added feature
-    def sudo(self,password=None,username=None,expect=None,initials=None,shell:bool=True,login=True,get_pty=True):
+    @_console_factory
+    def sudo(self,password=None,username=None,expect=None,initials=None,shell:bool=True,login=True,get_pty=True,enter_timeout=10):
         """Open a console through sudo, optionally selecting username; use with.
 
         password and expect handle authentication; initials runs setup commands.
         login selects login behavior. shell=True starts a base shell first;
         shell=False starts sudo directly. get_pty requests a PTY.
+        enter_timeout bounds authentication, readiness, and initials in __enter__
+        (default 10 seconds). Failure recovery has a separate two-second budget.
         File transfers still use the original SSH connection account.
         """
+        self._ensure_open()
         if get_pty is not None and not isinstance(get_pty, bool):
             raise TypeError('get_pty must be None or bool')
+        _validate_enter_timeout(enter_timeout)
         command=SudoConsole.get_command(self,username,login)
         if shell:
             self.shell(None,get_pty=get_pty)
-            self._lastDollar = ConsoleWrapper(self._lastDollar,'sudo',username=username,password=password,expect=expect,initials=initials,login=login,command=command)
+            self._lastDollar = ConsoleWrapper(self._lastDollar,'sudo',username=username,password=password,expect=expect,initials=initials,login=login,command=command,enter_timeout=enter_timeout)
         else:
             dollar = Dollar(self,command,for_with=True)
             dollar(get_pty=get_pty)
-            self._lastDollar = ConsoleWrapper(dollar,'sudo',username=username,password=password,expect=expect,initials=initials,login=login,command=False)
+            self._lastDollar = ConsoleWrapper(dollar,'sudo',username=username,password=password,expect=expect,initials=initials,login=login,command=False,enter_timeout=enter_timeout,_auth_token=command.auth_token)
 
         return self._lastDollar
 
     ## $.enter
+    @_console_factory
     def enter(self,command,expect=None,password=None,exit=None,shell:bool=True,get_pty=True,prompt=None):
         ## when base_shell is True, self.shell would assign value of self._lastDollar
         ## by assign to self._lastDollar, the $.exitcode and $.stderr would be available after "exit" the "enter"
@@ -1264,6 +1470,7 @@ class Session(object):
         no exit text. shell=True starts a base shell; False starts the command
         directly. get_pty requests a PTY.
         """
+        self._ensure_open()
         if not isinstance(command, str):
             raise TypeError('command must be str')
         if '\n' in command or '\r' in command:
@@ -1316,22 +1523,57 @@ class Session(object):
     def close(self, strict=False):
         """Close this session and its children; return whether all cleanup succeeded.
 
+        Active console contexts on this Session or its descendants prohibit close,
+        regardless of strict; rejection leaves resources and state unchanged.
+        Leave shell/su/sudo/enter contexts before closing. Successful close
+        permanently disables this Session; it does not close its parent.
         Cleanup attempts continue after individual failures. close_errors retains
         (operation, exception) tuples. strict=True raises RuntimeError after cleanup
         if any step failed; the default reports failure without masking an exception
         leaving a with block. Repeated calls retain the same cleanup outcome.
         """
 
-        ## don't allow to be called multiple times
+        with self._lifecycle_lock:
+            self._check_close_allowed()
+            return self._close_resources(strict)
+
+    def _close_resources(self, strict):
+        # Preflight has checked the entire child tree before any mutation.
         if self.closed:
             close_errors = getattr(self, 'close_errors', ())
             if strict and close_errors:
                 raise RuntimeError(self._close_error_summary())
             return not close_errors
 
+        # Permanently disable new work before cleanup, including on failure.
+        self.closed = True
         cleanup_errors = []
+        for job in tuple(getattr(self, '_jobs', ())):
+            if not job.done:
+                try:
+                    result = job.stop()
+                    if result.termination_status == 'unknown':
+                        cleanup_errors.append(('stop command', RuntimeError('command termination is unconfirmed')))
+                except CommandTimeoutError as exc:
+                    if exc.termination_status == 'unknown':
+                        cleanup_errors.append(('stop command', exc))
+                except Exception as exc:
+                    cleanup_errors.append(('stop command', exc))
+        # Factories start their channel before __enter__. Also release contexts
+        # that were constructed but never entered, independently of _lastDollar.
+        for channel in tuple(self._console_channels):
+            if not channel.closed:
+                try:
+                    channel.close()
+                    worker = channel.owner.call_thread
+                    if worker is not None:
+                        worker.join(timeout=3)
+                        if worker.is_alive():
+                            raise RuntimeError('console worker did not stop')
+                except Exception as exc:
+                    cleanup_errors.append(('close console channel', exc))
         transport = None
-        
+
         for subsession in reversed(tuple(self.subsessions)):
             if not subsession.close():
                 cleanup_errors.extend(
@@ -1364,7 +1606,7 @@ class Session(object):
                 self._client.close()
             except Exception as exc:
                 cleanup_errors.append(('close SSH client', exc))
-                logger.debug(
+                self.logger.debug(
                     'Unable to close SSH client cleanly '
                     '(host=%s, exception_type=%s)',
                     self.host,
@@ -1397,7 +1639,7 @@ class Session(object):
                         ))
 
                     if forced_kill:
-                        logger.warning(
+                        self.logger.warning(
                             'Proxy command required forced termination '
                             '(host=%s, pid=%s)',
                             self.host,
@@ -1415,7 +1657,7 @@ class Session(object):
                         self._sock = None                
             except Exception as exc:
                 cleanup_errors.append(('clean up SSH socket', exc))
-                logger.debug(
+                self.logger.debug(
                     'Unable to close SSH socket cleanly '
                     '(host=%s, exception_type=%s)',
                     self.host,
@@ -1426,7 +1668,7 @@ class Session(object):
 
 
         if self.host is not None:
-            logger.debug(
+            self.logger.debug(
                 'SSH connection closed (host=%s, port=%s, username=%s)',
                 self.host,
                 self.port,
@@ -1444,14 +1686,14 @@ class Session(object):
             try:
                 self.parent.subsessions.remove(self)
             except ValueError:
-                logger.debug(
+                self.logger.debug(
                     'Session is not registered with its parent '
                     '(session=%s, parent=%s)',
                     self,
                     self.parent,
                 )
             else:
-                logger.debug(
+                self.logger.debug(
                     'Removed session from its parent session (session=%s, parent=%s)',
                     self,
                     self.parent,
@@ -1460,7 +1702,7 @@ class Session(object):
 
         self.close_errors = tuple(cleanup_errors)
         for operation, exc in self.close_errors:
-            logger.warning(
+            self.logger.warning(
                 'Session cleanup step failed '
                 '(operation=%s, exception_type=%s)',
                 operation,

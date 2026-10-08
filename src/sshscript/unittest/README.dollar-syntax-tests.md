@@ -32,7 +32,26 @@ The dollar syntax suite covers:
   `$.stderr`, and `$.exitcode`;
 - automatic shell selection for pipelines, assignments, logical operators,
   expansion, and redirection;
-- string-only command validation and explicit `shell=False` or `shell=True`;
+- string/argv command validation, three-value results, and explicit shell options;
 - dollar commands inside Python functions;
 - a persistent local shell created with `with $(...)`; and
 - direct import of another `.spy` module containing dollar syntax.
+
+## Local language regression suite
+
+Run the 13 credential-free language cases with:
+
+```sh
+python3 sshscript.py unittest/language_fixture.spy
+```
+
+This suite also serves as the `.spy` import fixture. It contains no remote
+host setup, private-key paths, SSH-agent use, or private settings imports.
+
+## Files included in public validation
+
+Only the reviewed regression files listed in `tools/prepare_release.py`
+are included in release preparation and source archives. The legacy
+`unittest-v3/` directory and environment-specific exploratory scripts are
+private and excluded from Git tracking. New test files are ignored until
+their paths and purpose have been explicitly approved for tracking.

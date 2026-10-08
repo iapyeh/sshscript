@@ -49,6 +49,61 @@ def seek_non_space_prevtoken(tokens,i):
        i -= 1 
        if tokens[i].string != ' ': return tokens[i]
 
+def _command_tokens(code):
+    """Tokenize shell escapes without relaxing ordinary Python syntax.
+
+    Python 3.14 rejects bare backslashes before yielding the rest of a shell
+    command. Mask only escaped dollars after an already recognized raw-command
+    prefix, retry tokenization, then restore the exact original token text.
+    Columns and physical lines remain unchanged for source diagnostics.
+    """
+    lines = code.splitlines(keepends=True)
+    masked_lines = list(lines)
+    changed = set()
+    while True:
+        tokens = []
+        try:
+            tokens.extend(tokenize.generate_tokens(StringIO(''.join(masked_lines)).readline))
+        except tokenize.TokenError as error:
+            message, (lineno, _) = error.args
+            if message != 'unexpected character after line continuation character':
+                raise
+            prefix = [token for token in tokens if token.start[0] == lineno]
+            command_start = None
+            for i, token in enumerate(prefix[:-1]):
+                previous = seek_non_space_prevtoken(prefix, i)
+                following = prefix[i + 1]
+                if (is_dollar(token)
+                        and following.type in (tokenize.NAME, tokenize.OP, tokenize.NUMBER)
+                        and following.string not in ('.', '(')
+                        and not (previous and previous.string == 'with')):
+                    command_start = following.start[1]
+                    break
+            if command_start is None:
+                raise
+            line = masked_lines[lineno - 1]
+            replacement = line[:command_start] + re.sub(
+                r'\\(?=\$)', '_', line[command_start:])
+            if replacement == line:
+                raise
+            masked_lines[lineno - 1] = replacement
+            changed.add(lineno)
+            continue
+        if not changed:
+            return tokens
+        offsets = [0]
+        for line in lines:
+            offsets.append(offsets[-1] + len(line))
+        restored = []
+        for token in tokens:
+            if any(token.start[0] <= line <= token.end[0] for line in changed):
+                start = offsets[token.start[0] - 1] + token.start[1]
+                end = offsets[token.end[0] - 1] + token.end[1]
+                token = token._replace(string=code[start:end])
+            restored.append(token)
+        return restored
+
+
 def convert(code):
     """Return placeholder Python source for AST transformation, warning on legacy $$ syntax."""
     legacy_twodollars_warned = False
@@ -185,7 +240,7 @@ def convert(code):
     ## converting starts   
     # Let TokenError retain its structured source position.  dollarparser maps
     # it to the original .spy source and presents it as a normal SyntaxError.
-    tokens = list(tokenize.generate_tokens(StringIO(code).readline))
+    tokens = _command_tokens(code)
 
     i = 0
     output = []

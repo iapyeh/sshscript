@@ -16,7 +16,7 @@ import uuid
 
 import paramiko
 
-from sshscript import Session
+from sshscript import Session, CommandTimeoutError
 
 
 ENABLED = os.environ.get("SSHSCRIPT_OPENSSH_TESTS") == "1"
@@ -129,6 +129,59 @@ class OpenSSHIntegrationTests(unittest.TestCase):
                 shell=True,
                 timeout=10,
             )
+
+    def test_managed_short_deadline(self):
+        remote = self._connect()
+        started = time.monotonic()
+        with self.assertRaises(CommandTimeoutError) as caught:
+            remote.exec_command(
+                ["sh", "-c", "while :; do echo tick; sleep 0.05; done"],
+                command_timeout=0.5, stop_timeout=0.2,
+            )
+        self.assertLess(time.monotonic() - started, 3)
+        # The total budget includes channel setup and command startup, so a
+        # short deadline may expire before the first output reaches the client.
+        self.assertEqual(caught.exception.result.stop_reason, "timeout")
+        self.assertEqual(caught.exception.termination_status, "unknown")
+        self.assertEqual(remote.exec_command(["printf", "alive"], command_timeout=3).stdout, "alive")
+
+    def test_managed_timeout_preserves_observed_output(self):
+        remote = self._connect()
+        started = time.monotonic()
+        with self.assertRaises(CommandTimeoutError) as caught:
+            with remote.start(
+                ["sh", "-c", "while :; do echo tick; sleep 0.05; done"],
+                timeout=5, stop_timeout=0.2,
+            ) as job:
+                # Consume chunks until the marker is complete; iter_stdout()
+                # does not promise whole lines. Startup failure must fail.
+                observed = ""
+                for chunk in job.iter_stdout():
+                    observed += chunk
+                    if "tick" in observed:
+                        break
+                self.assertIn("tick", observed)
+                job.wait()
+        self.assertIn("tick", observed)
+        self.assertIn("tick", caught.exception.stdout)
+        self.assertEqual(caught.exception.result.stop_reason, "timeout")
+        self.assertEqual(caught.exception.termination_status, "unknown")
+        self.assertLess(time.monotonic() - started, 8)
+        self.assertEqual(remote.exec_command(["printf", "alive"], command_timeout=3).stdout, "alive")
+
+    def test_managed_pty_stop(self):
+        remote = self._connect()
+        # POSIX terminal job control is exercised against a real OpenSSH PTY.
+        with remote.start(
+            ["sh", "-c", "trap 'echo flushed; exit 0' INT; echo ready; while :; do sleep 0.1; done"],
+            get_pty=True, timeout=10, stop_timeout=2,
+        ) as job:
+            self.assertIn("ready", next(job.iter_stdout()))
+            result = job.stop()
+            self.assertEqual(result.termination_status, "confirmed")
+            self.assertEqual(result.stop_reason, "cancelled")
+            self.assertIn("flushed", result.stdout)
+        self.assertEqual(remote.exec_command(["printf", "alive"], command_timeout=3).stdout, "alive")
 
     def test_host_key_reject_trust_and_mismatch(self):
         self.known_hosts.write_text("", encoding="utf-8")
@@ -254,7 +307,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
         self.assertIn("/dev/pts/", str(stdout) + str(stderr))
 
         with remote.shell("bash -i", get_pty=True) as console:
-            stdout, stderr = console("tty", command_timeout=10)
+            stdout, stderr, exitcode = console("tty", command_timeout=10)
             self.assertEqual(console.exitcode, 0)
             self.assertIn("/dev/pts/", str(stdout) + str(stderr))
 
@@ -262,7 +315,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
         remote = self._connect()
 
         with remote.sudo(self.password, get_pty=True) as root_console:
-            stdout, stderr = root_console(
+            stdout, stderr, exitcode = root_console(
                 "whoami",
                 command_timeout=15,
             )
@@ -277,7 +330,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
             self.target_password,
             get_pty=True,
         ) as target_console:
-            stdout, stderr = target_console(
+            stdout, stderr, exitcode = target_console(
                 "whoami",
                 command_timeout=15,
             )
@@ -286,6 +339,23 @@ class OpenSSHIntegrationTests(unittest.TestCase):
                 str(stdout) + str(stderr),
                 rf"(?m)^{self.target_username}\r?$",
             )
+
+    def test_close_rejects_active_remote_console_and_parent_close(self):
+        remote = self._connect()
+        with remote.shell('bash -i', get_pty=True) as console:
+            for owner in (remote, remote.parent):
+                for strict in (False, True):
+                    with self.assertRaisesRegex(RuntimeError, 'console context is active'):
+                        owner.close(strict=strict)
+                    self.assertFalse(owner.closed)
+            self.assertTrue(remote.connected)
+            console('printf still-active', check=True)
+            self.assertIn('still-active', str(console.stdout))
+        self.assertTrue(remote.close(strict=True))
+        self.assertTrue(remote.close(strict=True))
+        self.assertFalse(remote.parent.closed)
+        with self.assertRaises(RuntimeError):
+            remote.exec_command(['true'])
 
     def test_real_expect_and_command_timeouts(self):
         remote = self._connect()

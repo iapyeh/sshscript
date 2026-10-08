@@ -200,7 +200,7 @@ class POpenChannel(GenericChannel):
                     sel.close()
         POpenChannel.count += 1
         await _reading()
-        logger.debug(
+        self.logger.debug(
             '[POpen] Subprocess reader stopped (pid=%s, returncode=%s)',
             self.cp.pid,
             self.cp.poll(),
@@ -248,7 +248,7 @@ class POpenChannel(GenericChannel):
                 pid = self.cp.pid
                 if self.cp.poll() is None:
                     timeout = 2
-                    logger.debug(
+                    self.logger.debug(
                         '[POpen] Waiting for subprocess to exit (pid=%s, timeout=%ss)',
                         pid,
                         timeout,
@@ -256,7 +256,7 @@ class POpenChannel(GenericChannel):
                     try:
                         self.cp.wait(timeout)
                     except subprocess.TimeoutExpired:
-                        logger.warning(
+                        self.logger.warning(
                             '[POpen] Subprocess did not exit before close timeout; '
                             'terminating (pid=%s, timeout=%ss)',
                             pid,
@@ -266,7 +266,7 @@ class POpenChannel(GenericChannel):
                         try:
                             self.cp.wait(timeout)
                         except subprocess.TimeoutExpired:
-                            logger.warning(
+                            self.logger.warning(
                                 '[POpen] Subprocess did not terminate before timeout; '
                                 'killing (pid=%s, timeout=%ss)',
                                 pid,
@@ -284,7 +284,7 @@ class POpenChannel(GenericChannel):
                     else:
                         fd.close()
 
-                logger.debug(
+                self.logger.debug(
                     '[POpen] Subprocess channel closed (pid=%s, returncode=%s)',
                     pid,
                     self.cp.poll(),

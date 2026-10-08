@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from session import Session
 from errorutils import SSHScriptException
@@ -14,6 +14,9 @@ class LocalSFTP:
     def __init__(self, root):
         self.root = root
         self.before_open = lambda: None
+
+    def close(self):
+        pass
 
     def path(self, path):
         return self.root / path.lstrip('/')
@@ -82,8 +85,13 @@ class TransferTests(unittest.TestCase):
         remote = root / 'remote'
         remote.mkdir()
         self.sftp = LocalSFTP(remote)
-        self.session = SimpleNamespace(connected=True, sftp=self.sftp,
-                                       host='test', _lastDollar=SimpleNamespace(exitcode=7))
+        self.session = Session()
+        self.session._client = Mock()
+        self.session._client.get_transport.return_value.is_active.return_value = True
+        self.session._sftp = self.sftp
+        self.session.host = 'test'
+        self.session._lastDollar = SimpleNamespace(exitcode=7)
+        self.addCleanup(self.session.close)
 
     def upload(self, dst, **kwargs):
         return Session.upload(self.session, self.src, dst, **kwargs)
