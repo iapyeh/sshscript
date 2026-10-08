@@ -3,7 +3,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-MODULES = '__init__ _runtime _version sshscript session sessionsettings commandresult commandjob sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
+MODULES = '__init__ _runtime _version sshscript session sessionsettings commandresult commandjob consolejob sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
 ROOT_FILES = [
     'API_GUIDE.md', 'pyproject.toml', 'README.md', 'LICENSE.txt', 'RELEASING.md',
     'MANIFEST.in', 'CHANGELOG.md', 'CONTRIBUTING.md', 'EXCEPTIONS.md',
@@ -37,6 +37,7 @@ TESTS = [
     'test_native_console_authentication.py',
     'test_native_auth_runner.py',
     'test_console_results.py',
+    'test_console_job.py',
     'test_dollar_command_escapes.py',
     'test_file_transfer.py',
     'test_logger_api.py',

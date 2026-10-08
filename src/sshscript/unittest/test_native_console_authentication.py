@@ -57,6 +57,27 @@ class NativeAuthenticationTests(unittest.TestCase):
             self.assertEqual(after, before, 'parent UID and shell PID must both survive')
             CONFIG['outcomes'].append({'case': self._testMethodName, 'recovery': 'confirmed'})
 
+    def test_foreground_job_in_real_su_and_sudo(self):
+        for kind in ('su', 'sudo'):
+            context = (self.session.su(CONFIG['target_user'], CONFIG['target_password'], enter_timeout=15)
+                       if kind == 'su' else self.session.sudo(CONFIG['password'], enter_timeout=15))
+            with self.subTest(kind=kind), context as console:
+                before = self.identity(console)
+                expected = self.target_uid if kind == 'su' else '0'
+                self.assertEqual(before[0], expected)
+                console('export JOB_VALUE=native', check=True)
+                with console.start('printf "%s:%s:%s" "$(id -u)" "$$" "$JOB_VALUE"', timeout=10) as job:
+                    self.assertEqual(job.wait().stdout.strip(), ':'.join(before) + ':native')
+                with console.start('printf ready; sleep 30', timeout=10, stop_timeout=3) as job:
+                    observed = ''
+                    for chunk in job.iter_stdout():
+                        observed += chunk
+                        if 'ready' in observed:
+                            break
+                    self.assertIn('ready', observed)
+                    self.assertEqual(job.stop().termination_status, 'confirmed')
+                self.assertEqual(self.identity(console), before)
+
     def test_real_success_option_matrix(self):
         for kind in ('su', 'sudo'):
             for login in (False, True):

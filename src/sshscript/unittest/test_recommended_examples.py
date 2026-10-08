@@ -23,7 +23,7 @@ def test_canonical_examples(self):
     text = guide.read_text()
     blocks = re.findall(r'<!-- example: (.+?) -->\n```python\n(.*?)```', text, re.S)
     self.assertEqual(len(blocks), text.count('```python'), 'every example needs a version profile')
-    self.assertEqual(len(blocks), 8)
+    self.assertEqual(len(blocks), 9)
     ids = set()
     for metadata, source in blocks:
         example = json.loads(metadata)

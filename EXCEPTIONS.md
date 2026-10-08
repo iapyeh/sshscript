@@ -120,3 +120,18 @@ operations are rejected. `closed` does not imply successful cleanup: the bool
 return and `close_errors` report the outcome; `strict=True` raises after cleanup
 for failures. Repeated calls retain that outcome. Child close does not close
 the parent; an unentered owned console is released by Session close.
+
+## Console foreground jobs (unreleased)
+
+console.start() returns CommandJob with the current Bash console's state.
+An active job prohibits other console operations with immediate RuntimeError;
+console/job operations reject use from another thread. start inside enter()
+raises RuntimeError. Invalid command forms/options fail before dispatch.
+A finite console deadline defaults to 60 seconds. Completion or cancellation
+must verify the original UID/PID. Only PTY consoles attempt Ctrl-C; cancelled
+pipe jobs and unconfirmed recovery disable the channel and raise with partial
+`.result` (termination_status="unknown"). Deadline expiry raises
+CommandTimeoutError. Native nonzero exit with check=True raises CalledProcessError.
+Results may have merged PTY streams. Confirmed shell recovery does not establish
+termination of detached descendants. Nested su/sudo APIs are required for
+privilege transitions; background/detached jobs are outside the contract.

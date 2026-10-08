@@ -177,9 +177,21 @@ class InnerConsole(GenericConsole):
     
     __enter__ = enter
 
+    def _finish_job(self, primary_exception):
+        job = self.channel._console_job
+        if job is not None:
+            try:
+                job.stop()
+            except Exception as error:
+                if primary_exception is None:
+                    raise
+                primary_exception.add_note('console job cleanup also raised ' + type(error).__name__)
+
     def exit(self,exc_type, exc_value, traceback):
         """Leave the console and restore its parent layer, applying configured exit handling."""
         
+        self._finish_job(exc_value)
+
         ## ensure all command has sent
         #while self.channel.sending_queue.qsize() > 0: time.sleep(0.01)
 
@@ -512,6 +524,7 @@ class AuthenticatedConsole(InnerConsole):
 
     def __exit__(self, exc_type, exc_value, traceback):
         try:
+            self._finish_job(exc_value)
             if self.channel._failure is not None:
                 return super().__exit__(exc_type, exc_value, traceback)
             deadline = time.monotonic() + self.enter_timeout

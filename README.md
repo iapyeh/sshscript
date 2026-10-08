@@ -191,6 +191,18 @@ uses an override. Settings dictionaries are copied, but policy objects are
 shared; custom policies should support reuse. Existing connections keep their
 original policy.
 
+## Foreground jobs in persistent consoles (unreleased)
+
+`console.start(command)` and `$.start(command)` inside shell/sudo/su return a
+CommandJob in the current Bash console, retaining cwd/environment/identity.
+Ordinary calls still return completed CommandResult snapshots. Each console
+permits one foreground job; use its stream/wait/stop methods before issuing
+another command. Console jobs default to a 60-second total deadline. PTY stop
+requests Ctrl-C and verifies recovery to the original UID/PID; an unresolved
+recovery disables the channel. Pipe consoles cannot safely cancel a running job.
+See [console foreground jobs](API_GUIDE.md#unreleased-foreground-jobs-inside-shell-sudo-and-su)
+for executable examples, quoting, thread ownership and failure handling.
+
 ## Managed deadlines and long-running commands (unreleased)
 
 The source checkout adds a total deadline shared by local and SSH commands:
