@@ -163,6 +163,19 @@ class CommandJobTests(unittest.TestCase):
                         job._signal()
                         self.assertEqual(job._sent_local_signals, {signal.SIGINT})
 
+    def test_force_stop_does_not_send_later_sigint_to_dying_group(self):
+        job = object.__new__(CommandJob)
+        job._process = Mock(pid=123, poll=Mock(return_value=None))
+        job._channel = None
+        job._signal_lock = threading.Lock()
+        job._sent_local_signals = set()
+        with patch('commandjob.os.killpg', side_effect=[None, PermissionError]) as killpg:
+            job._signal(force=True)
+            job._signal()
+            job._signal(force=True)
+        killpg.assert_called_once_with(123, signal.SIGKILL)
+        self.assertEqual(job._sent_local_signals, {signal.SIGKILL})
+
     def test_local_stop_allows_sigint_handler_to_flush(self):
         source = 'import signal,time,sys\ndef stop(*args):\n print("flushed"); sys.exit(0)\nsignal.signal(signal.SIGINT,stop)\nprint("ready")\nwhile True: time.sleep(.1)'
         with self.local().start(self.command(source), timeout=None, check=True) as job:

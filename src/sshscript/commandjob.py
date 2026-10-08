@@ -182,7 +182,11 @@ class CommandJob:
             # Descendants which create a new session are outside this guarantee.
             sig = signal.SIGKILL if force else signal.SIGINT
             with self._signal_lock:
-                if sig not in self._sent_local_signals:
+                # The worker can escalate before the watcher sends SIGINT.
+                # Never send a weaker signal after a confirmed SIGKILL send.
+                if sig not in self._sent_local_signals and (
+                    force or signal.SIGKILL not in self._sent_local_signals
+                ):
                     try:
                         os.killpg(process.pid, sig)
                     except ProcessLookupError:

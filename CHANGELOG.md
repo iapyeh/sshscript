@@ -5,7 +5,9 @@ provenance are available from the linked GitHub Release and PyPI pages.
 
 ## Unreleased
 
-- Preserve confirmed child exit when a concurrent final cancellation signal
+- Never send a weaker SIGINT after a cancellation worker has already sent
+  SIGKILL; serialize worker/watcher escalation. Preserve confirmed child exit
+  when a concurrent final cancellation signal
   reports a permission error; still expose signal failures for live processes.
 
 - After an explicit authentication rejection, wait for the bounded return
