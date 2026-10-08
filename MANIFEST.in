@@ -25,6 +25,7 @@ include src/sshscript/unittest/test_console_authentication.py
 include src/sshscript/unittest/test_native_console_authentication.py
 include src/sshscript/unittest/test_native_auth_runner.py
 include src/sshscript/unittest/test_console_results.py
+include src/sshscript/unittest/test_console_job.py
 include src/sshscript/unittest/test_dollar_command_escapes.py
 include src/sshscript/unittest/test_file_transfer.py
 include src/sshscript/unittest/test_logger_api.py

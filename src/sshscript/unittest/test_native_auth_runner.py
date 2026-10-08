@@ -25,8 +25,8 @@ class NativeRunnerTests(unittest.TestCase):
         with patch.object(module, 'Session', side_effect=AssertionError('native session must not be created')):
             result = unittest.TestResult()
             unittest.defaultTestLoader.loadTestsFromTestCase(module.NativeAuthenticationTests).run(result)
-        self.assertEqual(result.testsRun, 8)
-        self.assertEqual(len(result.skipped), 8)
+        self.assertEqual(result.testsRun, 9)
+        self.assertEqual(len(result.skipped), 9)
         self.assertFalse(result.errors or result.failures)
 
     def run_fixture(self, local_report=None, timeout=False):
@@ -47,7 +47,7 @@ class NativeRunnerTests(unittest.TestCase):
                 if timeout and config['backend'] == 'local':
                     raise subprocess.TimeoutExpired(command, 240)
                 report = local_report if config['backend'] == 'local' and local_report is not None else dict(
-                    backend=config['backend'], passed=True, tests=8, skipped=0)
+                    backend=config['backend'], passed=True, tests=9, skipped=0)
                 return subprocess.CompletedProcess(command, 0, 'NATIVE_AUTH_REPORT=' + json.dumps(report) + '\n',
                                                    'diagnostic secret-one secret-two\n')
             capture = StringIO()
@@ -75,7 +75,7 @@ class NativeRunnerTests(unittest.TestCase):
         self.assertTrue(evidence['passed'])
 
     def test_skipped_or_empty_native_evidence_cannot_pass(self):
-        for report in (dict(passed=True, tests=8, skipped=1), dict(passed=True, tests=0, skipped=0)):
+        for report in (dict(passed=True, tests=9, skipped=1), dict(passed=True, tests=0, skipped=0), dict(passed=True, tests=8, skipped=0)):
             with self.subTest(report=report):
                 status, evidence = self.run_fixture(local_report=report)
                 self.assertEqual(status, 1)

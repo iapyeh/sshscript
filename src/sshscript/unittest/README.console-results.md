@@ -24,3 +24,14 @@ return two buffers. For new source consumers, prefer `result = console(command)`
 and named fields, or unpack exactly stdout, stderr, exitcode. Read API_GUIDE.md
 for finite capture, streaming with a stop condition and fallback deadline, and
 capture inside a shell/privilege context.
+
+## Console foreground jobs
+
+Run `python3 -m unittest discover -s unittest -p test_console_job.py -v` and
+repeat with `python3 -O`. Coverage includes PTY/pipe completion and stderr
+fences, bounded capture/stream overflow, deadline/stop/recovery, exclusive use,
+creator-thread enforcement, `.spy` scope, preserved shell state, simulated
+su/sudo UID/PID protocol and a real Paramiko pipe-console fixture. Native
+su/sudo job identity and PTY stop are opt-in cases in
+`test_native_console_authentication.py`; they require the disposable CI fixture.
+These tests do not establish real tcpdump or every OS/PAM/sudo policy behavior.

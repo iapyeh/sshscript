@@ -189,7 +189,7 @@ class POpenChannel(GenericChannel):
                         for key, mask in events:
                             # key.fileobj 是原始的 pipe 物件
                             # key.data 是我們剛才註冊的自定義字串
-                            await callback[key.fileobj](os.read(key.fileobj,1024))
+                            await callback[key.fileobj](os.read(key.fileobj, 65536 if self._console_job is not None else 1024))
                         await asyncio.sleep(interval)
                 except OSError as e:
                     ## when subprocess exited, the file descriptor would be closed, and os.read() would raise OSError with errno.EIO 

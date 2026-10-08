@@ -19,6 +19,16 @@
 import subprocess
 import re
 import time
+import threading
+from functools import wraps
+
+
+def _console_operation(method):
+    @wraps(method)
+    def call(self, *args, **kwargs):
+        self._check_operation()
+        return method(self, *args, **kwargs)
+    return call
 
 if __package__:
     from .sessionsettings import UNSET
@@ -54,6 +64,7 @@ class SessionWrapper(object):
     
    
     @property
+    @_console_operation
     def exitcode(self):
         ## for onedollar, the getExitcode() would be called after command
         ## but for $.enter() (EnterConsole), the getExitcode() was called by demand
@@ -61,11 +72,13 @@ class SessionWrapper(object):
         return self.channel.exitcode
 
     @property
+    @_console_operation
     def stdout(self):
         """Return the current console stdout buffer; see stdio.DequeString."""
         return self.channel.stdout
 
     @property
+    @_console_operation
     def stderr(self):
         """Return the current console stderr buffer; see stdio.DequeString."""
         return self.channel.stderr
@@ -97,16 +110,61 @@ class SessionWrapper(object):
         """Return the session logger."""
         return self.channel.owner.session.logger
     
+    def _check_operation(self):
+        owner = getattr(self, '_owner_thread', None)
+        if owner is not None and owner != threading.get_ident():
+            raise RuntimeError('console operations must run on the thread that entered the context')
+        job = getattr(self.channel, '_console_job', None)
+        if job is not None and not job.done:
+            raise RuntimeError('console has an active job; use job.wait() or job.stop() first')
+        ensure_open = getattr(self.channel, '_raise_if_unusable', None)
+        if ensure_open is not None:
+            ensure_open()
+
+    @_console_operation
+    def start(self, command, *, timeout=60, stop_timeout=3,
+              capture_limit=1024 * 1024, check=UNSET):
+        """Start one foreground job in this shell/su/sudo context.
+
+        Inherits cwd, environment and identity. Use its CommandJob to read/wait/stop.
+        A finite total timeout is recommended; None explicitly disables it.
+        Other console operations are rejected until the original shell is recovered.
+        Interactive enter() contexts cannot start a shell job. PTY streams may merge.
+        """
+        if self.channel.hijacked:
+            raise RuntimeError('start() is unavailable inside enter(); leave the interactive program first')
+        if getattr(self, '_owner_thread', None) is None:
+            raise RuntimeError('enter the console context before calling start()')
+        if __package__:
+            from .consolejob import ConsoleCommandJob
+        else:
+            from consolejob import ConsoleCommandJob
+        session = self.channel.owner.session
+        session._ensure_open()
+        self.channel._raise_if_unusable()
+        job = ConsoleCommandJob(self, command, timeout=timeout, stop_timeout=stop_timeout,
+                                capture_limit=capture_limit,
+                                check=session.check if check is UNSET else check)
+        with self.channel._console_job_lock:
+            if self.channel._console_job is not None:
+                raise RuntimeError('console has an active job; use job.wait() or job.stop() first')
+            self.channel._console_job = job
+        session._jobs.add(job)
+        return job._launch()
+
+    @_console_operation
     def clear(self):
         """Clear the channel's output buffers."""
         self.channel.clear()
 
+    @_console_operation
     def send(self,s):
         """Send raw text without adding a newline; wait for the write, returning None."""
         result = self.channel.send(s)
         #result.result()
         return result
 
+    @_console_operation
     def input(self,s,timeout=60):
         """Send a line and wait for an interactive prompt, exit, or output silence.
 
@@ -124,6 +182,7 @@ class SessionWrapper(object):
     def get(self, name=None):
         return self.channel.owner.session.get(name)
 
+    @_console_operation
     def send_line(self,s,*,check=UNSET,**expections):
         """Execute a shell command and return CommandResult; also console(command).
 
@@ -164,6 +223,7 @@ class SessionWrapper(object):
     __call__ = send_line
     exec_command = send_line
 
+    @_console_operation
     def expect(self,rawpat,timeout=None,stdout=True,stderr=True,silent=False):
         """Wait for an unconsumed output match; see GenericChannel.expect().
 
@@ -174,6 +234,7 @@ class SessionWrapper(object):
         """
         return self.channel.expect(rawpat,timeout,stdout,stderr,silent)
 
+    @_console_operation
     def wait_for_silent(self,seconds,max_seconds=0):
         """Wait for seconds of output silence; return None.
 
@@ -182,6 +243,7 @@ class SessionWrapper(object):
         """
         return self.channel.wait_for_silent(seconds,max_seconds)
     wait = wait_for_silent
+    @_console_operation
     def wait_for_output(self,timeout=0,silent=False):
         """Wait for new I/O activity; return True when observed.
 
@@ -191,10 +253,12 @@ class SessionWrapper(object):
         """
         return self.channel.wait_for_output(timeout,silent)
 
+    @_console_operation
     def send_signal(self,s):
         """Send a signal.Signals value (for example signal.SIGTERM); return None."""
         return self.channel.send_signal(s)
 
+    @_console_operation
     def environ(self,key=None,value=None,**kw):
         """Update the channel's environment variables.
         
@@ -209,6 +273,7 @@ class SessionWrapper(object):
             kw[key] = value
         self.channel.channel.update_environment(kw)
 
+    @_console_operation
     def su(self,username,password=None,expect=None,initials=None,command=None,login=True,shell=None,get_pty=None,enter_timeout=10,*,_auth_token=None):
         """Enter a nested su console on the existing channel; see Session.su().
 
@@ -233,6 +298,7 @@ class SessionWrapper(object):
         ## when localhost is ubuntu, pty is required for su to send password
         return SuConsole(self,username,password,expect=expect,initials=initials,command=command,login=login,enter_timeout=enter_timeout,_auth_token=_auth_token)
     #sudo(self,password=None,expect=None,initials=None,shell:bool=True,login=True,username=None,get_pty=True):
+    @_console_operation
     def sudo(self,password=None,username=None,expect=None,initials=None,command=None,login=True,shell=None,get_pty=None,enter_timeout=10,*,_auth_token=None):
         """Enter a nested sudo console on the existing channel; see Session.sudo().
 
@@ -256,6 +322,7 @@ class SessionWrapper(object):
                 raise ValueError('command must not be empty')
         return SudoConsole(self,password,username=username,expect=expect,initials=initials,command=command,login=login,enter_timeout=enter_timeout,_auth_token=_auth_token)
 
+    @_console_operation
     def enter(self,command,expect=None,password=None,exit=None,shell=None,get_pty=None,prompt=None):
         """Enter an interactive program on this channel; see Session.enter().
 
@@ -277,6 +344,7 @@ class SessionWrapper(object):
     ## $sh      => with _sshscriptstack_[-1].shell(' sh ') 
     ## $sudo    => with _sshscriptstack_[-1].shell(' sudo ') 
     ## $python3 => with _sshscriptstack_[-1].shell(' python3 ')
+    @_console_operation
     def shell(self,*args,**kw):
         """Enter a nested shell on the existing channel; return a ShellConsole context."""
         if len(args) == 0:
@@ -342,6 +410,8 @@ class SessionWrapper(object):
     ##     with $.session: <== here calls __enter__()
     ##        ...
     def __enter__(self):
+        self._check_operation()
+        self._owner_thread = threading.get_ident()
         patching.get_thread_stack().append(self)
         return self
     ## why below??

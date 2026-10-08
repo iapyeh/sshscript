@@ -5,6 +5,15 @@ provenance are available from the linked GitHub Release and PyPI pages.
 
 ## Unreleased
 
+- Add foreground `console.start()` / `$.start()` jobs inside Bash shell, su and
+  sudo contexts, preserving cwd/environment/identity and returning CommandJob.
+  Keep synchronous commands unchanged. Enforce one job per console channel and
+  creator-thread operations, bounded capture and explicit streaming overflow.
+  Verify completion/PTY cancellation using fresh UID/PID handshakes; disable
+  unresolved consoles. Reject interactive enter() jobs and common raw privilege,
+  background and shell-replacement forms. Add release-tracked protocol, SSH,
+  native-auth opt-in, dollar-syntax and executable documentation coverage.
+
 - Never send a weaker SIGINT after a cancellation worker has already sent
   SIGKILL; serialize worker/watcher escalation. Preserve confirmed child exit
   when a concurrent final cancellation signal

@@ -94,6 +94,7 @@ htmlcov/
 !/unittest/test_native_console_authentication.py
 !/unittest/test_native_auth_runner.py
 !/unittest/test_console_results.py
+!/unittest/test_console_job.py
 !/unittest/test_dollar_command_escapes.py
 !/unittest/test_file_transfer.py
 !/unittest/test_logger_api.py

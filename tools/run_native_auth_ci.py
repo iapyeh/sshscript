@@ -68,7 +68,7 @@ def main():
                 report = json.loads(lines[0].split('=', 1)[1])
                 reports.append(report)
                 failed |= (result.returncode != 0 or report.get('passed') is not True
-                           or report.get('tests', 0) < 8 or report.get('skipped') != 0)
+                           or report.get('tests', 0) < 9 or report.get('skipped') != 0)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(dict(schema_version=1, wheel=wheel.name, wheel_sha256=digest, reports=reports, passed=not failed), indent=2) + '\n')
     args.report.chmod(0o600)

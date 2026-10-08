@@ -144,6 +144,8 @@ class GenericChannel(object):
         self._send_call_lock = threading.Lock()
         self._async_send_lock = None
         self.send_timeout = 30
+        self._console_job = None
+        self._console_job_lock = threading.Lock()
         self.command_timeout = 60         
 
     @property
@@ -1936,7 +1938,7 @@ class GenericChannel(object):
             if self.closed: return
             self.touchIO(True)
             try:
-                self._stdout.append(newbytes.decode('utf8'),True)
+                self._stdout.append(self._console_job._decoders[0].decode(newbytes) if self._console_job is not None else newbytes.decode('utf8'),True)
             except UnicodeDecodeError:
                 self._stdout.append(newbytes.decode('utf8','replace'),True)
         if self.dump2sys[0]:
@@ -1953,7 +1955,7 @@ class GenericChannel(object):
             if self.closed: return
             self.touchIO(True)
             try:
-                self._stderr.append(newbytes.decode('utf8'),True)
+                self._stderr.append(self._console_job._decoders[1].decode(newbytes) if self._console_job is not None else newbytes.decode('utf8'),True)
             except UnicodeDecodeError:
                 self._stderr.append(newbytes.decode('utf8','replace'),True)
         if self.dump2sys[1]:

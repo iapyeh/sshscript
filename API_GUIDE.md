@@ -273,6 +273,88 @@ Slow stream consumers can raise `BufferError`. For large or binary captures,
 write at the source with tcpdump `-w PATH` and retrieve the file after confirming
 capture termination; PTY text streams are unsuitable for a binary pcap.
 
+## Unreleased: foreground jobs inside shell, sudo and su
+
+Use `console.start(command)` or `$.start(command)` inside a shell/sudo/su context
+when output must be observed before completion. It returns `CommandJob`, using
+the current Bash console's channel, cwd, environment and identity. It does not
+launch through the underlying Session. Ordinary `console(command)` / `$command`
+still waits and returns `CommandResult`; no migration is needed for finite commands.
+
+<!-- example: {"id":"console-stream", "profile":"unreleased", "stdout":"cancelled confirmed\nconsole-alive\n"} -->
+```python
+from contextlib import closing
+import shlex
+import sys
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.shell("bash") as console:
+        command = shlex.join([sys.executable, "-u", "-c",
+                              "import time; print('ready'); time.sleep(60)"])
+        with console.start(command, timeout=10, stop_timeout=2) as job:
+            seen = ""
+            try:
+                for chunk in job.iter_stdout():
+                    seen = (seen + chunk)[-4096:]
+                    if "ready" in seen:
+                        break
+            finally:
+                result = job.stop()
+            print(result.stop_reason, result.termination_status)
+        print(console("printf console-alive", check=True).stdout)
+```
+
+For tcpdump, select a permitted interface and use the authenticated context:
+
+```spy
+from getpass import getpass
+
+with $.sudo(password=getpass("sudo password: ")):
+    with $.start("tcpdump -l -n -i INTERFACE", timeout=30) as job:
+        try:
+            for chunk in job.iter_stdout():
+                print(chunk, end="", flush=True)
+        finally:
+            result = job.stop()
+    result = $hostname
+```
+
+The sudo example requires native account policy and capture permissions; the
+executable Python example above is credential-free. Use nested `$.su()` /
+`$.sudo()` to change identity before starting the job. Direct privilege commands,
+background `&`, nohup/disown, and replacing the managing shell with exec are
+unsupported. Validation rejects common explicit forms; quoted ampersands are
+ordinary data. This is not a sandbox: wrapper scripts, aliases, functions and
+programs which detach themselves cannot be completely detected or managed.
+
+Console jobs accept one command string, not argv. Quote dynamic values with
+`shlex.join()`; Session.start(argv) remains the choice for an independent process.
+Console start has a **60-second total deadline by default**, covering startup,
+execution and completion; `timeout=None` explicitly removes that deadline.
+Prefer a finite deadline for unattended agents. `stop_timeout` bounds the
+separate shell recovery handshake. Capture and stream overflow follow CommandJob.
+
+One console channel has one foreground job. While it is active, other commands,
+console output/status access, send/input/expect, clear and nested console entry
+raise RuntimeError immediately. Use the job's output/wait/stop methods instead.
+User operations on a console job must run on its creating thread; internal I/O
+runs in background threads. start() inside enter() is rejected: that context is
+program input, not a shell command boundary. Leaving an owning console context
+also stops an active job; prefer an explicit job context for clear lifetimes.
+
+Completion fences both output streams, records exit status, and verifies the
+original effective UID and Bash PID. stop() sends Ctrl-C only when the channel
+has a PTY, then probes that same shell. PTY output can merge stderr into stdout;
+this text interface is unsuitable for binary capture. A confirmed recovery
+allows the next command. It does not prove detached descendants terminated.
+Pipe consoles support finite completion but cannot safely interrupt a running
+program; a cancelled pipe job fails and disables the console. Ignored Ctrl-C,
+identity mismatch, shell exit or an unresolved recovery also disable it. Runtime
+failures expose `.result` with `termination_status="unknown"`; a total deadline
+raises CommandTimeoutError with partial output, regardless of check. Never clear
+a stored channel failure or treat unknown termination as successful cleanup.
+
 ## Lifetime and failure rules
 
 - A root `with Session()` does not close the Session. These examples use
@@ -441,7 +523,7 @@ for commands, coverage, and the native-system validation matrix.
 | Dynamic command built with `shlex.join()` | Pass argv directly; `shlex.join()` remains supported, not deprecated |
 | `--check` without a filename for updates | `--check-updates`; reserve `--check file.spy` for syntax validation |
 
-All six executable blocks above carry explicit version profiles and run in CI.
+All nine executable blocks above carry explicit version profiles and run in CI.
 The same source is mirrored into the website; edit this file, then use
 `tools/sync_api_guide.py` to refresh the website copy. Additional protocol and
 production details remain in the full documentation.
