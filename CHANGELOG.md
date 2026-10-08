@@ -3,7 +3,40 @@
 This project records user-visible changes here. Release artifacts and their
 provenance are available from the linked GitHub Release and PyPI pages.
 
-## Unreleased
+## 4.0.1 — 2026-10-08
+
+- Settle the legacy command worker before propagating timeout/transport errors;
+  retain the primary error and report incomplete or failed worker cleanup.
+
+- Attempt every local job stream close independently, and reap even after signal
+  failure. Preserve the primary exception and attach subsequent cleanup failures
+  as exception notes; report cleanup failure after otherwise successful execution.
+
+- Confirm delayed local child exit with a bounded wait after macOS group-signal
+  permission errors; preserve genuine signal failures. Close local job streams
+  even when forced cancellation fails.
+
+- Test full-duplex binary stdin/stdout/stderr beyond SSH flow-control windows,
+  exact EOF, transport loss, missing exit status, and repeated resource cleanup.
+  The credential-free SSH fixture forwards stdin to a real subprocess.
+- Feed legacy SSH stdin concurrently with output readers to prevent a flow-control
+  deadlock when a command writes output before consuming input. Close the owned
+  channel and settle I/O workers on failure; missing SSH exit status raises
+  EOFError rather than becoming a completed result with exitcode -1.
+- Extend native OpenSSH regression coverage to bulk transmission, execution-time
+  disconnection, nested SSH and ProxyJump cleanup/host-key rejection. CI and
+  release transport jobs test the metadata minimum and Paramiko 3.x/4.x.
+
+- Identify development artifacts as 4.0.0.dev0 rather than the published 3.1.5.
+  Target 4.0 for incompatible execution-contract changes; document migration,
+  exact-version diagnostics and release channels in VERSIONING.md. Block
+  prerelease/local versions in the production publication paths.
+
+- Preserve `input=` unchanged on local, SSH, and managed execution paths; remove
+  the legacy SSH-only newline addition. Line-oriented stdin callers must supply
+  their own newline. Document explicit console `input()` (one added Enter),
+  `send()` (exact text), and command execution; retain context-dependent aliases
+  for compatibility. Add byte/Unicode/EOF and PTY/pipe/.spy regressions.
 
 - Add foreground `console.start()` / `$.start()` jobs inside Bash shell, su and
   sudo contexts, preserving cwd/environment/identity and returning CommandJob.

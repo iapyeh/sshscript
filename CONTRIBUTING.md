@@ -30,7 +30,8 @@ python3 tools/check_release.py --output /tmp/sshscript-candidate-UNIQUE
 ```
 
 The output path must not already exist. The first command finds the public test
-suite under `src/sshscript/unittest/` and runs normal and optimized tests,
+suite under `unittest/` in a source checkout or `src/sshscript/unittest/` in a
+release checkout, and runs normal and optimized tests,
 compile checks, the package assertion scan, and dollar-syntax smoke tests. The
 second command builds the allowlisted wheel and source distribution, checks
 their metadata, installs the wheel in an isolated environment, and performs an

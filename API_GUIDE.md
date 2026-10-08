@@ -1,10 +1,19 @@
 # Recommended SSHScript API
 
 This is the canonical entry point for new code and AI-generated examples.
-**Version baseline: 3.1.5**, Python 3.11+. Sections marked **unreleased** require
-this development checkout; installing `sshscript==3.1.5` does not provide them.
-The checkout still reports 3.1.5 while these additions await a release. Do not
-infer development feature availability from that version string alone.
+**Current contract: 4.0.1**, Python 3.11+. Sections marked **4.0** require
+SSHScript 4.0.1; installing `sshscript==3.1.5` does not provide them.
+Examples labelled 3.1.5 remain verified compatibility examples for that baseline.
+Pin the exact artifact version and record it with execution diagnostics when
+handing off automation. See [version policy and migration](VERSIONING.md).
+
+SSHScript aims to help engineers and AI agents execute, understand, and hand
+off automation reliably. Keep the execution host and retained result with the
+script's version and inputs; distinguish completion, failure, timeout, and
+unknown termination. Verify application outcomes separately: a zero command
+exit status does not prove that a deployment succeeded, and closing an SSH
+channel does not prove that its remote process stopped. Structured execution
+identifiers and handoff reports are future work, not a current API guarantee.
 
 ## Recommended choices
 
@@ -13,12 +22,12 @@ infer development feature availability from that version string alone.
 | A command with dynamic arguments | `session.exec_command([program, arg, ...], check=True)` |
 | Pipelines or shell expansion | A string with explicit `shell=True` or `shell="bash"`; quote dynamic values |
 | Retain output | Save the returned result; read `result.stdout`, `stderr`, `exitcode` |
-| Shared shell directory/environment | `session.shell()`; check each required command; **unreleased:** save its CommandResult |
+| Shared shell directory/environment | `session.shell()`; check each required command; **4.0:** save its CommandResult |
 | SSH | `with local.connect(...) as remote:`; retain host-key verification |
 | Compact script | One `$` in a `.spy` file; use `$(argv, check=True)` for dynamic arguments |
-| Consistent total deadline | **Unreleased:** `exec_command(command_timeout=...)` |
-| Long-running program | **Unreleased:** `start(timeout=None)`, `stop()`, `wait()` |
-| Session-wide failure/output policy | **Unreleased:** `set(...)`, `get(...)`, or matching properties |
+| Consistent total deadline | **4.0:** `exec_command(command_timeout=...)` |
+| Long-running program | **4.0:** `start(timeout=None)`, `stop()`, `wait()` |
+| Session-wide failure/output policy | **4.0:** `set(...)`, `get(...)`, or matching properties |
 
 ## 3.1.5: one command, one retained result
 
@@ -86,9 +95,11 @@ result = $(["printf", "%s", "ready"], check=True)
 print(result.stdout)
 ```
 
-## Unreleased: settings and managed jobs
+<a id="unreleased-settings-and-managed-jobs"></a>
 
-Use this source checkout for the following examples. CLI `-v`, `--stderr`, and
+## 4.0: settings and managed jobs
+
+Use SSHScript 4.0.1 for the following examples. CLI `-v`, `--stderr`, and
 `--debug` override root defaults only for that execution. Child Sessions copy
 their parent's settings. `set()` validates before changing anything; `get()`
 returns a copy. Explicit command options override Session policy.
@@ -107,7 +118,7 @@ the settings dictionary at creation; the policy object itself is shared, so
 custom policies with mutable state must account for reuse. Changing the setting
 does not reconfigure existing connections.
 
-<!-- example: {"id":"settings", "profile":"unreleased", "stdout":"True\n1\n"} -->
+<!-- example: {"id":"settings", "profile":"4.0.1", "stdout":"True\n1\n"} -->
 ```python
 from contextlib import closing
 import paramiko
@@ -129,7 +140,7 @@ semantics; do not combine it with `command_timeout`.
 For an indefinite command such as tcpdump, use `start(timeout=None)`. This safe
 local example uses a small Python process instead of capturing network traffic:
 
-<!-- example: {"id":"stop", "profile":"unreleased", "stdout":"cancelled confirmed\n"} -->
+<!-- example: {"id":"stop", "profile":"4.0.1", "stdout":"cancelled confirmed\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -153,7 +164,82 @@ termination. Inspect `termination_status`; `unknown` requires reconciliation.
 Managed output retains bounded tails (default 1 MiB per stream), with truncation
 flags. `iter_stdout()` yields text chunks and reports queue overflow explicitly.
 
-## Unreleased: command results and long-running programs
+<a id="unreleased-exact-stdin-and-explicit-interactive-replies"></a>
+
+## 4.0: exact stdin and explicit interactive replies
+
+`exec_command(input=data)` and `start(input=data)` send stdin unchanged on local
+and SSH backends. Strings are encoded as UTF-8; bytes retain their exact values.
+No newline is added, existing newlines are preserved, and stdin is closed after
+sending supplied data (including an empty string or bytes). `input=None` supplies
+no payload: legacy local execution can inherit stdin, whereas SSH and managed
+execution close their stdin write side. This preserves the existing no-input
+policy; use empty input to explicitly supply no data and EOF. This fixes the
+legacy SSH behavior which appended a newline to strings: if a consumer
+needs a line, migrate `input=password` to `input=password + "\n"` explicitly.
+Published 3.1.5 still has the legacy SSH behavior.
+
+<!-- example: {"id":"exact-stdin", "profile":"4.0.1", "stdout":"'abc'\n'abc\\n'\n"} -->
+```python
+from contextlib import closing
+import sys
+from sshscript import Session
+
+with closing(Session()) as local:
+    command = [sys.executable, "-c", "import sys; sys.stdout.write(sys.stdin.read())"]
+    print(repr(local.exec_command(command, input="abc", check=True).stdout))
+    print(repr(local.exec_command(command, input="abc\n", command_timeout=5,
+                                  check=True).stdout))
+```
+
+A shell command and a reply use the same channel but have different completion
+boundaries. SSHScript follows the explicit context; it does not guess from the
+text or its newline characters.
+
+| Intent | API | Newline and completion behavior |
+| --- | --- | --- |
+| Execute a command | `shell(command)` / `shell.exec_command(command)` | Submits the command and waits for CommandResult / exit status |
+| Answer a program | `program.input(answer)` inside `enter()` | Appends exactly one `"\n"`, then waits for readiness, exit, or silence |
+| Write exact text or control characters | `program.send(data)` | Adds nothing; returning only confirms the write |
+| Supply one-shot stdin | `session.exec_command(..., input=data)` | Adds nothing; the command result follows command completion |
+
+`input("answer\n")` sends `"answer\n\n"`; it never removes a newline supplied by
+the caller. `input("")` presses Enter. `send("answer\n")` writes exactly that
+line without waiting for a reply. Use `expect()` to observe the next output when
+using raw `send()`. An input result of `"prompt"`, `"exited"`, or `"silent"` is
+not a CommandResult: silence or a prompt alone never proves authentication or
+command success.
+
+For a program within a persistent shell, use this template with its actual
+prompt and quit command:
+
+```py
+with local.shell("bash") as shell:
+    result = shell("hostname", check=True)
+    with shell.enter("YOUR_INTERACTIVE_PROGRAM", prompt="NEXT_PROMPT>",
+                     exit="quit") as program:
+        program.expect("QUESTION:", timeout=10)
+        program.input("answer", timeout=10)  # Includes one Enter.
+        program.send("partial")             # Includes no Enter.
+        program.input("-reply", timeout=10)  # Completes partial-reply.
+    result = shell("printf ready", check=True)
+```
+
+Equivalent `.spy` operations are `$.input()`, `$.send()`, and `$.expect()` inside
+`with $.enter(...)`. Keep `$command` for shell commands. Inside `enter()`, `$...`,
+console calls, and `send_line()` retain their existing input dispatch for
+compatibility; prefer explicit `input()` for new replies. `send_line()` remains
+a command-execution alias in a shell, not a raw line-write helper.
+
+Some password-reading programs use the controlling terminal instead of stdin;
+`input=password + "\n"` cannot guarantee a terminal password response. Use an
+appropriate PTY and `enter()`/`input()` for terminal conversations. Supply secrets
+through `getpass` or a secret manager and avoid verbose output when it may expose
+them. For authenticated privilege changes, prefer `su()`/`sudo()`'s handshake.
+
+<a id="unreleased-command-results-and-long-running-programs"></a>
+
+## 4.0: command results and long-running programs
 
 A completed command returns an immutable `CommandResult`, whether called as
 `session(command)`, `shell(command)`, a single `$command`, or `$command` inside
@@ -162,7 +248,7 @@ or unpack exactly `stdout, stderr, exitcode`. This changes the released 3.1.5
 console contract: old `stdout, stderr = shell(command)` must be migrated.
 Shell calls accept command strings; argv execution belongs to Session.
 
-<!-- example: {"id":"shell-result", "profile":"unreleased", "stdout":"first 0\n"} -->
+<!-- example: {"id":"shell-result", "profile":"4.0.1", "stdout":"first 0\n"} -->
 ```python
 from contextlib import closing
 from sshscript import Session
@@ -218,7 +304,7 @@ matching: `iter_stdout()` yields chunks, not packets or lines. Put `stop()` in
 `finally`, so condition matches, exceptions, and KeyboardInterrupt all trigger
 cleanup. This credential-free example uses a continuous Python process:
 
-<!-- example: {"id":"stream-condition", "profile":"unreleased", "stdout":"cancelled confirmed\n"} -->
+<!-- example: {"id":"stream-condition", "profile":"4.0.1", "stdout":"cancelled confirmed\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -273,7 +359,9 @@ Slow stream consumers can raise `BufferError`. For large or binary captures,
 write at the source with tcpdump `-w PATH` and retrieve the file after confirming
 capture termination; PTY text streams are unsuitable for a binary pcap.
 
-## Unreleased: foreground jobs inside shell, sudo and su
+<a id="unreleased-foreground-jobs-inside-shell-sudo-and-su"></a>
+
+## 4.0: foreground jobs inside shell, sudo and su
 
 Use `console.start(command)` or `$.start(command)` inside a shell/sudo/su context
 when output must be observed before completion. It returns `CommandJob`, using
@@ -281,7 +369,7 @@ the current Bash console's channel, cwd, environment and identity. It does not
 launch through the underlying Session. Ordinary `console(command)` / `$command`
 still waits and returns `CommandResult`; no migration is needed for finite commands.
 
-<!-- example: {"id":"console-stream", "profile":"unreleased", "stdout":"cancelled confirmed\nconsole-alive\n"} -->
+<!-- example: {"id":"console-stream", "profile":"4.0.1", "stdout":"cancelled confirmed\nconsole-alive\n"} -->
 ```python
 from contextlib import closing
 import shlex
@@ -362,7 +450,15 @@ a stored channel failure or treat unknown termination as successful cleanup.
   For strict cleanup reporting, inspect `close_errors` or use `close(strict=True)`;
   preserve any already-propagating exception when reporting cleanup failure.
 - Remote Session, shell, and managed-job contexts own their scoped cleanup.
-- **Unreleased:** `close()`/`disconnect()` cannot run while this Session or any
+- Legacy one-shot failures wait up to two seconds for their owned command worker
+  to finish cleanup. Incomplete or failed cleanup is recorded in exception notes.
+- Local managed jobs attempt every stdin/stdout/stderr close even after a signal,
+  wait, or another close fails. The original execution error remains primary;
+  additional cleanup errors appear in its exception notes. If execution succeeded,
+  the first cleanup error is raised with notes for subsequent failures.
+  A deadline still raises `CommandTimeoutError`; any stored worker error is its
+  cause, and cleanup notes are retained on the timeout exception.
+- **4.0:** `close()`/`disconnect()` cannot run while this Session or any
   descendant has an active `shell()`, `su()`, `sudo()`, or `enter()` context.
   They raise `RuntimeError` even with `strict=False`, before changing state or
   cleaning any resource. Leave those contexts first; a function `return`, an
@@ -378,13 +474,15 @@ a stored channel failure or treat unknown termination as successful cleanup.
   `close(strict=True)` raises after cleanup if any operation failed.
 
 - A shell block manages one shell lifetime. It does not aggregate every command's
-  success. In unreleased source, completed shell commands return immutable
+  success. In 4.0 source, completed shell commands return immutable
   CommandResult snapshots and inherit `check`; interactive prompt input does not.
   Console stdout/stderr properties remain live buffers for expect/input workflows.
 - A successful final shell status does not prove every pipeline stage succeeded.
 - `Session.start()` keeps job results independent of Session latest-command state.
 
-## Unreleased: authenticated su/sudo consoles
+<a id="unreleased-authenticated-susudo-consoles"></a>
+
+## 4.0: authenticated su/sudo consoles
 
 `Session.su()`, `Session.sudo()`, and their nested console equivalents accept
 `enter_timeout=10` (positive finite seconds). The deadline covers entry's lock
@@ -411,7 +509,7 @@ remains available for other authentication prompt formats.
 These transcripts require a real local account and its authentication policy;
 they are manual examples, separate from the credential-free CI examples above.
 Read passwords with `getpass` rather than storing them in the script. The new
-behavior is in unreleased source, not a promise about the installed 3.1.5 release.
+behavior requires 4.0.1 and does not apply to the installed 3.1.5 release.
 
 Open a root console through sudo and allow up to 15 seconds for entry:
 
@@ -518,12 +616,14 @@ for commands, coverage, and the native-system validation matrix.
 | Old/alternative form | Recommended new code |
 | --- | --- |
 | `$$command`, `onedollar()`, `twodollars()` | `$command` or `exec_command()`, with explicit shell mode when needed |
-| Two-value unpacking of a Session command | A named result or three-value unpacking; unreleased shell commands now follow the same contract |
+| Two-value unpacking of a Session command | A named result or three-value unpacking; 4.0 shell commands now follow the same contract |
 | `assert` for command success | `check=True` or an explicit exception |
 | Dynamic command built with `shlex.join()` | Pass argv directly; `shlex.join()` remains supported, not deprecated |
 | `--check` without a filename for updates | `--check-updates`; reserve `--check file.spy` for syntax validation |
 
-All nine executable blocks above carry explicit version profiles and run in CI.
+The version-profiled executable examples above run in CI. README quickstart
+examples are also checked; native account transcripts require the documented
+host prerequisites and are not credential-free examples.
 The same source is mirrored into the website; edit this file, then use
 `tools/sync_api_guide.py` to refresh the website copy. Additional protocol and
 production details remain in the full documentation.

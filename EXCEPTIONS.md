@@ -24,7 +24,7 @@ after saving `session.last_result` and channel output/status. The exception's
 `output`/`stdout` and `stderr` are text snapshots on both backends; `cmd` is a
 string or argument tuple, and `result` is the complete immutable CommandResult.
 CommandResult unpacks as exactly three values: stdout, stderr, exitcode; indexing
-and slicing use the same order. Unreleased persistent shell commands use the same three-value result.
+and slicing use the same order. 4.0 persistent shell commands use the same three-value result.
 Interactive input retains its prompt/exit/silence status; it is not a command result.
 This replaces the local backend's former raw subprocess exception (byte
 output and generated argv). `AssertionError` was never a supported API contract.
@@ -56,7 +56,9 @@ normal and optimized test suites, the dollar-syntax smoke suite, compile checks,
 and the package-assertion gate. CI runs these checks on Python 3.11–3.14 on
 Linux and macOS. The AST gate scans package runtime modules and excludes tests.
 
-## Managed execution (unreleased)
+<a id="managed-execution-unreleased"></a>
+
+## Managed execution (4.0)
 
 `Session.start(timeout=...)` and `exec_command(command_timeout=...)` share a
 monotonic total command budget. None means unlimited; finite values must be
@@ -72,7 +74,9 @@ raise CalledProcessError. Remote channel closure alone is not confirmation of
 process termination. Unconfirmed active-job termination is reported by
 Session.close() as a cleanup error. See the timeout guide for the full contract.
 
-## Authenticated su/sudo consoles (unreleased)
+<a id="authenticated-susudo-consoles-unreleased"></a>
+
+## Authenticated su/sudo consoles (4.0)
 
 The same contract applies to Session factories and nested console factories.
 
@@ -107,7 +111,9 @@ already-propagating exception if exit or resource cleanup also fails.
 See [the API guide](API_GUIDE.md#unreleased-authenticated-susudo-consoles) for
 usage, custom-command migration, and platform-specific limitations.
 
-## Session close safeguards (unreleased)
+<a id="session-close-safeguards-unreleased"></a>
+
+## Session close safeguards (4.0)
 
 `Session.close()` and `disconnect()` raise `RuntimeError` if this Session or
 any descendant has an active shell/su/sudo/enter context, independently of
@@ -121,7 +127,9 @@ return and `close_errors` report the outcome; `strict=True` raises after cleanup
 for failures. Repeated calls retain that outcome. Child close does not close
 the parent; an unentered owned console is released by Session close.
 
-## Console foreground jobs (unreleased)
+<a id="console-foreground-jobs-unreleased"></a>
+
+## Console foreground jobs (4.0)
 
 console.start() returns CommandJob with the current Bash console's state.
 An active job prohibits other console operations with immediate RuntimeError;

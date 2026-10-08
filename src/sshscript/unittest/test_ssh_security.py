@@ -170,6 +170,9 @@ class RemoteCommandIOTests(unittest.TestCase):
                 barrier.wait(timeout=2)
                 return self.value
 
+            def close(self):
+                self.closed = True
+
         remote_channel = Mock()
         remote_channel.recv_exit_status.return_value = 0
         stdin = Mock()
@@ -215,9 +218,12 @@ class RemoteCommandIOTests(unittest.TestCase):
 
         self.assertEqual(command.channel.stdout, 'out')
         self.assertEqual(command.channel.stderr, 'err')
-        stdin.write.assert_called_once_with('password\n')
+        stdin.write.assert_called_once_with('password')
         stdin.flush.assert_called_once_with()
-        remote_channel.shutdown_write.assert_called_once_with()
+        self.assertTrue(stdout.closed and stderr.closed)
+        stdin.close.assert_called_once_with()
+        remote_channel.close.assert_called_once_with()
+        self.assertTrue(remote_channel.shutdown_write.called)
 
     def test_full_remote_call_waits_for_executor_shutdown(self):
         remote_channel = Mock()
@@ -232,6 +238,9 @@ class RemoteCommandIOTests(unittest.TestCase):
 
             def read(self):
                 return self.value
+
+            def close(self):
+                self.closed = True
 
         client = Mock()
         client.exec_command.return_value = (

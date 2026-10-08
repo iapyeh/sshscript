@@ -29,6 +29,8 @@ assert_type(s(["true"], command_timeout=2), JobResult)
 assert_type(s.start(["true"]), CommandJob)
 with s.shell() as console:
     assert_type(console.start("printf ready", timeout=3), CommandJob)
+    assert_type(console.send("partial"), None)
+    assert_type(console.input("reply", timeout=3), str | None)
     shell_result = console("printf ready", check=True)
     if isinstance(shell_result, CommandResult):
         assert_type(shell_result, CommandResult[int])

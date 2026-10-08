@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
     content = HEADER + (Path(__file__).resolve().parents[1] / 'API_GUIDE.md').read_text()
+    content = content.replace('(VERSIONING.md)', '({{ site.baseurl }}/v3a/migration-and-releases/version-policy/)')
     if args.check:
         existing = re.sub(r"\nLast Updated: [^\n]+\n?$", "", args.destination.read_text())
         if existing.rstrip() != content.rstrip():

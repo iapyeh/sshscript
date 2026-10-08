@@ -1487,6 +1487,11 @@ class GenericChannel(object):
                 )
 
     def input(self, text, timeout=60):
+        """Append one newline and wait for interactive readiness, exit, or silence.
+
+        Existing newlines are retained. Use send() to write exact text instead.
+        A readiness/silence status does not establish command success.
+        """
         if not isinstance(text, str):
             raise TypeError('input text must be str')
 

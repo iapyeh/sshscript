@@ -39,6 +39,8 @@ jobs:
         run: |
           PACKAGE_VERSION=$(python -c "import runpy; print(runpy.run_path('src/sshscript/_version.py')['__version__'])")
           test "$RELEASE_TAG" = "v$PACKAGE_VERSION"
+      - name: Reject development versions for production publication
+        run: python tools/version_policy.py --production
       - name: Stabilize build timestamps
         run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
       - name: Run release gates and build verified artifacts
@@ -58,14 +60,26 @@ jobs:
           path: ${{ runner.temp }}/sshscript-release/
 
   openssh-integration:
-    name: Release OpenSSH integration (Python ${{ matrix.python-version }})
+    name: Release OpenSSH integration (Python ${{ matrix.python-version }}, ${{ matrix.dependency-label }})
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.14']
+        include:
+          - python-version: '3.11'
+            paramiko: 'paramiko==2.11.0'
+            dependency-label: minimum
+          - python-version: '3.14'
+            paramiko: 'paramiko==2.11.0'
+            dependency-label: minimum-new-python
+          - python-version: '3.11'
+            paramiko: 'paramiko>=3,<4'
+            dependency-label: 3.x
+          - python-version: '3.14'
+            paramiko: 'paramiko>=4,<5'
+            dependency-label: 4.x
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -78,7 +92,7 @@ jobs:
           name: python-package-distributions
           path: dist
       - name: Install verified wheel
-        run: python -m pip install dist/*.whl
+        run: python -m pip install dist/*.whl "${{ matrix.paramiko }}"
       - name: Provision loopback OpenSSH server
         run: bash tools/setup_openssh_ci.sh "$GITHUB_ENV"
       - name: Test installed wheel against OpenSSH
@@ -95,14 +109,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: release-native-auth-python-${{ matrix.python-version }}
+          name: release-native-auth-python-${{ matrix.python-version }}-${{ matrix.dependency-label }}
           if-no-files-found: warn
           path: ${{ runner.temp }}/native-auth-report.json
       - name: Upload OpenSSH server log
         if: ${{ failure() && env.SSHSCRIPT_OPENSSH_LOG != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: release-openssh-log-python-${{ matrix.python-version }}
+          name: release-openssh-log-python-${{ matrix.python-version }}-${{ matrix.dependency-label }}
           if-no-files-found: warn
           path: ${{ env.SSHSCRIPT_OPENSSH_LOG }}
       - name: Remove disposable OpenSSH state

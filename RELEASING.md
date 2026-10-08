@@ -4,13 +4,18 @@ Python 3.11 or newer is required. The development checkout is a flat source tree
 
 Install development tools with `python -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine`. Run `python tools/run_checks.py` from working_branch. Run `python tools/check_release.py --output /tmp/sshscript-candidate-UNIQUE` to build a clean allowlisted source distribution, build its wheel, verify the exact public test/instruction list in the sdist, rerun the credential-free gates from that extracted sdist, check metadata and test the installed wheel. The output directory must not exist. Local preparation includes current files, including uncommitted changes; only committed inputs are available in CI.
 
-Review and commit the intended development changes before merging working_branch into src/main. Follow the project version policy: increment src/_version.py once after a successful integration, commit it, and synchronize that version back to working_branch. Version imports must refer to _version.py; build and upload tools never edit versions.
+Review and commit the intended development changes before any explicitly authorized merge into src/main. Follow [VERSIONING.md](VERSIONING.md): edit only working_branch/_version.py on the working_branch branch. Never edit src/main directly. Development builds use distinct .devN versions; incompatible public execution contracts target the next major release. Promotion to a stable version is a separately authorized action after release validation, not an automatic patch bump on merge. Version imports must refer to _version.py; build and upload tools never edit versions.
 
 From git/, run `sh update_from_src.sh` to synchronize the integrated src tree. The explicit allowlist preserves unrelated files; review deletions separately when retiring modules. Review the diff, including newly created files. Run `python tools/run_checks.py` and `python tools/check_release.py --output /tmp/sshscript-release-UNIQUE` in git/. Commit reviewed release files, then verify a clean checkout of that commit before tagging or uploading. CI uses the same checks in both layouts on Linux/macOS and Python 3.11–3.14.
 
 The default `python -m build` operation builds an sdist and then a wheel from that sdist. Successful verification writes verified.json containing artifact SHA-256 hashes. Keep this file with the two distribution files. CI artifacts are for inspection; select one verified candidate for release.
 
-Production publication uses `.github/workflows/release.yml`. Configure the PyPI
+Production publication uses `.github/workflows/release.yml`. Both this workflow
+and the manual PyPI uploader reject prerelease and local versions; development
+artifacts may be verified locally or explicitly uploaded to TestPyPI.
+`4.0.0.dev0` does not authorize a 4.0 release.
+
+Configure the PyPI
 Trusted Publisher for owner `iapyeh`, repository `sshscript`, workflow
 `release.yml`, and GitHub environment `pypi`. Require approval on that
 environment. Pushing an annotated tag that exactly matches

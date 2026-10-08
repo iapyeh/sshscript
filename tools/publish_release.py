@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+from packaging.utils import parse_wheel_filename
+from version_policy import require_production_version
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--artifacts', type=Path, required=True)
@@ -21,6 +23,8 @@ for name, digest in manifest.items():
     path = root / name
     if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
         raise ValueError('Artifact changed after verification: ' + name)
+    if args.repository == "pypi" and name.endswith(".whl"):
+        require_production_version(parse_wheel_filename(name)[1])
     files.append(str(path))
 subprocess.run([sys.executable, '-m', 'twine', 'check', '--strict', *files], check=True)
 subprocess.run([sys.executable, '-m', 'twine', 'upload', '--non-interactive', '--repository', args.repository, *files], check=True)

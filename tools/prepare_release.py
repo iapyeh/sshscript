@@ -5,7 +5,7 @@ from pathlib import Path
 
 MODULES = '__init__ _runtime _version sshscript session sessionsettings commandresult commandjob consolejob sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
 ROOT_FILES = [
-    'API_GUIDE.md', 'pyproject.toml', 'README.md', 'LICENSE.txt', 'RELEASING.md',
+    'API_GUIDE.md', 'VERSIONING.md', 'pyproject.toml', 'README.md', 'LICENSE.txt', 'RELEASING.md',
     'MANIFEST.in', 'CHANGELOG.md', 'CONTRIBUTING.md', 'EXCEPTIONS.md',
     'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md', '.gitignore',
     '.github/ISSUE_TEMPLATE/bug_report.yml',
@@ -17,7 +17,7 @@ ROOT_FILES = [
 ]
 TOOLS = [
     'check_baseline_examples.py', 'sync_api_guide.py', 'check_public_types.py', 'prepare_release.py', 'check_release.py', 'run_checks.py',
-    'publish_release.py', 'setup_openssh_ci.sh', 'run_native_auth_ci.py',
+    'publish_release.py', 'version_policy.py', 'setup_openssh_ci.sh', 'run_native_auth_ci.py',
 ]
 # Public regression fixtures and instructions; private legacy tests are excluded.
 TESTS = [
@@ -46,6 +46,7 @@ TESTS = [
     'test_production_contract.py',
     'test_public_types.py',
     'test_python_version.py',
+    'test_version_policy.py',
     'test_release_inputs.py',
     'test_recommended_examples.py',
     'test_session_close_reporting.py',
@@ -58,6 +59,7 @@ TESTS = [
     'test_sshscript_dollar_syntax.py',
     'test_sshscript_module.py',
     'test_stdio_dynamic_string.py',
+    'test_stdin_contract.py',
     'test_syntax_error.spy',
     'test_update_check.py',
 ]
@@ -126,6 +128,12 @@ def prepare(source, destination):
     for src, dst in pairs:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
+    # Root docs link to tests at different paths in source and release layouts.
+    for name in ROOT_FILES:
+        if name.endswith('.md'):
+            path = destination / name
+            text = path.read_text()
+            path.write_text(text.replace('](unittest/', '](src/sshscript/unittest/'))
     return [str(dst.relative_to(destination)) for _, dst in pairs]
 
 def main():

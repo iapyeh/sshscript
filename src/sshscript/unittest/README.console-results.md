@@ -19,7 +19,7 @@ are required. The continuous Python process exercises lifecycle behavior; this
 is not evidence of real tcpdump or remote OpenSSH capture behavior. Remote
 protocol tests and opt-in OpenSSH integration tests are separate.
 
-The console result change is unreleased. Published 3.1.5 console commands still
+The console result change requires SSHScript 4.0.1. Published 3.1.5 console commands still
 return two buffers. For new source consumers, prefer `result = console(command)`
 and named fields, or unpack exactly stdout, stderr, exitcode. Read API_GUIDE.md
 for finite capture, streaming with a stop condition and fallback deadline, and
@@ -35,3 +35,15 @@ su/sudo UID/PID protocol and a real Paramiko pipe-console fixture. Native
 su/sudo job identity and PTY stop are opt-in cases in
 `test_native_console_authentication.py`; they require the disposable CI fixture.
 These tests do not establish real tcpdump or every OS/PAM/sudo policy behavior.
+
+
+## Exact stdin and interactive Enter keys
+
+Run `python3 -m unittest discover -v -s unittest -p 'test_stdin_contract.py'`
+with the runtime dependencies installed (and repeat with `python3 -O`). These
+credential-free tests compare local subprocess, real Paramiko/socketpair SSH,
+managed exec and start: None, empty input, UTF-8, arbitrary bytes, existing
+newlines, and EOF. They also use real local PTY/pipe programs and .spy contexts
+to verify command/input/raw-send dispatch and shell reuse after enter().
+`input=` is exact data; console `input()` appends one newline even when text
+already contains one. No real password or MySQL server is required.

@@ -191,12 +191,19 @@ class CommandJob:
                         os.killpg(process.pid, sig)
                     except ProcessLookupError:
                         pass
-                    except PermissionError:
-                        # The worker may have already reaped the group leader
-                        # while the watcher was sending its final signal. Only
-                        # accept that race when child exit is actually confirmed.
-                        if process.poll() is None:
-                            raise
+                    except PermissionError as exc:
+                        # Darwin can reject group signals while the child is
+                        # exiting, before waitpid can report its status. A single
+                        # nonblocking poll is not sufficient to exclude that race.
+                        status = process.poll()
+                        if status is None:
+                            try:
+                                status = process.wait(timeout=1)
+                            except subprocess.TimeoutExpired:
+                                # Retain genuine signal denial; never turn an
+                                # unconfirmed exit into successful cancellation.
+                                raise exc from None
+                        self._status = status
                     self._sent_local_signals.add(sig)
         if channel is not None:
             if force or not self._pty:
@@ -270,6 +277,7 @@ class CommandJob:
                                    env=None if self._env is None else dict(os.environ, **self._env),
                                    start_new_session=True)
         self._process = process
+        primary_error = None
         try:
             # Cancellation may have arrived while Popen was creating the process.
             if self._reason is not None:
@@ -315,15 +323,42 @@ class CommandJob:
                         break
                     time.sleep(0.02)
                 self._status = process.wait(timeout=1)
+        except BaseException as exc:
+            primary_error = exc
+            raise
         finally:
+            self._cleanup_local(process, primary_error)
+
+    def _cleanup_local(self, process, primary_error):
+        errors = []
+        try:
             if process.poll() is None:
-                self._signal(force=True)
+                try:
+                    self._signal(force=True)
+                except BaseException as exc:
+                    errors.append(('process signal', exc))
+                # Reap independently of signal success: the child may have
+                # exited even when signal delivery could not be confirmed.
                 try:
                     self._status = process.wait(timeout=1)
                 except subprocess.TimeoutExpired:
                     pass
-            for stream in (process.stdin, process.stdout, process.stderr):
-                stream.close()
+        except BaseException as exc:
+            errors.append(('process wait', exc))
+        for name in ('stdin', 'stdout', 'stderr'):
+            try:
+                getattr(process, name).close()
+            except BaseException as exc:
+                errors.append((name + '.close()', exc))
+        if errors:
+            reported = primary_error if primary_error is not None else errors[0][1]
+            for operation, error in errors:
+                if error is not reported:
+                    reported.add_note(
+                        f'Local job cleanup failed during {operation}: '
+                        f'{type(error).__name__}: {error}')
+            if primary_error is None:
+                raise reported
 
     def _run_remote(self):
         remaining = None if self._deadline is None else max(0.001, self._deadline - time.monotonic())
@@ -378,7 +413,13 @@ class CommandJob:
         """Wait for completion. The job's deadline continues while nobody waits."""
         self._done.wait()
         if self._result.stop_reason == 'timeout':
-            raise CommandTimeoutError(self._result, self.timeout)
+            error = CommandTimeoutError(self._result, self.timeout)
+            if self._error is not None:
+                error.add_note(f'Managed command error while timing out: '
+                               f'{type(self._error).__name__}: {self._error}')
+                for note in getattr(self._error, '__notes__', ()):
+                    error.add_note(note)
+            raise error from self._error
         if self._error is not None:
             raise self._error
         if self.check and self._result.stop_reason == 'completed' and self._result.exitcode != 0:
