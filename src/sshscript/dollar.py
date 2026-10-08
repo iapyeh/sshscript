@@ -22,10 +22,12 @@ import asyncio
 import threading
 
 if __package__:
+    from .sessionsettings import SessionLogger
     from .errorutils import command_requires_shell, command_summary, get_logger
     from .channelsubprocess import POpenChannel
     from .channelssh import SSHChannel    
 else:
+    from sessionsettings import SessionLogger
     from errorutils import command_requires_shell, command_summary, get_logger
     from channelsubprocess import POpenChannel
     from channelssh import SSHChannel    
@@ -68,6 +70,8 @@ class Dollar(object):
         self.command = command
         self.argv = None
         self.session = session # Session instance in context
+        self.settings = session.get()
+        self.logger = SessionLogger(self.settings)
         self.channel = None
         self.use_shell = use_shell
         self.shell_executable = shell_executable
@@ -164,7 +168,7 @@ class Dollar(object):
                     newloop.stop()
                 except Exception as exc:
                     self._worker_exception = exc
-                    logger.debug(
+                    self.logger.debug(
                         'Command worker failed (exception_type=%s)',
                         type(exc).__name__,
                     )
@@ -186,7 +190,7 @@ class Dollar(object):
                     if self.channel is not None:
                         self.channel.fail(exc)
 
-                    logger.debug(
+                    self.logger.debug(
                         'Command worker failed (exception_type=%s)',
                         type(exc).__name__,
                     )
@@ -291,7 +295,7 @@ class Dollar(object):
             cpargs = shlex.split(self.command)
             summary = command_summary(cpargs)
             if get_pty:
-                logger.debug(
+                self.logger.debug(
                     'Starting interactive subprocess '
                     '(executable=%s, pty=%s, argc=%d)',
                     summary['executable'],
@@ -378,7 +382,7 @@ class Dollar(object):
                 await self.channel.async_start_interaction()
 
             elif 1:
-                logger.debug(
+                self.logger.debug(
                     'Starting interactive subprocess '
                     '(executable=%s, pty=%s, argc=%d)',
                     summary['executable'],
@@ -420,7 +424,7 @@ class Dollar(object):
                     )
             '''
             else:
-                logger.debug('Starting interactive subprocess without a PTY')
+                self.logger.debug('Starting interactive subprocess without a PTY')
                 ## pros:
                 ##  su (get_pty=False) works and stderr does not mixed with stdout
                 ## cons:
@@ -468,7 +472,7 @@ class Dollar(object):
             ## with_pty is always False
             self.channel = POpenChannel(self,None,None,None,[],False)
             self.channel.increase_layer('')
-            logger.debug(
+            self.logger.debug(
                 'Executing subprocess '
                 '(executable=%s, shell=%s, pty=%s, argc=%d, '
                 'shell_reasons=%s, command_length=%d)',
@@ -542,7 +546,7 @@ class Dollar(object):
                 summary = command_summary(argv)
                 argc = summary['arg_count']
 
-            logger.debug(
+            self.logger.debug(
                 'Executing SSH command '
                 '(host=%s, executable=%s, shell=%s, pty=%s, argc=%s, '
                 'shell_reasons=%s, command_length=%d)',
@@ -582,7 +586,7 @@ class Dollar(object):
             await self.channel._add_stderr_data(stderr_data)
             await self.channel._dump_stdout_err()
             self.channel._exitcode = stdout.channel.recv_exit_status()
-            logger.debug(
+            self.logger.debug(
                 'SSH command completed (host=%s, exit_code=%s)',
                 host,
                 self.exitcode,

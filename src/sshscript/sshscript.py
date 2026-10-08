@@ -23,6 +23,13 @@ Importing this module does not install .spy import hooks or console logging.
 
 import os
 import sys
+if __package__:
+    from ._runtime import require_python as _require_python
+else:
+    from _runtime import require_python as _require_python
+
+_require_python(cli=__name__ == '__main__')
+
 import time
 import traceback
 
@@ -32,7 +39,8 @@ def warning_on_one_line(message, category, filename, lineno, file=None, line=Non
     return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
 if __package__:
     from ._version import __version__
-    from .session import Session, CommandResult
+    from .sessionsettings import execution_defaults
+    from .session import Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
     from .errorutils import SSHScriptExit, SSHScriptBreak, get_logger, set_logger, SSHScriptException,command_summary
     ## 2025/3/3 v2.0.3 feature: import *.spy file directly
     from . import spyimporter
@@ -42,7 +50,8 @@ else:
     mydir = os.path.abspath(os.path.dirname(__file__))
     if not mydir in sys.path: sys.path.insert(0,mydir)
     from _version import __version__
-    from session import Session, CommandResult
+    from sessionsettings import execution_defaults
+    from session import Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
     from errorutils import SSHScriptExit, SSHScriptBreak, get_logger, set_logger, SSHScriptException,command_summary
     import spyimporter
     import dollarparser
@@ -355,14 +364,13 @@ def main():
         
         sys.argv[0] = args.path
 
-        if args.debug:
-            os.environ['DEBUG'] = str(args.debug)
-            logger.reset_debug()
-        
+        policy = {}
+        if args.debug is not None:
+            policy['log_level'] = max(10, args.debug)
         if args.verbose:
-            os.environ['VERBOSE'] = '1'
+            policy['verbose'] = True
         elif args.verbose_stderr:
-            os.environ['VERBOSE_STDERR'] = '1'
+            policy.update(verbose=False, verbose_stderr=True)
 
         try:
             if args.check:
@@ -372,10 +380,11 @@ def main():
                     parser.error('--check and --script cannot be combined')
                 exitcode = check_file(args.path)
             else:
-                exitcode = run_file(
-                    args.path,
-                    showScript=args.showScript,
-                )
+                with execution_defaults(**policy):
+                    exitcode = run_file(
+                        args.path,
+                        showScript=args.showScript,
+                    )
         except SSHScriptExit as e:
             sys.exit(e.errno)
         except SSHScriptException as e:

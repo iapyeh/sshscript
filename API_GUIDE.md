@@ -1,0 +1,447 @@
+# Recommended SSHScript API
+
+This is the canonical entry point for new code and AI-generated examples.
+**Version baseline: 3.1.5**, Python 3.11+. Sections marked **unreleased** require
+this development checkout; installing `sshscript==3.1.5` does not provide them.
+The checkout still reports 3.1.5 while these additions await a release. Do not
+infer development feature availability from that version string alone.
+
+## Recommended choices
+
+| Need | Use |
+| --- | --- |
+| A command with dynamic arguments | `session.exec_command([program, arg, ...], check=True)` |
+| Pipelines or shell expansion | A string with explicit `shell=True` or `shell="bash"`; quote dynamic values |
+| Retain output | Save the returned result; read `result.stdout`, `stderr`, `exitcode` |
+| Shared shell directory/environment | `session.shell()`; check each required command; **unreleased:** save its CommandResult |
+| SSH | `with local.connect(...) as remote:`; retain host-key verification |
+| Compact script | One `$` in a `.spy` file; use `$(argv, check=True)` for dynamic arguments |
+| Consistent total deadline | **Unreleased:** `exec_command(command_timeout=...)` |
+| Long-running program | **Unreleased:** `start(timeout=None)`, `stop()`, `wait()` |
+| Session-wide failure/output policy | **Unreleased:** `set(...)`, `get(...)`, or matching properties |
+
+## 3.1.5: one command, one retained result
+
+Install the baseline with `python -m pip install "sshscript==3.1.5"`.
+An argv list is one command, not a batch. Shell-looking argument text stays data.
+
+<!-- example: {"id":"argv", "profile":"3.1.5", "stdout":"a; b\n"} -->
+```python
+from contextlib import closing
+import sys
+from sshscript import Session
+
+with closing(Session()) as local:
+    result = local.exec_command(
+        [sys.executable, "-c", "import sys; print(sys.argv[1])", "a; b"],
+        check=True,
+    )
+    local.exec_command([sys.executable, "-c", "pass"], check=True)
+    print(result.stdout.strip())  # Still the first command's output.
+```
+
+`CommandResult` is immutable; unpacking yields exactly stdout, stderr, exitcode.
+`check=True` raises `subprocess.CalledProcessError` on nonzero exit, with text
+stdout/stderr and `.result`. A timeout or transport error is not an exit status.
+
+<!-- example: {"id":"failure", "profile":"3.1.5", "stdout":"failed: 7\n"} -->
+```python
+from contextlib import closing
+import subprocess
+import sys
+from sshscript import Session
+
+with closing(Session()) as local:
+    try:
+        local.exec_command([sys.executable, "-c", "raise SystemExit(7)"], check=True)
+    except subprocess.CalledProcessError as error:
+        print(f"failed: {error.returncode}")
+```
+
+## 3.1.5: SSH and optional dollar syntax
+
+Replace the example host with your configured host and verified known-host key.
+CI executes this block with a local SSH protocol fixture in place of the login;
+it does not contact example.net. OpenSSH integration tests cover the transport
+separately in CI.
+
+<!-- example: {"id":"ssh", "profile":"3.1.5", "fixture":"ssh", "stdout":"ready\n"} -->
+```python
+from contextlib import closing
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.connect("ops@example.net", timeout=10,
+                       banner_timeout=10, auth_timeout=10) as remote:
+        result = remote.exec_command(["printf", "%s", "ready"], check=True)
+        print(result.stdout)
+```
+
+Save dollar syntax as `.spy`, run with `sshscript file.spy`, and syntax-check
+without execution using `sshscript --check file.spy`.
+
+<!-- example: {"id":"dollar", "profile":"3.1.5", "stdout":"ready\n"} -->
+```python
+result = $(["printf", "%s", "ready"], check=True)
+print(result.stdout)
+```
+
+## Unreleased: settings and managed jobs
+
+Use this source checkout for the following examples. CLI `-v`, `--stderr`, and
+`--debug` override root defaults only for that execution. Child Sessions copy
+their parent's settings. `set()` validates before changing anything; `get()`
+returns a copy. Explicit command options override Session policy.
+
+The `policy` setting controls future SSH connections. It defaults to `None`
+(Paramiko's RejectPolicy) and accepts a Paramiko `MissingHostKeyPolicy` instance
+or subclass. For example, `local.set(policy=paramiko.AutoAddPolicy())` makes
+subsequent `local.connect(...)` calls accept unknown host keys. Import `paramiko`
+before using its policies. The matching `local.policy` property and
+`local.get("policy")` use the same setting.
+
+An explicit `connect(policy=...)` overrides the setting for that connection;
+`connect(policy=None)` restores default rejection for that connection. These
+overrides do not change the settings inherited by child Sessions. Children copy
+the settings dictionary at creation; the policy object itself is shared, so
+custom policies with mutable state must account for reuse. Changing the setting
+does not reconfigure existing connections.
+
+<!-- example: {"id":"settings", "profile":"unreleased", "stdout":"True\n1\n"} -->
+```python
+from contextlib import closing
+import paramiko
+from sshscript import Session
+
+with closing(Session()) as local:
+    local.set(check=True, verbose=False, log_level="WARNING",
+              policy=paramiko.AutoAddPolicy())
+    print(local.get("check"))
+    result = local.exec_command(["false"], check=False, command_timeout=5)
+    print(result.exitcode)
+```
+
+`command_timeout` is a total command budget on both backends; output does not
+reset it. `CommandTimeoutError` includes partial output and termination status.
+The legacy `exec_command(timeout=...)` retains different subprocess/Paramiko
+semantics; do not combine it with `command_timeout`.
+
+For an indefinite command such as tcpdump, use `start(timeout=None)`. This safe
+local example uses a small Python process instead of capturing network traffic:
+
+<!-- example: {"id":"stop", "profile":"unreleased", "stdout":"cancelled confirmed\n"} -->
+```python
+from contextlib import closing
+import sys
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.start(
+        [sys.executable, "-u", "-c", "import time; print('ready'); time.sleep(60)"],
+        timeout=None, stop_timeout=1,
+    ) as job:
+        try:
+            next(job.iter_stdout())
+        finally:
+            result = job.stop()  # Also use this after catching KeyboardInterrupt.
+        print(result.stop_reason, result.termination_status)
+```
+
+Local stop sends SIGINT, then escalates if needed. Remote PTY stop attempts
+Ctrl-C; non-PTY stop closes the channel. Closure alone never confirms remote
+termination. Inspect `termination_status`; `unknown` requires reconciliation.
+Managed output retains bounded tails (default 1 MiB per stream), with truncation
+flags. `iter_stdout()` yields text chunks and reports queue overflow explicitly.
+
+## Unreleased: command results and long-running programs
+
+A completed command returns an immutable `CommandResult`, whether called as
+`session(command)`, `shell(command)`, a single `$command`, or `$command` inside
+`with $.shell()`, `su()`, or `sudo()`. Save `result` and read its named fields,
+or unpack exactly `stdout, stderr, exitcode`. This changes the released 3.1.5
+console contract: old `stdout, stderr = shell(command)` must be migrated.
+Shell calls accept command strings; argv execution belongs to Session.
+
+<!-- example: {"id":"shell-result", "profile":"unreleased", "stdout":"first 0\n"} -->
+```python
+from contextlib import closing
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.shell("bash") as shell:
+        result = shell("printf first", check=True)
+        shell("printf second", check=True)
+    print(result.stdout, result.exitcode)  # Retains the first command.
+```
+
+Equivalent `.spy` code:
+
+```spy
+result = $hostname
+with $.shell("bash"):
+    result = $hostname
+    stdout, stderr, exitcode = $hostname
+```
+
+A shell context scopes lifetime; it does not aggregate command results.
+`$.stdout`/`$.stderr` (or `console.stdout`/`stderr`) remain live buffers;
+`$.exitcode` is the latest status. Prefer the saved result for completed commands.
+A shell `check=True` failure carries `.result`, just like a Session failure.
+A timeout is an exception, not a fabricated completed result or proof of a stop.
+
+### Choose the command's lifetime before choosing syntax
+
+| Need | Recommended choice | When a result is available |
+| --- | --- | --- |
+| A finite command | Session call; use argv for dynamic arguments | On completion |
+| A finite capture | Give tcpdump `-c N` and set a total deadline | On completion; `-c N` can still wait forever if no packets arrive |
+| Stream until a condition or user Ctrl-C | `Session.start()` with `iter_stdout()` and `stop()` in `finally` | `wait()`/`stop()` returns JobResult; inspect stop reason and termination status |
+| Run inside a configured shell or privilege context | `console.enter(command, exit=chr(3))`, `expect()`/live buffers | The body observes live output; leaving requests Ctrl-C and recovers the shell |
+| Send input to a REPL or interactive program | `enter()`, then `input()`/`send()`/`expect()` | Input readiness is not a completed command or its exitcode |
+
+Do not assign `result = $tcpdump ...` and expect to inspect it while the command
+is running: synchronous assignment waits for completion. Changing two-value
+unpacking to three values does not add streaming or a stop condition.
+Shell command calls keep their existing completion deadline (60 seconds by
+default); use managed jobs for indefinite lifetimes. `start(timeout=None)` means
+no total deadline, so the caller must supply a stop condition or handle Ctrl-C.
+Prefer a finite fallback deadline for unattended agents, even when they also
+stop on output. A loop checking elapsed time only after receiving a chunk cannot
+stop a silent process on time; use the job deadline for that guarantee.
+
+### Best practice for tcpdump and other continuous output
+
+Use `tcpdump -l -n -i INTERFACE` for line-buffered text; select the interface and
+capture privileges explicitly. For a finite capture, use `-c N` plus a deadline.
+For an output condition, accumulate chunks or split complete lines before
+matching: `iter_stdout()` yields chunks, not packets or lines. Put `stop()` in
+`finally`, so condition matches, exceptions, and KeyboardInterrupt all trigger
+cleanup. This credential-free example uses a continuous Python process:
+
+<!-- example: {"id":"stream-condition", "profile":"unreleased", "stdout":"cancelled confirmed\n"} -->
+```python
+from contextlib import closing
+import sys
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.start(
+        [sys.executable, "-u", "-c",
+         "import time; print('ready'); exec('while True: time.sleep(1)')"],
+        timeout=10, stop_timeout=1,
+    ) as job:
+        seen = ""
+        try:
+            for chunk in job.iter_stdout():
+                seen = (seen + chunk)[-4096:]
+                if "ready" in seen:  # Replace with the application's condition.
+                    break
+        finally:
+            result = job.stop()
+        print(result.stop_reason, result.termination_status)
+```
+
+For local tcpdump replace argv with `["tcpdump", "-l", "-n", "-i", "INTERFACE"]`.
+On a connected remote Session use `remote.start(..., get_pty=True)` when Ctrl-C
+is the intended stop mechanism. PTYs can merge stderr into stdout; do not
+assume independent streams. `stop()` requests termination: remote channel close
+alone is not evidence that tcpdump stopped. Handle `termination_status="unknown"`
+with a separate host/process check. A deadline raises `CommandTimeoutError`
+with partial `error.result`; stop does not turn that timeout into success.
+
+When capture needs the current shell's directory/environment or sudo context
+(the following is a template inside an existing `local` Session):
+
+```py
+with local.shell("bash") as shell:
+    with shell.enter("tcpdump -l -n -i INTERFACE", exit=chr(3)) as capture:
+        capture.expect("YOUR_PACKET_PATTERN", timeout=30)
+    # Ctrl-C requested on leaving; the parent shell is recovered.
+    result = shell("printf capture-scope-ended", check=True)
+```
+
+This requires capture permission and a suitable PTY. `expect()` observes the
+running program; a match does not mean tcpdump exited. Inside `enter()`, console
+calls / `$...` send program input and retain their existing readiness-status
+return, rather than CommandResult. Use explicit `input()`/`send()` to make the
+intent clear to readers and agents. `exit=chr(3)` sends Ctrl-C, not a universal
+kill guarantee; context cleanup may raise when recovery cannot be confirmed.
+The following `shell()` result describes that following command, not tcpdump.
+
+Retained job output is bounded and can be truncated; check the truncation flags.
+Slow stream consumers can raise `BufferError`. For large or binary captures,
+write at the source with tcpdump `-w PATH` and retrieve the file after confirming
+capture termination; PTY text streams are unsuitable for a binary pcap.
+
+## Lifetime and failure rules
+
+- A root `with Session()` does not close the Session. These examples use
+  `contextlib.closing`; it calls `close()` but does not inspect its bool result.
+  For strict cleanup reporting, inspect `close_errors` or use `close(strict=True)`;
+  preserve any already-propagating exception when reporting cleanup failure.
+- Remote Session, shell, and managed-job contexts own their scoped cleanup.
+- **Unreleased:** `close()`/`disconnect()` cannot run while this Session or any
+  descendant has an active `shell()`, `su()`, `sudo()`, or `enter()` context.
+  They raise `RuntimeError` even with `strict=False`, before changing state or
+  cleaning any resource. Leave those contexts first; a function `return`, an
+  exception, or a break from an enclosing loop runs their context cleanup.
+- After leaving consoles, `close()` permanently disables the Session and closes
+  its owned console channels, managed jobs, connections and child Sessions.
+  Closing a child does not close its parent. Repeated close calls retain the
+  cleanup outcome. Console contexts constructed but never entered are also
+  cleaned up and cannot be entered after their Session is closed.
+- `closed=True` means new execution, connection, console, script and file/key
+  operations are forbidden; it does not prove every resource cleanup succeeded.
+  `close()` returns a bool, `close_errors` preserves cleanup failures, and
+  `close(strict=True)` raises after cleanup if any operation failed.
+
+- A shell block manages one shell lifetime. It does not aggregate every command's
+  success. In unreleased source, completed shell commands return immutable
+  CommandResult snapshots and inherit `check`; interactive prompt input does not.
+  Console stdout/stderr properties remain live buffers for expect/input workflows.
+- A successful final shell status does not prove every pipeline stage succeeded.
+- `Session.start()` keeps job results independent of Session latest-command state.
+
+## Unreleased: authenticated su/sudo consoles
+
+`Session.su()`, `Session.sudo()`, and their nested console equivalents accept
+`enter_timeout=10` (positive finite seconds). The deadline covers entry's lock
+acquisition, password conversation, target-shell readiness, and `initials`.
+It begins in `__enter__`; creating a base shell or probing `console_info` in the
+factory is outside that deadline. Success returns immediately, without a fixed
+password-verification delay. On context exit, the same duration bounds waiting
+for the target shell to return to its parent.
+
+The requested command emits a fresh authentication marker only after su/sudo
+has started it as the target account. It checks effective UID against `id -u
+USERNAME`; a second handshake checks that UID and shell PID survived shell
+startup. PTY contexts also wait for their own unique prompt. Output silence,
+a missing error message, and a missing password prompt are never success
+criteria. Passwordless entry is supported, including when a password was
+provided but never requested. The supplied password is sent at most once.
+Each authenticated console context is single-use; create a new context for an
+explicit retry.
+Default prompt matching covers standard English password prompts; `expect=`
+remains available for other authentication prompt formats.
+
+### Interactive usage
+
+These transcripts require a real local account and its authentication policy;
+they are manual examples, separate from the credential-free CI examples above.
+Read passwords with `getpass` rather than storing them in the script. The new
+behavior is in unreleased source, not a promise about the installed 3.1.5 release.
+
+Open a root console through sudo and allow up to 15 seconds for entry:
+
+```pycon
+>>> from contextlib import closing
+>>> from getpass import getpass
+>>> from sshscript import Session
+>>> with closing(Session()) as local:
+...     with local.sudo(password=getpass("sudo password: "), enter_timeout=15) as root:
+...         stdout, stderr, exitcode = root("id -u")
+...         print(str(stdout).strip())
+0
+```
+
+Enter an existing account named `alice` from a persistent shell. Replace the
+account name with your intended target; su normally asks for the target
+account's password, whereas sudo's password choice is determined by sudo policy.
+
+```pycon
+>>> with closing(Session()) as local:
+...     with local.shell() as shell:
+...         with shell.su("alice", password=getpass("su password: "), enter_timeout=15) as user:
+...             stdout, stderr, exitcode = user("id -u")
+...             print(str(stdout).strip())
+```
+
+For a configured passwordless sudo policy, use `local.sudo(password=None,
+enter_timeout=15)`. If a password is actually requested, entry raises
+`PermissionError` before the block body runs. Both factories also accept
+`shell=False` to start su/sudo directly, `get_pty=False` to use pipes, and
+`login=False` to omit login mode. Host policy and the installed utility may
+reject these combinations. Nested console `shell`/`get_pty` arguments remain
+compatibility placeholders; they do not reconfigure an existing channel.
+
+### Failure handling
+
+Explicit authentication rejection or a second password request raises
+`PermissionError`; an early command exit or identity mismatch raises
+`RuntimeError`. An unresolved deadline raises `TimeoutError`. I/O failures
+propagate. A failure has a separate **two-second recovery budget**: observe
+return to the parent, or interrupt unresolved PTY authentication, then verify
+the parent's original UID/PID. If this cannot be confirmed, the channel is
+marked failed and rejects further commands. A direct `shell=False` console
+has no parent to recover; its owning context closes the channel on entry
+failure. Channel resource cleanup can take additional time. There is no
+password retry or automatic fallback to the original account.
+
+Handle entry failure outside the `with` statement; its body has not run unless
+the readiness handshake completed. A `TimeoutError` means that completion was
+not confirmed, rather than proof of a bad password. `enter_timeout=True`, zero,
+negative values, NaN, and infinity are not accepted.
+
+After a failed nested entry, use the parent only if recovery was confirmed.
+`console.closed` alone cannot establish this: an open channel may have been
+marked failed and will reject subsequent commands. There is no public recovery
+status flag; attempting another parent command propagates the stored channel
+failure if recovery was unconfirmed. Do not attempt to clear that failure.
+Create a new console context for an intentional retry, and a new underlying
+channel when the old channel is unusable. Context unwinding preserves the
+original exception and releases the console's lock and thread-stack entry.
+
+### Platform behavior and custom commands
+
+Bash remains required and is found through the target's PATH, including
+FreeBSD's usual `/usr/local/bin` installation. su uses the cached
+`session.console_info['is_su_pty_ok']` capability to select `--pty`; the handshake
+does not depend on a distribution name or a fixed PAM delay. su's `-c` follows
+USERNAME so that BSD passes it to the target shell instead of interpreting it
+as a login class. The existing sudo-to-su route for a non-root target and login
+mode are retained. If Bash, `id`, or the necessary shell behavior is unavailable,
+entry fails rather than being treated as successful.
+
+`console_info` is a cache for tool capability probes. In the current source it
+contains `is_su_pty_ok`; it does not expose a populated OS/distribution inventory.
+Prefer a tool capability result over a distribution-name guess. The bootstrap
+also prevents the outer login shell from expanding its dollar expressions when
+sudo reconstructs argv for `-i`; available Bourne and csh-family shells are
+covered by the protocol tests.
+
+Custom nested `command=` strings now require a bootstrap placeholder. Use
+`{auth_command}` where the generated Bash command is ordinary command argv,
+for example `command="sudo -k -S {auth_command}"`. Use
+`{auth_command_quoted}` where the command must be one shell argument, for
+example `command="su - alice -c {auth_command_quoted}"` together with
+`username="alice"`. Do not add your own quotes around either placeholder.
+Templates without a placeholder are rejected before sending them. This is a
+compatibility change: an arbitrary interactive command cannot guarantee an
+authenticated startup marker. `Session.enter()` remains the lower-level API
+for application-specific conversations and does not provide this su/sudo
+handshake guarantee.
+
+Credential-free coverage is in `unittest/test_console_authentication.py`.
+It uses real PTY/pipe channels and simulated authentication, plus available
+Bourne/csh-family shells. These checks do not establish real authentication
+compatibility with every OS, sudo policy, PAM stack, or utility version;
+native Ubuntu local/SSH gates now exercise real util-linux su, sudo and PAM,
+including failure and recovery. Passing candidate reports are required before
+claiming validation; configuring CI alone is not a passing result. BusyBox,
+FreeBSD and macOS authentication still require native verification. See `unittest/README.console-authentication.md` in the source checkout
+for commands, coverage, and the native-system validation matrix.
+
+## Compatibility forms: read, do not generate
+
+| Old/alternative form | Recommended new code |
+| --- | --- |
+| `$$command`, `onedollar()`, `twodollars()` | `$command` or `exec_command()`, with explicit shell mode when needed |
+| Two-value unpacking of a Session command | A named result or three-value unpacking; unreleased shell commands now follow the same contract |
+| `assert` for command success | `check=True` or an explicit exception |
+| Dynamic command built with `shlex.join()` | Pass argv directly; `shlex.join()` remains supported, not deprecated |
+| `--check` without a filename for updates | `--check-updates`; reserve `--check file.spy` for syntax validation |
+
+All six executable blocks above carry explicit version profiles and run in CI.
+The same source is mirrored into the website; edit this file, then use
+`tools/sync_api_guide.py` to refresh the website copy. Additional protocol and
+production details remain in the full documentation.

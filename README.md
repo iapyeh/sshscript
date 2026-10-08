@@ -2,8 +2,11 @@
 
 [![PyPI](https://img.shields.io/pypi/v/sshscript)](https://pypi.org/project/sshscript/)
 [![Python](https://img.shields.io/pypi/pyversions/sshscript)](https://pypi.org/project/sshscript/)
+[![PyPI](https://img.shields.io/pypi/v/sshscript)](https://pypi.org/project/sshscript/)
+[![Python](https://img.shields.io/pypi/pyversions/sshscript)](https://pypi.org/project/sshscript/)
 [![CI](https://github.com/iapyeh/sshscript/actions/workflows/ci.yml/badge.svg?branch=release)](https://github.com/iapyeh/sshscript/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml/badge.svg?branch=release)](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/iapyeh/sshscript/blob/release/LICENSE.txt)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/iapyeh/sshscript/blob/release/LICENSE.txt)
 
 SSHScript is a Python automation library for running commands locally and over
@@ -19,6 +22,25 @@ compact `.spy` automation files.
 [Changelog](https://github.com/iapyeh/sshscript/blob/release/CHANGELOG.md) ·
 [Security](https://github.com/iapyeh/sshscript/security/policy) ·
 [Support](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
+
+## Recommended API
+
+Start with [the canonical API guide](API_GUIDE.md): version-labelled examples,
+recommended argv/check/result patterns, lifetime rules, and compatibility forms.
+Its executable examples run in CI. The same guide is available in the
+[website documentation](https://iapyeh.github.io/sshscript/v3a/recommended-api/).
+
+The unreleased source also ships `py.typed` and public `.pyi` declarations for
+Session, results, jobs, console calls and package entry points. Legacy live
+buffers and backend-specific keyword options retain `Any`; this is targeted
+public typing, not a claim that every internal module is fully annotated.
+
+In unreleased source, `su()` and `sudo()` accept `enter_timeout=10` and return a
+console only after authenticated startup and a target-shell UID/PID handshake.
+Passwords are sent at most once; an unconfirmed recovery makes the channel
+unusable. Custom nested `command=` strings now require a bootstrap placeholder.
+See [authenticated console usage and migration](API_GUIDE.md#unreleased-authenticated-susudo-consoles)
+and [the cross-system test guide](unittest/README.console-authentication.md).
 
 ## Why SSHScript?
 
@@ -45,6 +67,10 @@ python3 -m pip install sshscript
 sshscript --version
 ```
 
+On Python versions below 3.11, SSHScript stops before loading its features.
+The CLI reports the detected version and interpreter path without a traceback;
+importing the Python API raises `ImportError` with the same diagnostic.
+
 For a production deployment that requires repeatable dependency resolution,
 pin SSHScript and all transitive dependencies in your application's lock file.
 To install this release explicitly:
@@ -60,16 +86,15 @@ it never installs an update by itself.
 ## 60-second local quickstart
 
 ```python
-import shlex
 import sys
 
 from sshscript import Session
 
-command = shlex.join([
+command = [
     sys.executable,
     "-c",
     "print('sshscript is ready')",
-])
+]
 
 with Session() as local:
     stdout, stderr, exitcode = local.exec_command(
@@ -126,9 +151,108 @@ Compatibility: the returned object is no longer a tuple of live output
 buffers. Unpack exactly three values: stdout, stderr, exitcode. Indexing and
 slicing use that same three-value order; old two-value unpacking must change.
 Use `session.stdout`/`session.stderr` for the existing buffer interface.
-Persistent shell and interactive console APIs retain their existing buffer
-and prompt semantics; this result/check contract applies to one-shot Session
-commands, including `$` commands outside persistent consoles.
+Unreleased persistent shell commands also return CommandResult snapshots.
+Interactive console APIs retain their existing buffer
+and prompt semantics. For completed commands inside or outside a shell, save
+the result and read its fields. For continuous output such as tcpdump, choose
+a bounded capture, a managed streaming job, or an interactive enter() scope;
+see [the execution and long-command guide](API_GUIDE.md#unreleased-command-results-and-long-running-programs).
+
+## Session settings (unreleased)
+
+```python
+session.set(check=True, verbose=False, log_level="DEBUG")
+print(session.get())          # Independent copy of effective settings.
+print(session.get("check"))   # True
+session.verbose = True       # Same validation as set(verbose=True).
+session(["false"], check=False)  # Explicit per-command override.
+```
+
+In `.spy`, use `$.set(...)` and `$.get(...)`. Settings are `check`, `verbose`,
+`verbose_stderr`, `log_level` (logging integer or level name), and `policy`
+(a Paramiko `MissingHostKeyPolicy` instance or subclass, or `None`). New root
+Sessions snapshot package/application defaults; CLI `-v`, `--stderr`, and
+`--debug` override defaults only in that execution context. Child Sessions
+snapshot their parent's current settings. Existing Sessions are independent.
+`set()` validates every key/value before applying changes; unknown keys fail.
+Properties and set/get use the same storage. Command options override settings;
+running jobs retain their startup policy. Shell commands inherit check and can
+override it per call; interactive prompt input is not an exit-status check.
+Session logging never changes the shared logger level; application handler
+filters/levels still apply. Verbose explicitly prints command output and may
+expose sensitive output. No console logging handler is installed by Session.
+
+Set `session.set(policy=paramiko.AutoAddPolicy())` or assign `session.policy`
+to choose the missing-host-key policy for future connections (import `paramiko`
+first). The default is `None`, retaining Paramiko's RejectPolicy. An explicit
+`connect(policy=...)` wins for that connection; `connect(policy=None)` uses
+default rejection. Children inherit the Session setting, even when a connection
+uses an override. Settings dictionaries are copied, but policy objects are
+shared; custom policies should support reuse. Existing connections keep their
+original policy.
+
+## Managed deadlines and long-running commands (unreleased)
+
+The source checkout adds a total deadline shared by local and SSH commands:
+
+```python
+result = session.exec_command(["uname", "-s"], command_timeout=30, check=True)
+```
+
+This opt-in path returns `JobResult` (a `CommandResult` subclass), retains at
+most 1 MiB of output per stream by default, and raises `CommandTimeoutError`
+with partial output on expiry. `command_timeout=None` selects managed execution
+without a deadline. Legacy `exec_command(timeout=...)` keeps its existing
+backend-specific behavior; do not combine the two parameters.
+
+Use `Session.start()` for a command that runs until its user stops it:
+
+```python
+from contextlib import closing
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.start(["tcpdump", "-l", "-n", "-i", "eth0"],
+                     timeout=None, stop_timeout=5, check=True) as capture:
+        try:
+            for chunk in capture.iter_stdout():
+                print(chunk, end="", flush=True)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            result = capture.stop()
+        print("\nTermination:", result.termination_status)
+```
+
+Choose an interface on your host and run under an account authorized to capture
+packets. `start(timeout=...)` always means a total command budget; `None` means
+no deadline. Local stop sends SIGINT to the owned process group, then escalates
+after `stop_timeout`. Remote stop can attempt Ctrl-C with `get_pty=True`, but
+closing an SSH channel alone does not prove termination: inspect
+`termination_status`. A job context and `Session.close()` clean up active jobs.
+Streaming yields chunks, with bounded buffering and explicit overflow errors.
+
+See [Timeouts, cancellation, tcpdump, and cleanup](https://iapyeh.github.io/sshscript/v3a/security-and-operations/timeouts-retries-and-cleanup/)
+for the timing contract, remote example, output limits, and migration details.
+These new APIs are not present in the published 3.1.5 package.
+
+## Session lifetime (unreleased close safeguards)
+
+Use console and remote Session contexts to manage their scoped resources.
+A local `with Session()` activates a reusable Session; leaving that block does
+not close it. Use `contextlib.closing(Session())` when the outer scope should
+also release the local Session, as shown in the canonical API guide.
+
+To permanently stop using a Session, leave its console contexts first, then
+call `close()` (or `close(strict=True)` to raise on cleanup failure). Closing a
+Session with an active shell/su/sudo/enter context on itself or a descendant
+raises `RuntimeError` before any cleanup or state change, even with
+`strict=False`. Return from a function or propagate an exception to leave a
+console early. Closing a child Session leaves its parent usable.
+
+After close, new work is rejected; repeated close calls retain the cleanup
+outcome. `closed=True` means the Session is disabled, while the close return
+value and `close_errors` report whether all cleanup succeeded.
 
 ## First secure SSH connection
 
@@ -216,19 +340,21 @@ files; `run_script(source)` also accepts Dollar syntax from an in-memory string.
 Both forms use the same session and transport implementation as the module API:
 
 ```python
-# health.spy
-$hostname
-if $.exitcode != 0:
-    raise RuntimeError("hostname failed")
-print($.stdout.strip())
+import paramiko
 
-with $.connect("ops@example.net"):
-    $uname -s
-    if $.exitcode != 0:
-        raise RuntimeError("remote uname failed")
+remote = session.connect(
+    "user@new-host.example",
+    policy=paramiko.AutoAddPolicy(),
+)
 ```
 
-Run exactly one file with:
+Do this only in a trusted bootstrap environment. Interactive SSH sessions do
+not forward the complete local process environment; only terminal/locale
+defaults and values explicitly supplied through `env={...}` are sent.
+
+## Tests
+
+The canonical credential-free release gate is:
 
 ```sh
 sshscript health.spy

@@ -36,6 +36,13 @@ and spy_imports() to temporarily enable Python imports of .spy modules.
 """
 
 if __package__:
+    from ._runtime import require_python as _require_python
+else:
+    from _runtime import require_python as _require_python
+
+_require_python()
+
+if __package__:
     from ._version import __version__
     from . import sshscript
     from . import session
@@ -53,6 +60,9 @@ check_file = sshscript.check_file
 run_script = sshscript.run_script
 Session = session.Session
 CommandResult = session.CommandResult
+CommandJob = session.CommandJob
+CommandTimeoutError = session.CommandTimeoutError
+JobResult = session.JobResult
 
 set_logger = errorutils.set_logger
 get_logger = errorutils.get_logger
@@ -79,6 +89,9 @@ __all__ = [
     'run_script',
     'Session',
     'CommandResult',
+    'CommandJob',
+    'CommandTimeoutError',
+    'JobResult',
     'get_logger',
     'set_logger',
     'spy_imports',

@@ -49,12 +49,16 @@ Security = "https://github.com/iapyeh/sshscript/security/policy"
 Support = "https://github.com/iapyeh/sshscript/discussions"
 
 [project.scripts]
-sshscript = "sshscript.sshscript:main"
+sshscript = "_sshscript_cli:main"
 
 [tool.setuptools]
 packages = ["sshscript"]
+py-modules = ["_sshscript_cli"]
 include-package-data = false
 package-dir = {"" = "src"}
 
 [tool.setuptools.dynamic]
 version = {attr = "sshscript._version.__version__"}
+
+[tool.setuptools.package-data]
+sshscript = ["py.typed", "*.pyi"]

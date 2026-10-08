@@ -3,9 +3,22 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from prepare_release import TESTS, validate_release_inputs
 
 root = Path(__file__).resolve().parents[1]
 source = root / 'src/sshscript' if (root / 'src/sshscript').is_dir() else root
+validate_release_inputs(root)
+if (root / '.git').exists():
+    prefix = source.relative_to(root)
+    tracked = subprocess.check_output(
+        ['git', 'ls-files', '-z', '--', str(prefix / 'unittest'),
+         str(prefix / 'unittest-v3')], cwd=root,
+    ).decode().split('\0')
+    allowed = {str(prefix / 'unittest' / name) for name in TESTS}
+    unexpected = sorted(path for path in tracked if path and path not in allowed)
+    if unexpected:
+        raise SystemExit('Private or unapproved test files are tracked:\n' +
+                         '\n'.join(unexpected))
 env = os.environ.copy()
 env['PATH'] = str(Path(sys.executable).parent) + os.pathsep + env.get('PATH', '')
 commands = [

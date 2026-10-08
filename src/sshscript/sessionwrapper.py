@@ -16,22 +16,31 @@
 
 """Public console operations over a channel shared by shell and interactive contexts."""
 
+import subprocess
+import re
+import time
+
 if __package__:
+    from .sessionsettings import UNSET
     from . import patching
+    from .commandresult import CommandResult
 else:
+    from sessionsettings import UNSET
     import patching
+    from commandresult import CommandResult
 
 if __package__:
     from .errorutils import  command_is_shell
-    from .channelutils import SuConsole, SudoConsole,ShellConsole,EnterConsole 
+    from .channelutils import SuConsole, SudoConsole,ShellConsole,EnterConsole, _AuthCommand
 else:
     from errorutils import  command_is_shell
-    from channelutils import SuConsole, SudoConsole,ShellConsole,EnterConsole
+    from channelutils import SuConsole, SudoConsole,ShellConsole,EnterConsole, _AuthCommand
 
 class SessionWrapper(object):
     """Operate the current console returned by shell(), su(), sudo(), or enter().
 
-    In a shell, console(command) waits for completion and returns (stdout, stderr).
+    In a shell, console(command) waits for completion and returns a CommandResult.
+    Its text snapshots unpack as stdout, stderr, exitcode.
     In an enter() context, the same call sends input and waits for the program's
     prompt or exit. send() writes raw input; expect() matches buffered output.
 
@@ -108,14 +117,49 @@ class SessionWrapper(object):
         #result.result()
         return result
 
-    def send_line(self,s,**expections):
-        """Execute a shell command and return (stdout, stderr); also console(command).
+    def set(self, **settings):
+        """Configure the owning Session, including from $.set inside a shell."""
+        self.channel.owner.session.set(**settings)
 
+    def get(self, name=None):
+        return self.channel.owner.session.get(name)
+
+    def send_line(self,s,*,check=UNSET,**expections):
+        """Execute a shell command and return CommandResult; also console(command).
+
+        check inherits the Session policy unless explicitly supplied.
         command_timeout bounds command completion (default 60 seconds). Other keyword
         names are expected patterns and their values are reply strings.
         In an enter() context this delegates to input() and returns its status.
         """
-        return self.channel.send_line(s,**expections)
+        session = self.channel.owner.session
+        enabled = session.check if check is UNSET else check
+        if not isinstance(enabled, bool):
+            raise TypeError('check must be bool')
+        # Interactive input is not a command exit-status boundary.
+        if self.channel.hijacked:
+            return self.channel.send_line(s, **expections)
+        settings = session.get()
+        self.channel.dump2sys = (int(settings['verbose']), int(settings['verbose'] or settings['verbose_stderr']))
+        self.channel.logger.settings = settings
+        host = session.host
+        started = time.monotonic()
+        stdout, stderr = self.channel.send_line(s, **expections)
+        # Snapshot before status probing can consume/replace the console buffers.
+        stdout_text, stderr_text = str(stdout), str(stderr)
+        status = self.channel.exitcode
+        if not self.channel.prompt:
+            # Pipe consoles retain the internal status marker in their live buffer.
+            stdout_text = re.sub(r'_TT' + re.escape(str(status)) + r'_\r?\n?$',
+                                 '', stdout_text)
+        result = CommandResult(stdout_text, stderr_text, status, host,
+                               time.monotonic() - started, s)
+        if enabled and result.exitcode != 0:
+            error = subprocess.CalledProcessError(result.exitcode, s,
+                                                 output=result.stdout, stderr=result.stderr)
+            error.result = result
+            raise error
+        return result
     ## alias for sendline
     __call__ = send_line
     exec_command = send_line
@@ -165,11 +209,13 @@ class SessionWrapper(object):
             kw[key] = value
         self.channel.channel.update_environment(kw)
 
-    def su(self,username,password=None,expect=None,initials=None,command=None,login=True,shell=None,get_pty=None):
+    def su(self,username,password=None,expect=None,initials=None,command=None,login=True,shell=None,get_pty=None,enter_timeout=10,*,_auth_token=None):
         """Enter a nested su console on the existing channel; see Session.su().
 
         initials contains setup commands. shell/get_pty are compatibility placeholders;
-        they do not replace or reconfigure the existing channel.
+        they do not replace or reconfigure the existing channel. enter_timeout
+        bounds entry (default 10 seconds). Custom command templates must contain
+        {auth_command} (argv) or {auth_command_quoted} (one shell argument).
         """
         if get_pty is not None and not isinstance(get_pty, bool):
             raise TypeError('get_pty must be None or bool')
@@ -178,17 +224,22 @@ class SessionWrapper(object):
                 raise TypeError('command must be str, False, or None')
             if '\n' in command or '\r' in command:
                 raise ValueError('persistent command must be a single line')
+            token = getattr(command, 'auth_token', None)
             command = command.strip()
+            if token:
+                command = _AuthCommand(command, token)
             if not command:
                 raise ValueError('command must not be empty')
         ## when localhost is ubuntu, pty is required for su to send password
-        return SuConsole(self,username,password,expect=expect,initials=initials,command=command,login=login)
+        return SuConsole(self,username,password,expect=expect,initials=initials,command=command,login=login,enter_timeout=enter_timeout,_auth_token=_auth_token)
     #sudo(self,password=None,expect=None,initials=None,shell:bool=True,login=True,username=None,get_pty=True):
-    def sudo(self,password,username=None,expect=None,initials=None,command=None,login=True,shell=None,get_pty=None):
+    def sudo(self,password=None,username=None,expect=None,initials=None,command=None,login=True,shell=None,get_pty=None,enter_timeout=10,*,_auth_token=None):
         """Enter a nested sudo console on the existing channel; see Session.sudo().
 
         initials contains setup commands. shell/get_pty are compatibility placeholders;
         SFTP operations retain the SSH connection account's permissions.
+        enter_timeout bounds entry (default 10 seconds). Custom command templates
+        must contain {auth_command} or {auth_command_quoted}; see API_GUIDE.md.
         """
         if get_pty is not None and not isinstance(get_pty, bool):
             raise TypeError('get_pty must be None or bool')
@@ -197,10 +248,13 @@ class SessionWrapper(object):
                 raise TypeError('command must be str, False, or None')
             if '\n' in command or '\r' in command:
                 raise ValueError('persistent command must be a single line')
+            token = getattr(command, 'auth_token', None)
             command = command.strip()
+            if token:
+                command = _AuthCommand(command, token)
             if not command:
                 raise ValueError('command must not be empty')
-        return SudoConsole(self,password,username=username,expect=expect,initials=initials,command=command,login=login)
+        return SudoConsole(self,password,username=username,expect=expect,initials=initials,command=command,login=login,enter_timeout=enter_timeout,_auth_token=_auth_token)
 
     def enter(self,command,expect=None,password=None,exit=None,shell=None,get_pty=None,prompt=None):
         """Enter an interactive program on this channel; see Session.enter().

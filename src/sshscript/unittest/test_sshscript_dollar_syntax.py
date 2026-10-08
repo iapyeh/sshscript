@@ -15,6 +15,17 @@ SUCCESS_MARKER = "All 9 credential-free dollar syntax tests passed."
 
 
 class DollarSyntaxTests(unittest.TestCase):
+    def test_full_language_suite_local_environment(self):
+        completed = subprocess.run(
+            [sys.executable, str(RUNNER), str(SOURCE_ROOT / "unittest" / "language_fixture.spy")],
+            cwd=SOURCE_ROOT, capture_output=True, text=True, timeout=60,
+        )
+        diagnostic = completed.stdout + completed.stderr
+        self.assertEqual(completed.returncode, 0, diagnostic)
+        self.assertIn("All 13 SSHScript language tests passed on local.",
+                      completed.stdout, diagnostic)
+        self.assertEqual(completed.stdout.count("PASS: local:"), 13, diagnostic)
+
     def test_dollar_syntax_suite_uses_only_localhost(self):
         with tempfile.TemporaryDirectory(
             prefix="sshscript-empty-home-"

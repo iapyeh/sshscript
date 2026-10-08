@@ -1,9 +1,12 @@
 """Immutable snapshots of completed commands."""
 from dataclasses import dataclass
+from typing import Generic, TypeVar
+
+_Status = TypeVar("_Status", bound=int | None)
 
 
 @dataclass(frozen=True)
-class CommandResult:
+class CommandResult(Generic[_Status]):
     """One completed command, with text output and elapsed monotonic seconds.
 
     Three-value unpacking/indexing yields ``stdout, stderr, exitcode``.
@@ -13,7 +16,7 @@ class CommandResult:
 
     stdout: str
     stderr: str
-    exitcode: int
+    exitcode: _Status
     host: str | None
     duration: float
     command: str | tuple[str, ...]

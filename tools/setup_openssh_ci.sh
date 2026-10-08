@@ -93,6 +93,8 @@ sudo install -m 600 -o "${LOGIN_USER}" -g "${LOGIN_GROUP}" \
 {
     printf 'Defaults:%s timestamp_timeout=0\n' "${LOGIN_USER}"
     printf '%s ALL=(ALL:ALL) ALL\n' "${LOGIN_USER}"
+    printf '%s ALL=(root) !/usr/bin/false\n' "${LOGIN_USER}"
+    printf '%s ALL=(%s) NOPASSWD: ALL\n' "${LOGIN_USER}" "${TARGET_USER}"
 } | sudo tee "${SUDOERS_FILE}" >/dev/null
 sudo chmod 440 "${SUDOERS_FILE}"
 sudo "${VISUDO_BIN}" -cf "${SUDOERS_FILE}" >/dev/null
@@ -166,6 +168,7 @@ if [[ ! -s "${SSHD_PID_FILE}" ]]; then
 fi
 
 touch "${ENV_FILE}"
+chmod 600 "${ENV_FILE}"
 append_env() {
     printf '%s=%s\n' "$1" "$2" >>"${ENV_FILE}"
 }

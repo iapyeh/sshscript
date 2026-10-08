@@ -229,7 +229,19 @@ class DollarChanger(ast.NodeTransformer):
                     or \
                     (isinstance(nodeitem.context_expr.func.value, ast.Subscript) and  isinstance(nodeitem.context_expr.func.value.value,ast.Name) and nodeitem.context_expr.func.value.value.id == '_sshscriptstack_')
                 ):
-                if nodeitem.context_expr.func.attr in ('connect','open'):
+                if nodeitem.context_expr.func.attr == 'start':
+                    # A managed job owns a command, not a new Session/console.
+                    # Keep dollar commands in its body on the current Session.
+                    nodeitem.managed_job = True
+                    if self.currentConsole:
+                        nodeitem.context_expr.func.value = ast.copy_location(
+                            ast.Name(id=self.currentConsole[-1], ctx=ast.Load()),
+                            nodeitem.context_expr.func.value,
+                        )
+                    else:
+                        nodeitem.context_expr.func.value = self._template(
+                            self.tmplLineForSSHScriptInstance.value, nodeitem.context_expr)
+                elif nodeitem.context_expr.func.attr in ('connect','open'):
                     ## self.tmplLineForSSHScriptInstance is an ast.Expr, so we need to take .value
                     if len(self.currentConsole):
                         nodeitem.context_expr.func.value.id = self.currentConsole[-1]
@@ -504,7 +516,7 @@ class DollarChanger(ast.NodeTransformer):
                     newnode.args = node.args[:]
                     newnode.keywords = node.keywords[:]
         elif isinstance(node, ast.withitem):
-            self.insideWithitem = True
+            self.insideWithitem = not getattr(node, 'managed_job', False)
         elif isinstance(node,ast.Name) and node.id in ('_sshscript_in_context_', '_sshscriptstack_'):
             self.containsSSHScriptStack[-1] = True
         

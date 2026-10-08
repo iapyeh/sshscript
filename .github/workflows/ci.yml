@@ -19,15 +19,31 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install test and build dependencies
-        run: python -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine
+        run: python -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine 'mypy==2.3.1'
       - name: Test source
         run: python tools/run_checks.py
+      - name: Check public type contracts
+        run: python tools/check_public_types.py
       - name: Build and verify installed release
         run: python tools/check_release.py --output '${{ runner.temp }}/verified-artifacts'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: sshscript-${{ matrix.os }}-${{ matrix.python-version }}
           path: ${{ runner.temp }}/verified-artifacts/
+
+  baseline-examples:
+    name: Published 3.1.5 examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.11'
+      - run: python -m pip install 'sshscript==3.1.5'
+      - run: python -I tools/check_baseline_examples.py
 
   openssh-integration:
     name: OpenSSH integration (Python ${{ matrix.python-version }})
@@ -55,9 +71,20 @@ jobs:
       - name: Test installed wheel against OpenSSH
         run: |
           mkdir -p "$RUNNER_TEMP/openssh-tests"
-          cp src/sshscript/unittest/test_openssh_integration.py "$RUNNER_TEMP/openssh-tests/"
+          TEST_SOURCE=unittest/test_openssh_integration.py
+          if [[ -d src/sshscript ]]; then TEST_SOURCE=src/sshscript/unittest/test_openssh_integration.py; fi
+          cp "$TEST_SOURCE" "$RUNNER_TEMP/openssh-tests/"
           cd "$RUNNER_TEMP/openssh-tests"
           python -I test_openssh_integration.py -v
+      - name: Verify native su/sudo contracts on local and SSH backends
+        run: python tools/run_native_auth_ci.py --wheel "$RUNNER_TEMP"/verified-artifacts/*.whl --report "$RUNNER_TEMP/native-auth-report.json"
+      - name: Save native authentication evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-auth-python-${{ matrix.python-version }}
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/native-auth-report.json
       - name: Upload OpenSSH server log
         if: ${{ failure() && env.SSHSCRIPT_OPENSSH_LOG != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

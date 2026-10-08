@@ -36,7 +36,8 @@ class ParamikoChannel(object):
     def __init__(self,sshchannel,get_pty,channel=None):
         if not isinstance(sshchannel, SSHChannel):
             raise TypeError('sshchannel must be SSHChannel')
-        self.sshchannel = sshchannel 
+        self.sshchannel = sshchannel
+        self.logger = sshchannel.logger
         self.get_pty = get_pty
         self.suspending = False
         if channel is None:
@@ -78,7 +79,7 @@ class ParamikoChannel(object):
         
         ## two-dollars has no self.command
         if self.sshchannel.owner.command:
-            logger.debug(
+            self.logger.debug(
                 '[SSHChannel] Executing remote command (host=%s, pty=%s)',
                 self.sshchannel.owner.session.host,
                 self.get_pty,
@@ -118,7 +119,7 @@ class ParamikoChannel(object):
                         except (SSHException,ValueError):
                             if self.channel.closed or self.channel.exit_status_ready():
                                 break
-                            logger.exception(
+                            self.logger.exception(
                                 '[SSHChannel] SSH channel read failed (host=%s)',
                                 self.sshchannel.owner.session.host,
                             )
@@ -126,7 +127,7 @@ class ParamikoChannel(object):
                     await asyncio.sleep(0.1)
             except OSError as e:
                 if e.errno != errno.EIO and not self.channel.closed:
-                    logger.exception(
+                    self.logger.exception(
                         '[SSHChannel] SSH channel reader failed (host=%s)',
                         self.sshchannel.owner.session.host,
                     )
@@ -166,7 +167,7 @@ class ParamikoChannel(object):
         command result is kept separately from the SSH channel exit status.
         """
         host = self.sshchannel.owner.session.host
-        logger.debug('[SSHChannel] Closing SSH channel (host=%s)', host)
+        self.logger.debug('[SSHChannel] Closing SSH channel (host=%s)', host)
         ## automatically send exit to shell
         try:
             if not self.channel.exit_status_ready():
@@ -176,7 +177,7 @@ class ParamikoChannel(object):
             deadline = time.monotonic() + timeout_seconds
             while True:
                 if time.monotonic() > deadline:
-                    logger.warning(
+                    self.logger.warning(
                         '[SSHChannel] Exit status was not received before close timeout; '
                         'forcing channel close (host=%s, timeout=%ss)',
                         host,
@@ -191,7 +192,7 @@ class ParamikoChannel(object):
                 else:
                     time.sleep(0.1)
         except (SSHException, OSError):
-            logger.exception('[SSHChannel] Failed to close SSH channel (host=%s)', host)
+            self.logger.exception('[SSHChannel] Failed to close SSH channel (host=%s)', host)
             raise
         finally:
             self.channel.close()
