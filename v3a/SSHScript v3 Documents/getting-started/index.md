@@ -14,10 +14,10 @@ that local execution works, and then prepare for SSH automation.
 
 | Page | Status |
 | --- | --- |
-| [Installation and Verification](installation-and-verification/) | Complete — verified with 3.1.4 |
+| [Installation and Verification](installation-and-verification/) | Baseline: 3.1.5 |
 | [5-Minute Quickstart](quickstart/) | Complete |
 | [Your First SSH Connection](first-ssh-connection/) | Complete |
 | [Module API or Dollar Syntax?](module-api-or-dollar-syntax/) | Complete |
 | [Installation Troubleshooting]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/troubleshooting-installation/) | Available |
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-10-01 09:17:34

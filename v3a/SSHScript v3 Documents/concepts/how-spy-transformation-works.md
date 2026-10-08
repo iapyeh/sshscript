@@ -8,8 +8,10 @@ permalink: /v3a/concepts/how-spy-transformation-works/
 
 # How .spy Transformation Works
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 SSHScript does not teach Python's parser to understand `$command` directly. It
 converts Dollar syntax into a Python abstract syntax tree, compiles that tree
@@ -62,7 +64,7 @@ The filename extension alone therefore does not force transformation through
 
 The explicit `.spy` importer behaves differently: a discovered `module.spy` or
 `package/__init__.spy` is compiled through the `.spy` pipeline. These are
-current v3.1.4 selection rules, not a recommended business-logic test.
+v3.1 selection rules, not a recommended business-logic test.
 
 ## Conceptual lowering
 
@@ -240,4 +242,4 @@ closes afterward.
 Continue with the [Dollar Syntax Tutorial](../../tutorials/dollar-syntax/) or
 the [Session Lifecycle](../session-lifecycle/) concept.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

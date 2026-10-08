@@ -12,6 +12,48 @@ for REPLs, database clients, password-driven commands, and long-running
 programs that receive input after they start. It works locally, over SSH, and
 inside `su()` or `sudo()` contexts.
 
+## Choosing live interaction or a completed result
+
+Completed shell commands return immutable CommandResult snapshots in 4.0
+source, matching single-dollar execution. A synchronous `$tcpdump ...` assignment
+waits for completion; three-value unpacking does not provide a running stream.
+The enter()/expect()/send()/live-buffer examples below retain their existing
+interaction semantics, including the published 3.1.5 API.
+
+For a separate continuous process, prefer the 4.0 managed job API with
+streaming output, explicit stop and a finite fallback deadline for unattended
+agents. Use enter() when the current shell or privilege context is needed.
+Ctrl-C is a stop request, not proof of remote process termination. See the
+[canonical execution and long-program guide]({{ site.baseurl }}/v3a/recommended-api/#unreleased-command-results-and-long-running-programs)
+for bounded captures, output conditions, cleanup and termination reporting.
+
+## Stdin, commands, and replies
+
+In 4.0 source, one-shot `exec_command(input=data)` and `start(input=data)`
+send exact stdin: strings use UTF-8, bytes are unchanged, and no newline is added.
+Include `"\n"` yourself for line-oriented stdin. This fixes the legacy SSH-only
+newline addition in published 3.1.5; stdin callers relying on it must migrate.
+A terminal password reader may ignore stdin; use an appropriate PTY conversation.
+
+| Intent | API | Meaning |
+| --- | --- | --- |
+| Execute a shell command | `shell(command)` / `shell.exec_command(command)` | Submit it and wait for its result |
+| Answer a program | `program.input(answer)` inside `enter()` | Append one newline and wait for readiness, exit, or silence |
+| Send exact text | `program.send(data)` | No added newline; only wait for the write |
+
+`input("answer\n")` sends `"answer\n\n"`; existing newlines are never stripped.
+`input("")` presses Enter. `send("answer\n")` sends that exact line, then use
+`expect()` to observe subsequent output. Readiness or silence is not proof of
+successful authentication or a successful command.
+
+In `with $.shell()`, use `$command` to execute shell commands. Enter a program
+with `with $.enter(...)`, then explicitly call `$.input()`, `$.send()`, and
+`$.expect()` for its questions. `$...`, console calls, and `send_line()` within
+enter() remain compatibility forms for interactive input. In a shell,
+`send_line()` remains a command-execution alias, not a raw line-write helper.
+See the [canonical input contract]({{ site.baseurl }}/v3a/recommended-api/#unreleased-exact-stdin-and-explicit-interactive-replies)
+for migration and a nested-shell template.
+
 ## Enter an interactive program
 
 ```python
@@ -194,4 +236,4 @@ with $.enter("python3", prompt=">>>", exit="quit()"):
 The shorthand `$print(2 + 3)` also sends a line while `$.enter()` is active.
 Use `$.input()` when explicit interaction is easier to maintain.
 
-Last Updated: 2026-09-18 15:58:44
+Last Updated: 2026-10-08 23:46:37

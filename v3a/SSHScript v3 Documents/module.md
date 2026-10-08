@@ -7,8 +7,10 @@ nav_order: 1
 
 # Running Commands and Shell Pipelines
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 Use the regular Python `Session` API to run one-shot commands with preserved
 argument boundaries or through an explicitly selected shell. This is
@@ -101,6 +103,25 @@ exit code are independent snapshots. Keep the result object to also retain
 `check=True` raises `subprocess.CalledProcessError` on nonzero status locally
 and remotely, after saving `session.last_result` and `exception.result`.
 
+<a id="session-host-key-policy-unreleased-source-api"></a>
+
+## Session host-key policy (4.0 source API)
+
+In the development source, `session.set(policy=paramiko.AutoAddPolicy())`
+configures future SSH connections; import `paramiko` first. The equivalent
+property is `session.policy`, and `session.get("policy")` reads the setting.
+Omitted `connect(policy=...)` uses that setting; an explicit policy overrides
+it for one connection, and explicit `None` uses default RejectPolicy.
+
+Child Sessions inherit the parent's settings even when a connection uses an
+override. Existing connections are not reconfigured. Policy instances are
+shared across inherited settings, so custom policies must support reuse.
+The default remains `None`; AutoAddPolicy accepts unknown host keys and should
+be confined to verified bootstrap environments. Published 3.1.5 still requires
+per-connection policy arguments. See
+[Connections, Authentication, and Bastions](../Basic/connect/#default-host-key-policy-unreleased-source-api)
+for a complete example.
+
 ## Remote Sessions
 
 `connect()` returns a child Session. The same `exec_command()` API then runs
@@ -177,4 +198,4 @@ timeout, and transport failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

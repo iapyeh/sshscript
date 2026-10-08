@@ -8,15 +8,21 @@ permalink: /v3a/migration-and-releases/migrating-to-v3-1/
 
 # Migrating to v3.1
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+For the 3.1.5-to-4.0.1 upgrade, use
+[Version policy and 4.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+This page retains the v3.1 migration baseline.
+
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 This guide updates v3.0 and earlier code to the supported v3.1 contract. Make the
 changes in a branch, run credential-free tests first, and validate SSH and
 privileged workflows only against isolated test systems.
 
 Before migrating, read [Installation and Verification](../../getting-started/installation-and-verification/).
-Version 3.1.4 is the current Production/Stable release on PyPI.
+The recommended command API examples use the published 3.1.5 baseline.
 
 ## Migration checklist
 
@@ -55,7 +61,11 @@ duration, and command.
 Both local and remote one-shot commands accept check=True. CalledProcessError
 now contains text output, a normalized string/argv tuple in cmd, and the full
 snapshot in result. Earlier local exceptions carried raw subprocess bytes/argv.
-Persistent consoles retain their two-buffer/prompt contract.
+Published 3.1.5 persistent consoles retain two-buffer command returns. In
+4.0 source, completed shell/su/sudo commands now return CommandResult: use
+`result = console(command)` or three-value unpacking. Live console properties
+and enter() input/prompt behavior remain available. See the
+[command and long-program guide]({{ site.baseurl }}/v3a/recommended-api/#unreleased-command-results-and-long-running-programs).
 
 Local connect() now reads ~/.ssh/config; explicit API arguments win. Use
 ssh_config=False to retain configuration-independent connections. A nested
@@ -333,4 +343,27 @@ timeout, and transport failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-26 16:11:31
+<a id="authenticated-susudo-consoles-unreleased-source"></a>
+
+## Authenticated su/sudo consoles (4.0 source)
+
+The published 3.1.5 package does not include this entry protocol. When adopting
+4.0 source, `su()` and `sudo()` wait for an authenticated target command
+and a UID/PID readiness handshake instead of inferring success from silence.
+The default `enter_timeout=10` bounds entry; tune it for your host's PAM and
+shell startup. The password is sent at most once, and retries require a new
+context. After entry failure, reuse the parent only when recovery was confirmed;
+an unconfirmed channel refuses further commands.
+
+Custom nested `command=` templates must include `{auth_command}` for ordinary
+command argv or `{auth_command_quoted}` for a single shell argument. Do not add
+quotes around these placeholders. For example, use
+`command="sudo -k -S {auth_command}"`, or
+`command="su - alice -c {auth_command_quoted}"` with `username="alice"`.
+Templates without a placeholder raise `ValueError` before sending input.
+Application-specific interactive conversations can use `Session.enter()`;
+that API does not provide the authenticated su/sudo handshake.
+
+See [the API contract and platform notes]({{ site.baseurl }}/v3a/reference/session-and-console-api/#authenticated-susudo-entry-unreleased).
+
+Last Updated: 2026-10-08 23:48:09

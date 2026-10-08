@@ -8,13 +8,71 @@ permalink: /v3a/reference/session-and-console-api/
 
 # Session and Console API Reference
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The base command API is available in 3.1.5.
+> Session settings, managed deadlines, and jobs below are features available in 4.0.1.
 
 This page defines the supported core Session and Console API for the SSHScript
-v3.1 Production/Stable line, verified with 3.1.4. Examples that teach a
+v3.1 line, including the explicitly marked 4.0 managed-command API. Examples that teach a
 workflow belong in the tutorials and how-to guides; this page focuses on
 signatures, results, errors, and lifetime rules.
+
+<a id="session-settings-unreleased-source-api"></a>
+
+## Session settings (4.0 source API)
+
+`session.set(check=..., verbose=..., verbose_stderr=..., log_level=...,
+policy=...)` validates all supplied settings before applying changes.
+`session.get()` returns a copy of the settings dictionary; `session.get(name)`
+reads one setting. Matching properties use the same storage. Unknown setting
+names raise `ValueError`; invalid policy values raise `TypeError`.
+
+| Setting | Accepted values | Default |
+| --- | --- | --- |
+| `check` | bool | `False` |
+| `verbose` | bool | application/environment default |
+| `verbose_stderr` | bool | application/environment default |
+| `log_level` | logging integer or level name | application logger level |
+| `policy` | Paramiko `MissingHostKeyPolicy` instance, subclass, or `None` | `None` (RejectPolicy) |
+
+```python
+import paramiko
+from sshscript import Session
+
+session = Session()
+try:
+    session.set(policy=paramiko.AutoAddPolicy())
+    assert session.get("policy") is session.policy
+    session.policy = None
+finally:
+    session.close()
+```
+
+Child Sessions copy the parent's settings at creation. A policy object itself
+is shared, so custom policies with mutable state must account for reuse.
+Changes affect future connections only. These settings are not in published
+3.1.5; see the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/).
+
+<a id="managed-commands-unreleased-source-api"></a>
+
+## Managed commands (4.0 source API)
+
+`Session.start(cmd, *, shell=None, shell_executable=None, timeout=None,
+stop_timeout=3, capture_limit=1048576, check=False, input=None, env=None,
+get_pty=False)` returns a `CommandJob` with `wait()`, `stop()`, `iter_stdout()`,
+`done`, and a context manager. Timeout is a total local/SSH command budget;
+None means no execution deadline. Local get_pty=True is unsupported.
+
+`exec_command(..., command_timeout=...)` opts into the same managed execution;
+legacy timeout remains unchanged and cannot be combined with command_timeout.
+Managed calls return `JobResult`, a CommandResult subclass with stop_reason,
+termination_status and stdout/stderr truncation flags. Missing status is None.
+Deadline expiry raises `CommandTimeoutError` with a partial result and text
+output, even when check=False. start() does not alter Session.last_result.
+
+These APIs are not in published 3.1.5. The legacy result/buffer rules below
+apply when command_timeout is omitted. See the
+[timeout and cancellation guide]({{ site.baseurl }}/v3a/security-and-operations/timeouts-retries-and-cleanup/)
+for bounded output, cleanup guarantees, and a remote tcpdump/Ctrl-C example.
 
 ## Package-level entry points
 
@@ -122,10 +180,8 @@ Supplying both a string-valued `shell` and `shell_executable` raises
 Pass dynamic argument lists directly, or retain `shlex.join()` with `shell=False`:
 
 ```python
-import shlex
-
-command = shlex.join(["printf", "%s\\n", "hello world"])
-stdout, stderr, exitcode = session.exec_command(command, shell=False)
+result = session.exec_command(["printf", "%s\\n", "hello world"], check=True)
+stdout, stderr, exitcode = result
 ```
 
 The local and remote implementations therefore preserve the same argument
@@ -179,12 +235,17 @@ session.connect(
     username=None,
     password=None,
     port=None,
-    policy=None,
+    policy=...,  # 4.0: omitted argument uses the Session setting.
     *,
     ssh_config=None,
     **connect_options,
 ) -> Session
 ```
+
+In published 3.1.5, the signature uses `policy=None`. In the development source,
+an omitted policy uses `session.policy`; explicit `None` selects default
+RejectPolicy. A supplied policy overrides only this connection, without
+changing inherited child settings. The omitted value is an internal sentinel.
 
 Returns a connected child Session. `host` may be a hostname or the shorthand
 `"user@host"`. Remaining supported options are passed to
@@ -264,6 +325,43 @@ current directory. An existing local directory receives the remote basename.
 SFTP always uses the account that opened the SSH connection. Entering
 `sudo()` or `su()` changes command identity, not SFTP identity.
 
+<a id="unreleased-completed-console-command-results"></a>
+
+## 4.0: completed console command results
+
+`shell(command)`, `shell.exec_command(command)`, and their su/sudo equivalents
+return immutable `CommandResult` snapshots with three-value unpacking. Commands
+remain strings. Save the result; `check=True` failures carry `.result`.
+`console.stdout`/`stderr` remain live buffers, and `console.exitcode` is latest
+status. This changes published 3.1.5 two-value console unpacking. Inside enter(),
+console calls send input and retain readiness-status returns instead.
+For continuous programs choose a managed job or an enter()/expect() scope with
+an explicit stop condition; see the
+[canonical guide]({{ site.baseurl }}/v3a/recommended-api/#unreleased-command-results-and-long-running-programs).
+
+<a id="unreleased-console-foreground-jobs"></a>
+
+## 4.0: console foreground jobs
+
+```python
+console.start(command, *, timeout=60, stop_timeout=3,
+              capture_limit=1024 * 1024, check=...) -> CommandJob
+```
+
+Available in Bash shell/sudo/su contexts, including `$.start()` in `.spy`.
+Accepts one command string and preserves console cwd/environment/identity.
+check inherits Session policy. timeout is a total budget; None explicitly disables
+it. Only one foreground job may occupy a channel; other console operations and
+cross-thread operations are rejected. Use job.iter_stdout(), wait() and stop().
+No start() inside enter(). Completed synchronous console calls remain unchanged.
+
+Completion and PTY Ctrl-C recovery verify the original UID and shell PID. Pipe
+cancellation cannot safely interrupt and disables the console. Unconfirmed
+recovery raises with partial `.result`; a deadline raises CommandTimeoutError.
+PTY streams may merge and output capture is bounded. Change identity with nested
+su/sudo before starting; detached jobs and raw privilege shells are unsupported.
+See the [full contract and runnable examples]({{ site.baseurl }}/v3a/recommended-api/#unreleased-foreground-jobs-inside-shell-sudo-and-su).
+
 ## Persistent and interactive contexts
 
 The following methods return context managers. Entering one yields a console.
@@ -273,7 +371,10 @@ session.shell(command=None, *, get_pty=True)
 ```
 
 Starts a persistent shell, `bash -i` by default. Commands share working
-directory, environment, and other shell state.
+directory, environment, and other shell state. The whole block scopes the
+shell's lifetime; it does not return an aggregate CommandResult or check every
+command's status. Successful scope exit or a final zero exit status does not
+prove all commands succeeded. Check required commands individually.
 
 ```python
 session.su(
@@ -284,6 +385,7 @@ session.su(
     shell=True,
     login=True,
     get_pty=True,
+    enter_timeout=10,  # 4.0 source API.
 )
 
 session.sudo(
@@ -294,13 +396,145 @@ session.sudo(
     shell=True,
     login=True,
     get_pty=True,
+    enter_timeout=10,  # 4.0 source API.
 )
 ```
 
-These open bounded identity-changing consoles. `initials` may be one command
-or an iterable of setup commands. `PermissionError` is raised when expected
-authentication prompts cannot be handled. The host's PAM and `sudoers`
-policies remain authoritative.
+These open identity-changing consoles. `initials` may be one command or an
+iterable of setup commands. The host's PAM and `sudoers` policies remain
+authoritative. `enter_timeout` and the authenticated entry contract below are
+**features available in 4.0.1**, unavailable in the published 3.1.5 package.
+
+<a id="authenticated-susudo-entry-unreleased"></a>
+
+### Authenticated su/sudo entry (4.0)
+
+`Session.su()`, `Session.sudo()`, and their nested console equivalents accept
+`enter_timeout=10` (positive finite seconds). The deadline covers entry's lock
+acquisition, password conversation, target-shell readiness, and `initials`.
+It begins in `__enter__`; creating a base shell or probing `console_info` in the
+factory is outside that deadline. Success returns immediately, without a fixed
+password-verification delay. On context exit, the same duration bounds waiting
+for the target shell to return to its parent.
+
+The requested command emits a fresh authentication marker only after su/sudo
+has started it as the target account. It checks effective UID against `id -u
+USERNAME`; a second handshake checks that UID and shell PID survived shell
+startup. PTY contexts also wait for their own unique prompt. Output silence,
+a missing error message, and a missing password prompt are never success
+criteria. Passwordless entry is supported, including when a password was
+provided but never requested. The supplied password is sent at most once.
+Each authenticated console context is single-use; create a new context for an
+explicit retry.
+Default prompt matching covers standard English password prompts; `expect=`
+remains available for other authentication prompt formats.
+
+#### Interactive usage
+
+These transcripts require a real local account and its authentication policy;
+they are manual examples, separate from credential-free CI coverage.
+Read passwords with `getpass` rather than storing them in the script. The new
+behavior requires 4.0.1 and does not apply to the installed 3.1.5 release.
+
+Open a root console through sudo and allow up to 15 seconds for entry:
+
+```pycon
+>>> from contextlib import closing
+>>> from getpass import getpass
+>>> from sshscript import Session
+>>> with closing(Session()) as local:
+...     with local.sudo(password=getpass("sudo password: "), enter_timeout=15) as root:
+...         stdout, stderr, exitcode = root("id -u")
+...         print(str(stdout).strip())
+0
+```
+
+Enter an existing account named `alice` from a persistent shell. Replace the
+account name with your intended target; su normally asks for the target
+account's password, whereas sudo's password choice is determined by sudo policy.
+
+```pycon
+>>> with closing(Session()) as local:
+...     with local.shell() as shell:
+...         with shell.su("alice", password=getpass("su password: "), enter_timeout=15) as user:
+...             stdout, stderr, exitcode = user("id -u")
+...             print(str(stdout).strip())
+```
+
+For a configured passwordless sudo policy, use `local.sudo(password=None,
+enter_timeout=15)`. If a password is actually requested, entry raises
+`PermissionError` before the block body runs. Both factories also accept
+`shell=False` to start su/sudo directly, `get_pty=False` to use pipes, and
+`login=False` to omit login mode. Host policy and the installed utility may
+reject these combinations. Nested console `shell`/`get_pty` arguments remain
+compatibility placeholders; they do not reconfigure an existing channel.
+
+#### Failure handling
+
+Explicit authentication rejection or a second password request raises
+`PermissionError`; an early command exit or identity mismatch raises
+`RuntimeError`. An unresolved deadline raises `TimeoutError`. I/O failures
+propagate. A failure has a separate **two-second recovery budget**: observe
+return to the parent, or interrupt unresolved PTY authentication, then verify
+the parent's original UID/PID. If this cannot be confirmed, the channel is
+marked failed and rejects further commands. A direct `shell=False` console
+has no parent to recover; its owning context closes the channel on entry
+failure. Channel resource cleanup can take additional time. There is no
+password retry or automatic fallback to the original account.
+
+Handle entry failure outside the `with` statement; its body has not run unless
+the readiness handshake completed. A `TimeoutError` means that completion was
+not confirmed, rather than proof of a bad password. `enter_timeout=True`, zero,
+negative values, NaN, and infinity are not accepted.
+
+After a failed nested entry, use the parent only if recovery was confirmed.
+`console.closed` alone cannot establish this: an open channel may have been
+marked failed and will reject subsequent commands. There is no public recovery
+status flag; attempting another parent command propagates the stored channel
+failure if recovery was unconfirmed. Do not attempt to clear that failure.
+Create a new console context for an intentional retry, and a new underlying
+channel when the old channel is unusable. Context unwinding preserves the
+original exception and releases the console's lock and thread-stack entry.
+
+#### Platform behavior and custom commands
+
+Bash remains required and is found through the target's PATH, including
+FreeBSD's usual `/usr/local/bin` installation. su uses the cached
+`session.console_info['is_su_pty_ok']` capability to select `--pty`; the handshake
+does not depend on a distribution name or a fixed PAM delay. su's `-c` follows
+USERNAME so that BSD passes it to the target shell instead of interpreting it
+as a login class. The existing sudo-to-su route for a non-root target and login
+mode are retained. If Bash, `id`, or the necessary shell behavior is unavailable,
+entry fails rather than being treated as successful.
+
+`console_info` is a cache for tool capability probes. In the current source it
+contains `is_su_pty_ok`; it does not expose a populated OS/distribution inventory.
+Prefer a tool capability result over a distribution-name guess. The bootstrap
+also prevents the outer login shell from expanding its dollar expressions when
+sudo reconstructs argv for `-i`; available Bourne and csh-family shells are
+covered by the protocol tests.
+
+Custom nested `command=` strings now require a bootstrap placeholder. Use
+`{auth_command}` where the generated Bash command is ordinary command argv,
+for example `command="sudo -k -S {auth_command}"`. Use
+`{auth_command_quoted}` where the command must be one shell argument, for
+example `command="su - alice -c {auth_command_quoted}"` together with
+`username="alice"`. Do not add your own quotes around either placeholder.
+Templates without a placeholder are rejected before sending them. This is a
+compatibility change: an arbitrary interactive command cannot guarantee an
+authenticated startup marker. `Session.enter()` remains the lower-level API
+for application-specific conversations and does not provide this su/sudo
+handshake guarantee.
+
+Credential-free coverage is in `unittest/test_console_authentication.py`.
+It uses real PTY/pipe channels and simulated authentication, plus available
+Bourne/csh-family shells. These checks do not establish real authentication
+compatibility with every OS, sudo policy, PAM stack, or utility version;
+real Linux (util-linux and BusyBox), FreeBSD, and macOS verification is needed
+before release. See the source checkout's `unittest/README.console-authentication.md`
+for commands, coverage, and the native-system validation matrix.
+
+### General interactive programs
 
 ```python
 session.enter(
@@ -379,23 +613,44 @@ With a PTY, stderr may be merged into stdout.
 
 ### Console commands and input
 
+One-shot `Session.exec_command(input=data)` / `Session.start(input=data)` use
+exact stdin in 4.0 source, with UTF-8 strings, unchanged bytes, no added
+newline, and EOF after supplied input (including empty data). `input=None` keeps
+the existing backend policy; legacy local execution may inherit stdin.
+Published 3.1.5 legacy SSH string input adds a
+newline; migrate to explicit `input=answer + "\n"` where a consumer needs a line.
+Terminal password prompts may require `enter()` and a PTY instead of stdin.
+
+
 ```python
 console.exec_command(command, **expectation_replies)
 console(command, **expectation_replies)
 console.send_line(command, **expectation_replies)
 ```
 
-In a shell, `su`, or `sudo` context, these aliases execute one command and
-return `(stdout, stderr)`. `command_timeout=60` sets the command deadline;
-other keyword names are expected patterns whose values are replies. In an
-`enter()` context, the same call is routed to interactive input.
+In 4.0 source, shell/su/sudo aliases execute a command and return an
+immutable CommandResult. Unpack `stdout, stderr, exitcode`, or save the result
+and read named fields. Published 3.1.5 console calls retain their two-buffer
+returns. `command_timeout=60` bounds this command's console wait; other keyword
+names are expected patterns mapped to replies. Shell calls inherit Session
+`check`, with a per-command bool override; failures carry `.result`.
+Inside enter(), calls are routed to interactive input and retain readiness-status
+returns. Live `console.stdout`/`stderr` remain available for expect/send workflows.
+The console deadline is not the managed Session job contract, and timeout alone
+does not prove process termination. For continuous programs see the
+[command choices]({{ site.baseurl }}/v3a/recommended-api/#unreleased-command-results-and-long-running-programs).
+
 
 ```python
 console.send(text) -> None
 console.input(text, timeout=60) -> str | None
 ```
 
-`send()` writes raw text without adding a newline. `input()` sends a line. In
+`send()` writes exact text without adding a newline and only confirms the write.
+`input()` appends exactly one `"\n"`, retaining any existing newline, then waits:
+`input("answer\n")` sends `"answer\n\n"`; `input("")` presses Enter. Prefer these
+explicit APIs for replies inside `enter()`; context-dependent calls and
+`send_line()` remain compatibility forms. In
 an interactive context, `input()` returns `"prompt"`, `"exited"`, or
 `"silent"`; outside one it normally returns `None`. Invalid input, timeout,
 EOF, broken pipe, and transport errors propagate.
@@ -507,4 +762,4 @@ Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
 Paramiko failures retain their original exception and traceback. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

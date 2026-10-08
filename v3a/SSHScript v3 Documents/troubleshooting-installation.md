@@ -10,10 +10,10 @@ nav_order: 5
 SSHScript v3.1 requires Python 3.11 or newer. Use the same Python interpreter
 for installation and execution to avoid most environment problems.
 
-> **Release status:** SSHScript 3.1.4 is the current Production/Stable release
-> on PyPI. These instructions cover the supported 3.1.x line and were last
-> verified with 3.1.4. Start with
-> [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/).
+> **Example baseline:** Installation commands below pin 3.1.5. Start with
+> [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/)
+> and the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/)
+> to distinguish published APIs from features available in 4.0.1.
 
 ## Confirm the interpreter
 
@@ -31,7 +31,7 @@ virtual environment.
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip install "sshscript==3.1.4"
+python3 -m pip install "sshscript==4.0.1"
 ```
 
 A virtual environment avoids system-package permissions and makes the Python
@@ -44,7 +44,7 @@ First verify that the package is installed for the current interpreter:
 
 ```sh
 python3 -m pip show sshscript
-python3 -m pip install --force-reinstall "sshscript==3.1.4"
+python3 -m pip install --force-reinstall "sshscript==4.0.1"
 ```
 
 If the package is present but the command is unavailable, activate the
@@ -79,7 +79,7 @@ Upgrade packaging tools, then retry:
 
 ```sh
 python3 -m pip install --upgrade pip setuptools wheel
-python3 -m pip install --force-reinstall "sshscript==3.1.4"
+python3 -m pip install --force-reinstall "sshscript==4.0.1"
 ```
 
 If installation still fails, record the Python version, operating system, and
@@ -106,4 +106,4 @@ sshscript --version
 Use `--traceback` only in a protected diagnostic environment because a full
 trace can expose source, commands, paths, or secrets.
 
-Last Updated: 2026-09-24 15:36:45
+Last Updated: 2026-10-08 23:48:09

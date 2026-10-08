@@ -7,8 +7,10 @@ nav_order: 2
 
 # Dollar Syntax Reference
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 Dollar syntax is SSHScript v3.1's optional shorthand for `.spy` files. It
 uses the same Session implementation as the primary Python API, but lets an
@@ -54,8 +56,10 @@ $f'printf "Hello, %s\\n" {name}'
 Outside persistent consoles, `$(...)` accepts a nonempty string or a list/tuple
 of string arguments, just like `Session.exec_command()`. It returns
 CommandResult, unpacked as stdout, stderr, exitcode. `check=True` works locally
-and remotely. Persistent console commands remain one-line strings and return
-two buffers with status on the console.
+and remotely. Persistent console commands remain one-line strings. In 4.0
+source they also return immutable CommandResult snapshots with three-value
+unpacking; published 3.1.5 console calls still return two buffers. Input inside
+`enter()` remains an interaction, not a completed command result.
 
 Quote dynamic values before inserting them into a shell command:
 
@@ -178,4 +182,4 @@ timeout, and transport failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

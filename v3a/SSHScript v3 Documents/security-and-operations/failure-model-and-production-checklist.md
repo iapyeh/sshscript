@@ -8,8 +8,10 @@ permalink: /v3a/security-and-operations/failure-model-and-production-checklist/
 
 # Failure Model and Production Checklist
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 SSHScript automation is reliable only when code distinguishes command results,
 operational exceptions, and cleanup failures. This page provides that model
@@ -179,16 +181,15 @@ exception or log record.
 
 ## Command construction
 
-For dynamic arguments, build a list, quote it with `shlex.join()`, and request
-argument-preserving execution:
+For dynamic arguments, pass an argv list directly and check the result:
 
 ```python
-import shlex
-
 arguments = ["install", "-m", "0644", source, destination]
-command = shlex.join(arguments)
-stdout, stderr, exitcode = remote.exec_command(command, shell=False)
+result = remote.exec_command(arguments, check=True)
+stdout, stderr, exitcode = result
 ```
+
+Existing string callers may retain `shlex.join(arguments)` with `shell=False`.
 
 Use shell mode only when the operation actually requires a pipeline,
 redirection, expansion, assignment, or shell builtin. `shlex.join()` protects
@@ -272,7 +273,7 @@ controlled diagnostic environment, and review all output before sharing it.
 
 ### Commands and interactive protocols
 
-- [ ] Dynamic arguments use `shlex.join()` and `shell=False` where possible.
+- [ ] Dynamic arguments use argv directly; existing quoted-string callers specify `shell=False`.
 - [ ] Every nonzero status is classified and handled.
 - [ ] Connection, local-command, prompt, streaming, and workflow limits exist.
 - [ ] Remote workflow deadlines use an external supervisor, and ambiguous
@@ -306,4 +307,4 @@ timeout, and transport failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

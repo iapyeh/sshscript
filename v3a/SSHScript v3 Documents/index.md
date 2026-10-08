@@ -7,12 +7,21 @@ has_toc: false
 
 # SSHScript v3.1 Documentation
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+SSHScript aims to help engineers and AI agents execute, understand, and hand
+off automation reliably. Use the regular Python Session API first; optional
+Dollar syntax shares the same execution semantics. Retain the command's host,
+output, status and installed version, distinguish failure from timeout, and
+reconcile unknown termination. A zero exit status does not prove deployment
+success; closing an SSH channel does not prove its remote process stopped.
 
-The v3.1 documentation is organized by reader intent. Start with a verified,
-credential-free success; move to task-oriented guides; use concepts to
-understand behavior; and use reference pages for exact contracts.
+The published example baseline is **3.1.5**. The current production
+contract is **4.0.1**, with incompatible changes from 3.1.5; see
+[version policy and migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+Start with the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/)
+for version-labelled examples and lifetime rules.
+
+The documentation is organized by reader intent: start with a credential-free
+success, then use task guides, concepts, and reference for exact contracts.
 
 | Section | Purpose |
 | --- | --- |
@@ -31,10 +40,4 @@ translated files remain in source but are excluded from the published site and
 sidebar. The Example Gallery uses an append-only, one-page-per-case structure
 so future scripts can be published without reorganizing established links.
 
-> **Version notice:** SSHScript 3.1.4 is the current Production/Stable release
-> on PyPI. Pages marked **Next-release API** describe the updated source
-> checkout, including argv, three-value results, unified check, SSH config,
-> and compile-only checking. Those changes require the updated source. Begin with
-> [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/).
-
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:46:37

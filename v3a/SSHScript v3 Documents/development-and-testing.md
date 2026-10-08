@@ -6,8 +6,10 @@ nav_order: 9
 
 # Contributing and Testing
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 SSHScript v3.1 separates credential-free release checks and public disposable
 OpenSSH integration from manual, site-specific SSH tests. The default gate must
@@ -192,4 +194,83 @@ overrides and proxy command construction, and compile-only scripts with no user
 code or import side effects. Source mapping tests include functions, multiline
 expressions, imported `.spy` modules, and tokenizer indentation failures.
 
-Last Updated: 2026-09-26 16:11:31
+<a id="transport-and-resource-boundaries-400dev0-unreleased"></a>
+
+## Transport and resource boundaries (4.0.1, 4.0)
+
+The development candidate adds regressions for execution contracts that humans
+and AI can inspect: exact input, retained output, completion versus transport
+failure, and ownership of resources. These tests are not evidence that an
+application's deployment succeeded.
+
+`test_command_job.py` uses real Paramiko transports over a socketpair and
+forwards stdin to a real child process. A 32 KiB SSH window forces flow control.
+The bulk test sends more than 512 KiB of binary/Unicode input while the child
+first emits 256 KiB on each output stream before reading input. It compares
+complete output, input SHA-256, byte count and EOF across local/SSH backends,
+legacy calls, managed calls and `start()`. Empty input has a separate EOF test.
+
+The same suite checks missing SSH exit status, transport loss after observed
+output, rejection of local execution fallback, and a usable parent/shared
+transport after a command channel closes. Three cycles per backend of
+completion, cancellation and timeout check owned worker threads, local
+processes/pipes and SSH channels. Fixture teardown joins server/transport
+workers and checks descriptor counts where `/proc/self/fd` or `/dev/fd` exists.
+The fixture explicitly kills surviving test processes; that housekeeping does
+not prove that closing an SSH channel killed a remote process. A remote stop
+without termination evidence remains `termination_status="unknown"`.
+
+`test_openssh_integration.py` adds native OpenSSH coverage for more than 4 MiB
+of input, 3 MiB on each output stream before input is read, EOF, execution-time
+disconnection, nested SSH and ProxyJump. Tests check child/proxy resource
+cleanup, preservation of the parent connection and rejection of an unknown
+jump-host key with strict host-key checking.
+
+The candidate CI and release transport jobs select these dependency cases:
+
+| Python | Paramiko |
+| --- | --- |
+| 3.11 | 2.11.0, the package metadata minimum |
+| 3.14 | 2.11.0 |
+| 3.11 | current 3.x |
+| 3.14 | current 4.x |
+
+Installation explicitly keeps the selected dependency when installing the
+wheel. CI verifies source and extracted-sdist checks under that dependency,
+then runs native tests against the installed artifact outside the checkout.
+Release jobs test the built wheel under the same selected dependency cases.
+See `unittest/README.module-tests.md` in the candidate source distribution for
+focused commands and disposable Linux provisioning instructions.
+
+For local candidate commit `59c33e4`, normal and optimized source/sdist runs
+each discovered 278 tests and passed with 24 native cases skipped. Selected
+macOS OpenSSH regressions passed in eight-case runs, including an actual-wheel
+run. These are local observations: the expanded Linux GitHub Actions matrix
+has not yet run for this candidate. Skips and matrix definitions are not passing
+evidence. The selected transport tests do not establish complete PAM/su/sudo
+compatibility, every network failure, or long-duration resource stability;
+the three-cycle cleanup regression is not a long-term soak test.
+
+## Native privilege authentication evidence
+
+The 4.0 native authentication gate exercises actual su/sudo, PAM and
+sudoers on disposable Ubuntu accounts. It uses the candidate wheel with local
+subprocess and loopback OpenSSH backends. Cases check target UID, parent shell
+UID/PID restoration, wrong/missing passwords, policy rejection, passwordless
+entry, and deadlines. A failure must exclude the block body; an unconfirmed
+recovery must make the channel reject further work.
+
+CI and release jobs save JSON evidence with the wheel SHA-256, platform/tool
+versions, individual case results and observed recovery outcomes. Review the
+actual candidate's report before calling it validated: a configured CI job or
+skipped native tests are not passing evidence. This supports SSHScript's role as
+an execution layer that engineers and AI can inspect and hand off reliably.
+
+See `unittest/README.console-authentication.md` in the source distribution for
+reproducible disposable-host commands. Normal test discovery skips native cases
+and never requests workstation passwords or changes host accounts. Native
+macOS, FreeBSD, BusyBox and site-specific PAM/sudo policies remain unverified
+until corresponding reports exist; the macOS unit job does not establish native
+privilege-authentication compatibility.
+
+Last Updated: 2026-10-08 23:48:09

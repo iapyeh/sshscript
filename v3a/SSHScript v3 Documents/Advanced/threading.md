@@ -7,13 +7,27 @@ nav_order: 8
 
 # Concurrency and Threading
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 SSHScript v3.1 does not replace the process-wide `threading.Thread` class.
 Regular Python code should make Session ownership explicit. Transformed
 `.spy` files additionally provide scoped Session inheritance for recognized
 Thread constructors.
+
+<a id="unreleased-console-ownership"></a>
+
+## 4.0 console ownership
+
+Persistent shell/su/sudo consoles are used from the thread that entered their
+context. A console.start() foreground job permits only its creator thread to
+wait, stop, clear or consume its iterator. While a job runs, other console
+commands, input and nested contexts fail immediately. Internal background I/O
+and deadline handling do not permit multiple shell jobs. Use independent
+Sessions/consoles per worker; do not share a console through inherited `.spy`
+thread scope. See [console jobs]({{ site.baseurl }}/v3a/recommended-api/#unreleased-foreground-jobs-inside-shell-sudo-and-su).
 
 ## Regular Python: own a Session per worker
 
@@ -104,4 +118,4 @@ python3 -m unittest discover -v -s unittest -p 'test_*.py'
 See [Contributing and Testing](../../development-and-testing/) for the complete
 release gate and the separate manual integration modes.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

@@ -8,8 +8,10 @@ permalink: /v3a/getting-started/quickstart/
 
 # 5-Minute Quickstart
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 This quickstart proves the v3.1 Module API on localhost. It requires no SSH
 server, account, key, password, or network connection.
@@ -17,15 +19,15 @@ server, account, key, password, or network connection.
 ## Before you begin
 
 Complete [Installation and Verification](../installation-and-verification/).
-Use an environment containing the updated source checkout for the next-release
-API shown here. The released 3.1.4 wheel still has the earlier return contract.
+The one-shot examples here target 3.1.5. Start with the executable examples in
+the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/); 4.0
+settings and managed-job examples are explicitly separated there.
 
 ## Create a script
 
 Save the following as `quickstart.py`:
 
 ```python
-import shlex
 import sys
 
 from sshscript import Session
@@ -33,13 +35,13 @@ from sshscript import Session
 
 session = Session()
 try:
-    command = shlex.join([
+    command = [
         sys.executable,
         "-c",
         "print('hello from SSHScript')",
-    ])
+    ]
 
-    stdout, stderr, exitcode = session.exec_command(command, shell=False)
+    stdout, stderr, exitcode = session.exec_command(command, check=True)
 
     print("stdout:", str(stdout).strip())
     print("stderr:", repr(str(stderr)))
@@ -65,11 +67,20 @@ exit code: 0
 You have now created a local `Session`, executed one command, captured both
 output streams, inspected the process status, and closed every resource.
 
+A local `with Session()` context activates a reusable Session and does not
+close it. This script owns the root explicitly. `contextlib.closing(Session())`
+is a shorter option that calls `close()` without checking its bool return.
+Inspect `close_errors` or use `close(strict=True)` for cleanup reporting, and
+preserve an already-raised exception when cleanup also fails. See
+[Session Lifecycle](../../concepts/session-lifecycle/).
+
 ## What the example establishes
 
 `exec_command()` accepts one nonempty command string or a list/tuple of string
 arguments and returns an immutable CommandResult. Unpack exactly three values:
 stdout, stderr, exitcode. The Session also updates its latest-result properties.
+
+Inside the existing `try` block, before the Session is closed:
 
 ```python
 result = session.exec_command(["printf", "%s", "hello"], check=True)
@@ -88,7 +99,7 @@ Add the following before the `finally` block:
 
 ```python
     stdout, stderr, exitcode = session.exec_command(
-        "printf 'alpha\\nbeta\\n' | grep beta"
+        "printf 'alpha\\nbeta\\n' | grep beta", shell=True, check=True
     )
     print("pipeline:", str(stdout).strip())
 ```
@@ -99,9 +110,9 @@ Expected additional output:
 pipeline: beta
 ```
 
-The default `shell=None` detects that the pipeline requires a shell. For code
+This example explicitly requests shell execution and checks its exit status. For code
 that does not require expansion, redirection, pipelines, or other shell
-syntax, prefer a string assembled with `shlex.join()` and `shell=False`.
+syntax, prefer an argv list with `check=True`.
 
 ## Handle a nonzero command status
 
@@ -110,11 +121,11 @@ an exception. Pass `check=True` to raise on either backend, or inspect the
 returned `exitcode` explicitly:
 
 ```python
-    failing_command = shlex.join([
+    failing_command = [
         sys.executable,
         "-c",
         "import sys; sys.exit(7)",
-    ])
+    ]
     stdout, stderr, exitcode = session.exec_command(
         failing_command,
         shell=False,
@@ -149,4 +160,4 @@ stderr—instead. Handle both exceptions and nonzero command results.
 - [Failure Model and Production Checklist](../../security-and-operations/failure-model-and-production-checklist/)
   explains how to turn examples into operational code.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

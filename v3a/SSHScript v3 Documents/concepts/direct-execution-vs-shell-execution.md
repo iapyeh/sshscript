@@ -8,8 +8,10 @@ permalink: /v3a/concepts/direct-execution-vs-shell-execution/
 
 # Direct Execution vs Shell Execution
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 `Session.exec_command()` accepts a nonempty command string or a list/tuple of
 string arguments. Sequences always use direct mode and disallow shell mode.
@@ -42,18 +44,14 @@ Pass the argument sequence directly; quoting it with `shlex.join()` and
 forcing `shell=False` also remains supported:
 
 ```python
-import shlex
-
-
 arguments = [
     "python3",
     "-c",
     "import sys; print(sys.argv[1])",
     "hello; not shell syntax",
 ]
-command = shlex.join(arguments)
-
-stdout, stderr, exitcode = session.exec_command(command, shell=False)
+result = session.exec_command(arguments, check=True)
+stdout, stderr, exitcode = result
 ```
 
 Locally, SSHScript passes argv directly to `subprocess.run()`. When a caller
@@ -135,7 +133,7 @@ session.exec_command("false || printf recovered")
 
 Detection examines the final string. If external input contributes `;`, `|`,
 `$()`, redirection, or another recognized construct, it can change automatic
-selection to shell mode. Use `shlex.join()` and `shell=False` for dynamic
+selection to shell mode. Pass argv directly for dynamic
 argument lists.
 
 The detector is a bounded heuristic, not a complete parser for every installed
@@ -172,15 +170,32 @@ similar state:
 ```python
 with session.shell() as shell:
     shell.exec_command("cd /tmp")
+    if shell.exitcode != 0:
+        raise RuntimeError("cd /tmp failed")
+
     shell.exec_command("export MODE=staging")
-    stdout, stderr = shell.exec_command(
-        "printf '%s:%s\n' \"$PWD\" \"$MODE\""
+    if shell.exitcode != 0:
+        raise RuntimeError("setting MODE failed")
+
+    stdout, stderr, exitcode = shell.exec_command(
+        "printf '%s:%s\\n' \"$PWD\" \"$MODE\""
     )
+    status = shell.exitcode
+    saved_stdout, saved_stderr = str(stdout), str(stderr)
+    if status != 0:
+        raise RuntimeError(f"printf failed with exit status {status}")
 ```
 
 `session.shell()` starts a persistent process, `bash -i` by default. Commands
 sent to that console are interpreted by the running shell; they do not repeat
 one-shot automatic detection.
+The block's scope covers the shell lifecycle, not an aggregate success check.
+Each required command must be checked before the next command replaces the
+latest status. 4.0 console calls return immutable CommandResult snapshots with
+three-value unpacking; published 3.1.5 retains the two-buffer contract. See [Results and Error Model]({{ site.baseurl }}/v3a/concepts/results-and-error-model/)
+for a reusable checked-console helper and the distinction between returning
+from an interaction and completing a process.
+
 
 The `shell=` option on `enter()`, `su()`, and `sudo()` has another purpose: it
 chooses whether the interactive program is layered on a base shell or started
@@ -207,4 +222,4 @@ for task-oriented examples and
 [Host Keys, Credentials, and Command Injection](../../security-and-operations/host-keys-credentials-and-command-injection/)
 for security review.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

@@ -8,8 +8,10 @@ permalink: /v3a/security-and-operations/runtime-troubleshooting/
 
 # Runtime Troubleshooting
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 Use this page after the package imports correctly and reports the expected
 version. For installation, environment, and shadowed-import problems, start
@@ -67,7 +69,7 @@ investigating the network.
 | `FileNotFoundError` on a local direct command | Local executable lookup | Check the active environment, `PATH`, and the first argument produced by `shlex.split()`. |
 | Exit status 126 or 127 over SSH or shell mode | Permission or command lookup | Inspect sanitized stderr and the non-interactive remote `PATH`; do not assume the login shell profile was loaded. |
 | Nonzero status but no Python exception | Command completed unsuccessfully | Inspect `session.exitcode`; nonzero status is result data by default. |
-| Wrong arguments or literal `|`, `>`, or `*` | Execution-mode mismatch | Review `shell=` and the final string; use `shlex.join()` plus `shell=False` for arguments, shell mode only for shell syntax. |
+| Wrong arguments or literal `|`, `>`, or `*` | Execution-mode mismatch | Review `shell=` and the final string; pass argv directly for arguments, explicit shell mode for shell syntax; quoted strings with `shell=False` remain supported. |
 | Interactive timeout or EOF | Prompt/protocol mismatch | Capture redacted output, check the prompt regex, PTY choice, locale, application version, and early-exit status. |
 | SFTP permission error inside `sudo()` | Identity mismatch | SFTP still uses the SSH connection account; stage the file and move it with a privileged command. |
 | Worker printed an error but the job succeeded | Thread result not collected | Consume every `Future.result()` or otherwise propagate worker failure to the coordinator. |
@@ -100,8 +102,8 @@ execution mode explicitly:
 
 ```python
 arguments = ["tool", "--target", user_value]
-command = shlex.join(arguments)
-stdout, stderr, exitcode = remote.exec_command(command, shell=False, timeout=20)
+result = remote.exec_command(arguments, check=True, timeout=20)
+stdout, stderr, exitcode = result
 ```
 
 Local `shell=False` uses direct process execution. Remote `shell=False` safely
@@ -198,4 +200,4 @@ consult the [Session and Console API Reference](../../reference/session-and-cons
 and open a report using the project's
 [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md).
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09
