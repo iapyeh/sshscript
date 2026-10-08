@@ -164,8 +164,10 @@ class ConsoleAuthenticationTests(unittest.TestCase):
     def test_delayed_rejection_restores_parent_without_retry(self):
         with self.session.shell() as parent:
             before = parent.channel.layer_count
-            with self.assertRaises(PermissionError):
-                self.console(parent, mode="reject", delay=2.2).__enter__()
+            with patch.object(parent.channel, "send", wraps=parent.channel.send) as send:
+                with self.assertRaises(PermissionError):
+                    self.console(parent, mode="reject", delay=2.2).__enter__()
+                self.assertNotIn("\x03", [call.args[0] for call in send.call_args_list])
             self.assertEqual(self.count.read_text().splitlines(), ["input"])
             self.assertEqual(parent.channel.layer_count, before)
             self.assertFalse(parent.channel.executing_lock.locked())

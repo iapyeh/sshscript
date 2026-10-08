@@ -320,6 +320,7 @@ class AuthenticatedConsole(InnerConsole):
         self.enter_timeout = _validate_enter_timeout(enter_timeout)
         self._executing_lock = None
         self._return_seen = False
+        self._rejection_seen = False
         self._auth_identity = None
         self._command_sent = False
         self._used = False
@@ -417,6 +418,7 @@ class AuthenticatedConsole(InnerConsole):
                         'console command exited before readiness (status=' + m.group(1) + ')'
                     )
                 if matched is rejected:
+                    self._rejection_seen = True
                     raise PermissionError('console authentication was rejected')
                 if password_sent:
                     raise PermissionError('authentication requested another password; no retry was sent')
@@ -485,7 +487,12 @@ class AuthenticatedConsole(InnerConsole):
                     self.channel.send('if [ "$$" = ' + shlex.quote(pid)
                                       + ' ]; then exit; fi\n',
                                       timeout=max(0.001, deadline - time.monotonic()))
-                elif self.channel.owner.get_pty:
+                elif self.channel.owner.get_pty and not self._rejection_seen:
+                    # A reported rejection may be followed immediately by a
+                    # normal exit. Interrupting that exit can cancel the parent
+                    # shell command list before it emits RETURN (Bash on Linux).
+                    # Let rejection reach RETURN within the recovery budget;
+                    # if it keeps prompting, reject the unconfirmed channel.
                     # Raw interrupt: no newline or automatic password retry.
                     self.channel.send('\x03', timeout=max(0.001, deadline - time.monotonic()))
                 remaining = deadline - time.monotonic()
