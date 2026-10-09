@@ -569,9 +569,13 @@ class CommandJobTests(unittest.TestCase):
                 list(job.iter_stdout())
 
     def test_large_stderr_drained_on_ssh(self):
-        result = self.remote()(self.command('import sys; sys.stderr.write("y"*3_000_000); print("done")'), command_timeout=5, capture_limit=100)
+        # Exercise draining beyond the 32 KiB SSH window, not runner throughput.
+        # Leave scheduling headroom on loaded macOS CI; a deadlock still times out.
+        result = self.remote()(self.command('import sys; sys.stderr.write("y"*3_000_000); print("done")'), command_timeout=30, capture_limit=100)
         self.assertEqual(result.stdout, 'done\n')
+        self.assertEqual(result.stderr, 'y' * 100)
         self.assertTrue(result.stderr_truncated)
+        self.assertEqual(result.exitcode, 0)
 
     def test_local_input_env_and_utf8_stream(self):
         with self.local().start(self.command('import os,sys; print(os.environ["JOB_TEST"]); print(sys.stdin.read())'), input='中文', env={'JOB_TEST': 'yes'}) as job:
