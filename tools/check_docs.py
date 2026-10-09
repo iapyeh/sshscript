@@ -341,6 +341,9 @@ def check_repository_metadata(errors: list[str]) -> None:
     for relative in ("_config.yml", "index.html", "404.html", "README.md"):
         if not (ROOT / relative).is_file():
             errors.append(f"repository root is missing {relative}")
+    for relative in ("index.html", "404.html"):
+        if "SSHScript v3.1" in (ROOT / relative).read_text(encoding="utf-8"):
+            errors.append(f"{relative}: stale documentation entry label")
     info_path = ROOT / "info.json"
     try:
         version = json.loads(info_path.read_text(encoding="utf-8")).get("version")

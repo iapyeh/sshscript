@@ -63,6 +63,11 @@ def main():
         if not (output / relative).is_file():
             errors.append(f'missing build artifact: {relative}')
 
+    for relative in ('index.html', '404.html'):
+        path = output / relative
+        if path.is_file() and 'SSHScript v3.1' in path.read_text(encoding='utf-8'):
+            errors.append(f'{relative}: stale documentation entry label')
+
     links = 0
     for page in pages:
         path = output / page.url.lstrip('/') / 'index.html'
