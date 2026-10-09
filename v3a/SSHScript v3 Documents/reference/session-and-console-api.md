@@ -1,7 +1,7 @@
 ---
 title: "Session and Console API Reference"
 parent: "Reference"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 1
 permalink: /v3a/reference/session-and-console-api/
 ---
@@ -9,7 +9,7 @@ permalink: /v3a/reference/session-and-console-api/
 # Session and Console API Reference
 
 > **Version scope:** The base command API is available in 3.1.5.
-> Session settings, managed deadlines, and jobs below are features available in 4.0.1.
+> Session settings, managed deadlines, and jobs below are features available in 4.0.2.
 
 This page defines the supported core Session and Console API for the SSHScript
 v3.1 line, including the explicitly marked 4.0 managed-command API. Examples that teach a
@@ -242,7 +242,7 @@ session.connect(
 ) -> Session
 ```
 
-In published 3.1.5, the signature uses `policy=None`. In the development source,
+In published 3.1.5, the signature uses `policy=None`. In SSHScript 4.0,
 an omitted policy uses `session.policy`; explicit `None` selects default
 RejectPolicy. A supplied policy overrides only this connection, without
 changing inherited child settings. The omitted value is an internal sentinel.
@@ -403,7 +403,7 @@ session.sudo(
 These open identity-changing consoles. `initials` may be one command or an
 iterable of setup commands. The host's PAM and `sudoers` policies remain
 authoritative. `enter_timeout` and the authenticated entry contract below are
-**features available in 4.0.1**, unavailable in the published 3.1.5 package.
+**features available in 4.0.2**, unavailable in the published 3.1.5 package.
 
 <a id="authenticated-susudo-entry-unreleased"></a>
 
@@ -434,7 +434,7 @@ remains available for other authentication prompt formats.
 These transcripts require a real local account and its authentication policy;
 they are manual examples, separate from credential-free CI coverage.
 Read passwords with `getpass` rather than storing them in the script. The new
-behavior requires 4.0.1 and does not apply to the installed 3.1.5 release.
+behavior requires 4.0.2 and does not apply to the installed 3.1.5 release.
 
 Open a root console through sudo and allow up to 15 seconds for entry:
 
@@ -762,4 +762,4 @@ Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
 Paramiko failures retain their original exception and traceback. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

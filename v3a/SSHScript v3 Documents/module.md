@@ -1,14 +1,14 @@
 ---
 title: "Running Commands and Shell Pipelines"
 parent: "How-to Guides"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 1
 ---
 
 # Running Commands and Shell Pipelines
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Session settings and managed jobs/deadlines are features available in 4.0.2.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -107,7 +107,7 @@ and remotely, after saving `session.last_result` and `exception.result`.
 
 ## Session host-key policy (4.0 source API)
 
-In the development source, `session.set(policy=paramiko.AutoAddPolicy())`
+In SSHScript 4.0, `session.set(policy=paramiko.AutoAddPolicy())`
 configures future SSH connections; import `paramiko` first. The equivalent
 property is `session.policy`, and `session.get("policy")` reads the setting.
 Omitted `connect(policy=...)` uses that setting; an explicit policy overrides
@@ -198,4 +198,4 @@ timeout, and transport failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

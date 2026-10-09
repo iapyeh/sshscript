@@ -1,6 +1,6 @@
 ---
 title: "Example Gallery"
-parent: "SSHScript v3.1 Documentation"
+parent: "SSHScript Documentation"
 nav_order: 7
 has_children: true
 has_toc: false
@@ -62,7 +62,7 @@ never a literal secret.
 ---
 title: "Topic: Case Name"
 parent: "Example Gallery"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: NEXT_NUMBER
 ---
 
@@ -98,4 +98,4 @@ redact the captured output, add it to the catalog above, and run the v3a
 documentation validator. Source contributions should also follow
 [Contributing and Testing]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/development-and-testing/).
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-10-09 10:40:03

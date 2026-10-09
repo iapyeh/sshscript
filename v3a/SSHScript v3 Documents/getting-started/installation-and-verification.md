@@ -1,15 +1,15 @@
 ---
 title: "Installation and Verification"
 parent: "Getting Started"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 1
 permalink: /v3a/getting-started/installation-and-verification/
 ---
 
 # Installation and Verification
 
-> **Version scope:** The argv/CommandResult/check/config API is available in 4.0.1.
-> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> **Version scope:** The argv/CommandResult/check/config API is available in 4.0.2.
+> Session settings and managed jobs/deadlines are features available in 4.0.2.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -18,15 +18,15 @@ program, Python import, and dependency set before any SSH connection is made.
 
 ## Version status
 
-> **SSHScript 4.0.1 is the baseline for these examples.** It is available
-> from [PyPI](https://pypi.org/project/sshscript/4.0.1/) and the corresponding
-> [GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v4.0.1).
-> Settings and managed-job APIs are available in 4.0.1. See the canonical
+> **SSHScript 4.0.2 is the baseline for these examples.** It is available
+> from [PyPI](https://pypi.org/project/sshscript/4.0.2/) and the corresponding
+> [GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v4.0.2).
+> Settings and managed-job APIs are available in 4.0.2. See the canonical
 > guide and migration notes before upgrading 3.1.5 automation.
 
 ## Requirements
 
-SSHScript 4.0.1 declares:
+SSHScript 4.0.2 declares:
 
 - Python 3.11 or newer;
 - macOS or a POSIX Linux environment;
@@ -37,7 +37,7 @@ Windows is not currently listed as a supported platform. The local runner must
 use a supported POSIX environment. Remote one-shot commands require a
 POSIX-compatible SSH command environment; `shell()`, `su()`, and `sudo()` also
 require the corresponding Unix tools. Other remote operating systems are not
-part of the documented v3.1 contract.
+part of the documented 4.0 contract.
 
 ## Create an isolated environment
 
@@ -66,11 +66,11 @@ For a deployment that must remain reproducible, pin the exact release in the
 environment's requirements or lock file:
 
 ```sh
-python3 -m pip install "sshscript==4.0.1"
+python3 -m pip install "sshscript==4.0.2"
 ```
 
 To accept future compatible maintenance releases within the supported line,
-use `sshscript>=4.0.1,<5` and preserve the resolver output in a lock file.
+use `sshscript>=4.0.2,<5` and preserve the resolver output in a lock file.
 Do not rely on an unbounded dependency in a production deployment.
 
 ## Install the tagged source
@@ -79,7 +79,7 @@ Ordinary users should prefer the PyPI wheel. Contributors who need to inspect
 or test the released source can use the immutable release tag:
 
 ```sh
-git clone --branch v4.0.1 --depth 1 https://github.com/iapyeh/sshscript.git
+git clone --branch v4.0.2 --depth 1 https://github.com/iapyeh/sshscript.git
 cd sshscript
 python3 -m pip install .
 ```
@@ -97,11 +97,11 @@ sshscript --version
 Expected output:
 
 ```text
-4.0.1
+4.0.2
 ```
 
 If the command is missing, make sure the virtual environment is active. If it
-prints another version, stop and identify the environment before running v3.1
+prints another version, stop and identify the environment before running 4.0
 examples.
 
 ## Verify the Python import
@@ -110,7 +110,7 @@ examples.
 python3 -c "import sshscript; print(sshscript.__version__); print(sshscript.__file__)"
 ```
 
-The first line must be `4.0.1`. The second line identifies the package being
+The first line must be `4.0.2`. The second line identifies the package being
 imported and should point into the active virtual environment for a PyPI
 installation. This catches a common problem in which an older installation or
 a local `sshscript.py` file shadows the intended package.
@@ -129,7 +129,7 @@ before posting diagnostics publicly.
 
 ## Verify release provenance
 
-The 4.0.1 distributions were built and tested by the repository's public
+The 4.0.2 distributions were built and tested by the repository's public
 release workflow. The workflow:
 
 1. runs the credential-free checks and package assertion gate;
@@ -140,7 +140,7 @@ release workflow. The workflow:
    Trusted Publisher; and
 6. publishes the GitHub Release only after PyPI accepts the distributions.
 
-Review the [v4.0.1 release](https://github.com/iapyeh/sshscript/releases/tag/v4.0.1),
+Review the [v4.0.2 release](https://github.com/iapyeh/sshscript/releases/tag/v4.0.2),
 the [successful release workflow](https://github.com/iapyeh/sshscript/actions/runs/35963068790),
 and PyPI's distribution metadata before adopting an artifact. Provenance
 confirms where an artifact came from; it does not replace source review or
@@ -162,7 +162,7 @@ above.
 Upgrade within the supported 3.1 line with:
 
 ```sh
-python3 -m pip install --upgrade "sshscript>=4.0.1,<5"
+python3 -m pip install --upgrade "sshscript>=4.0.2,<5"
 sshscript --version
 python3 -m pip check
 ```
@@ -178,4 +178,4 @@ credential-free command. See
 if the
 version or import path is not what you expect.
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

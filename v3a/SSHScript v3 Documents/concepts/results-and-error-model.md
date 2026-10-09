@@ -1,7 +1,7 @@
 ---
 title: "Results and Error Model"
 parent: "Concepts"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 3
 permalink: /v3a/concepts/results-and-error-model/
 ---
@@ -9,7 +9,7 @@ permalink: /v3a/concepts/results-and-error-model/
 # Results and Error Model
 
 > **Version scope:** The base command API is available in 3.1.5.
-> Managed deadlines and jobs described below are features available in 4.0.1.
+> Managed deadlines and jobs described below are features available in 4.0.2.
 
 A completed command, an API failure, and cleanup failure are different outcomes.
 
@@ -76,7 +76,7 @@ a prompt is readiness for input, not process completion.
 
 <a id="missing-ssh-exit-status-and-transport-loss-400dev0-unreleased"></a>
 
-## Missing SSH exit status and transport loss (4.0.1, 4.0)
+## Missing SSH exit status and transport loss (4.0.2, 4.0)
 
 If an SSH command channel closes without an exit-status message, both legacy
 and managed one-shot calls raise `EOFError`. Paramiko's internal `-1` sentinel
@@ -183,4 +183,4 @@ not replace an application's explicit cleanup reporting policy.
 See [Failure Model and Production Checklist](../../security-and-operations/failure-model-and-production-checklist/)
 for production handling patterns.
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

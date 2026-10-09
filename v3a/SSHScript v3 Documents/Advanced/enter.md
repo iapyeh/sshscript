@@ -1,7 +1,7 @@
 ---
 title: "Interactive Programs with Session.enter()"
 parent: "How-to Guides"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 5
 ---
 
@@ -236,4 +236,4 @@ with $.enter("python3", prompt=">>>", exit="quit()"):
 The shorthand `$print(2 + 3)` also sends a line while `$.enter()` is active.
 Use `$.input()` when explicit interaction is easier to maintain.
 
-Last Updated: 2026-10-08 23:46:37
+Last Updated: 2026-10-09 10:40:03

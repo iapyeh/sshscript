@@ -1,14 +1,14 @@
 ---
 title: "Connections, Authentication, and Bastions"
 parent: "How-to Guides"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 2
 ---
 
 # Connections, Authentication, and Bastions
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Session settings and managed jobs/deadlines are features available in 4.0.2.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -175,7 +175,7 @@ default verification.
 
 ## Default host-key policy (4.0 source API)
 
-In the development source, configure a Session once instead of passing `policy`
+In SSHScript 4.0, configure a Session once instead of passing `policy`
 to every connection:
 
 ```python
@@ -269,4 +269,4 @@ with $.connect("ops@example.net"):
 Nested `$.connect()` blocks and the host-key policy follow the same Session
 API behavior.
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

@@ -1,6 +1,6 @@
 ---
 title: "Reference"
-parent: "SSHScript v3.1 Documentation"
+parent: "SSHScript Documentation"
 nav_order: 5
 has_children: true
 has_toc: false
@@ -19,4 +19,4 @@ compatibility behavior.
 | [CLI and Environment Variables]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/cli-and-environment/) | Available |
 | [Exceptions and Return Values](exceptions-and-return-values/) | Available |
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-10-09 10:40:03

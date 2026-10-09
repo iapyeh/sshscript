@@ -1,27 +1,26 @@
 ---
 title: "Module API Tutorial"
 parent: "Tutorials"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 1
 ---
 
 # Module API Tutorial
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Session settings and managed jobs/deadlines are features available in 4.0.2.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
-This tutorial introduces SSHScript v3.1 through its primary Python
+This tutorial introduces SSHScript 4.0.2 through its primary Python
 `Session` API. The optional Dollar syntax is shown only after the module
 workflow.
 
 ## Install SSHScript
 
-SSHScript v3.1 requires Python 3.11 or newer. The examples use 3.1.5 as
-the published baseline. Complete
+SSHScript 4.0.2 requires Python 3.11 or newer. The examples use the current 4.0.2 release. Complete
 [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/)
-and confirm that both the CLI and Python import report `3.1.5` before using
+and confirm that both the CLI and Python import report `4.0.2` before using
 this tutorial.
 
 ## Execute a local command
@@ -196,4 +195,4 @@ In v3.1, one `$` handles both direct commands and shell features. The former
 `$$` form is deprecated. See the [Dollar Syntax Reference](../Basic/dollar/)
 if this notation suits the project.
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03
