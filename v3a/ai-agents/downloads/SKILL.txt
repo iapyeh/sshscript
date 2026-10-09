@@ -1,3 +1,5 @@
+SSHScript skill instructions (use the ZIP for installation)
+
 ---
 name: sshscript
 description: Write, adapt, and verify Python or .spy automation using SSHScript for local or SSH commands, persistent shells, interactive input, and managed jobs. Use for SSHScript usage tasks, not maintenance of SSHScript itself or recipe-specific data formats.

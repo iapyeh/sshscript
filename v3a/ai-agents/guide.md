@@ -208,4 +208,4 @@ for reporting issues. Recipe-specific schemas and vault updates belong to that
 recipe's own documentation. Reading this guide does not authorize executing
 examples or submitting a public report.
 
-Last Updated: 2026-10-09 16:35:07
+Last Updated: 2026-10-09 17:18:41
