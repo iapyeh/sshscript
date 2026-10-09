@@ -5,18 +5,18 @@ nav_exclude: true
 
 # SSHScript v3.1
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+SSHScript aims to help engineers and AI agents execute, understand, and hand
+off automation reliably. Use the regular Python Session API first; optional
+Dollar syntax shares the same execution semantics. Retain the command's host,
+output, status and installed version, distinguish failure from timeout, and
+reconcile unknown termination. A zero exit status does not prove deployment
+success; closing an SSH channel does not prove its remote process stopped.
 
-SSHScript brings local commands, SSH automation, and Python control flow into
-one programming model. Its primary interface is the regular Python `Session`
-API, while the optional Dollar syntax offers concise notation for standalone
-`.spy` scripts.
-
-> **Release status:** SSHScript 3.1.4 is the current Production/Stable release
-> and is available from [PyPI](https://pypi.org/project/sshscript/3.1.4/) and
-> [GitHub](https://github.com/iapyeh/sshscript/releases/tag/v3.1.4). These
-> documents cover the supported 3.1.x line and were last verified with 3.1.4.
+The published example baseline is **3.1.5**. The current production
+contract is **4.0.1**, with incompatible changes from 3.1.5; see
+[version policy and migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+Start with the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/)
+for version-labelled examples and lifetime rules.
 
 ## Why SSHScript?
 
@@ -38,7 +38,7 @@ SSHScript v3.1 emphasizes predictable and secure automation:
 ## Start here
 
 1. Read [Installation and Verification](getting-started/installation-and-verification/)
-   and confirm that both the CLI and import report `3.1.4`.
+   and confirm that both the CLI and import report `4.0.1`.
 2. Complete the credential-free [5-Minute Quickstart](getting-started/quickstart/).
 3. Continue with the
    [Module API Tutorial](SSHScript%20v3%20Documents/tutorial/).
@@ -54,17 +54,17 @@ existing URLs.
 
 ## Project status
 
-SSHScript v3.1 is Production/Stable software for Python 3.11–3.14 on Linux and
-macOS. The 3.1.4 release passed the public platform matrix and disposable
-OpenSSH integration tests before OIDC publication to PyPI. Operators should
-still validate site-specific PAM, `sudoers`, network, and host-key policy in
-an isolated environment before production rollout. SSHScript is released
-under the MIT License.
+The current 4.0.1 release is classified Production/Stable for Python
+3.11–3.14 on Linux and macOS. It introduces an incompatible execution contract;
+review the migration guide before upgrading 3.1.5 automation. Review the candidate's CI
+reports and validate site-specific PAM, `sudoers`, network, and host-key policy
+in an isolated environment before rollout. SSHScript is released under the
+MIT License.
 
 ## Trust and support
 
 - Review the public [CI matrix](https://github.com/iapyeh/sshscript/actions/workflows/ci.yml)
-  and the [v3.1.4 release](https://github.com/iapyeh/sshscript/releases/tag/v3.1.4).
+  and the [published baseline release](https://github.com/iapyeh/sshscript/releases/tag/v3.1.5).
 - Read the [security policy](https://github.com/iapyeh/sshscript/blob/release/SECURITY.md)
   before reporting a vulnerability.
 - Use the [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
@@ -74,4 +74,4 @@ under the MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:46:37

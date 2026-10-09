@@ -7,8 +7,10 @@ nav_order: 2
 
 # Connections, Authentication, and Bastions
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 `Session.connect()` creates a connected child Session. Commands use the same
 `exec_command()` method locally and remotely, and the connection closes when
@@ -17,6 +19,7 @@ its context exits.
 ## Connect to a host
 
 ```python
+from contextlib import closing
 from sshscript import Session
 
 local = Session()
@@ -52,10 +55,11 @@ Host production
 ```
 
 ```python
+from contextlib import closing
 from sshscript import Session
 
 settings = Session.resolve_connection("production")  # no connection or proxy
-with Session() as local:
+with closing(Session()) as local:
     with local.connect("production") as remote:
         result = remote.exec_command(["uname", "-s"], check=True)
         stdout, stderr, exitcode = result
@@ -103,6 +107,7 @@ commit production secrets.
 
 ```python
 import os
+from contextlib import closing
 from sshscript import Session
 
 local = Session()
@@ -120,6 +125,7 @@ For an interactive password:
 
 ```python
 from getpass import getpass
+from contextlib import closing
 from sshscript import Session
 
 password = getpass("Password for ops@example.net: ")
@@ -146,6 +152,7 @@ Accepting a previously unknown key must be an explicit decision:
 
 ```python
 import paramiko
+from contextlib import closing
 from sshscript import Session
 
 local = Session()
@@ -164,12 +171,53 @@ server identity has been verified out of band. It is not the production
 default. The legacy `policy=0` form is deprecated and now selects secure
 default verification.
 
+<a id="default-host-key-policy-unreleased-source-api"></a>
+
+## Default host-key policy (4.0 source API)
+
+In the development source, configure a Session once instead of passing `policy`
+to every connection:
+
+```python
+from contextlib import closing
+import paramiko
+from contextlib import closing
+from sshscript import Session
+
+with closing(Session()) as local:
+    local.set(policy=paramiko.AutoAddPolicy())
+    with local.connect("ops@first.example.net") as first:
+        first.exec_command(["hostname"], check=True)
+    with local.connect("ops@second.example.net") as second:
+        second.exec_command(["hostname"], check=True)
+    with local.connect("ops@verified.example.net", policy=None) as verified:
+        verified.exec_command(["hostname"], check=True)
+```
+
+Use AutoAddPolicy only under the bootstrap conditions described above. The
+`policy` setting defaults to `None` and accepts a Paramiko `MissingHostKeyPolicy`
+instance or subclass. `local.policy = ...` and `local.get("policy")` access the
+same setting. In `.spy`, use `$.set(policy=paramiko.AutoAddPolicy())` and
+`$.get("policy")`.
+
+Omitting the connect argument uses the Session setting. An explicit policy
+wins for that connection; explicit `None` uses Paramiko's default RejectPolicy.
+Child Sessions snapshot the parent's settings, including policy, independently
+of a per-connection override. Nested connections use the child's setting.
+Changing a setting affects future connections, not existing clients. The
+settings dictionary is copied, but the policy object is shared; custom policies
+with mutable state must support reuse.
+
+This setting is not available in published 3.1.5. On that version, keep using
+`connect(policy=...)` for each connection.
+
 ## Nested connections
 
 Call `connect()` on an active remote Session to reach an internal host through
 its SSH transport:
 
 ```python
+from contextlib import closing
 from sshscript import Session
 
 local = Session()
@@ -221,4 +269,4 @@ with $.connect("ops@example.net"):
 Nested `$.connect()` blocks and the host-key policy follow the same Session
 API behavior.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

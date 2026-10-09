@@ -8,8 +8,10 @@ permalink: /v3a/how-to-guides/cli-and-script-composition/
 
 # CLI and Script Composition
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 The SSHScript CLI and `run_file()` deliberately execute one file at a time.
 Compose a larger program with ordinary Python modules and scoped `.spy`
@@ -289,4 +291,4 @@ for the option reference and
 [How `.spy` Transformation Works](../../concepts/how-spy-transformation-works/)
 for importer and transformation details.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

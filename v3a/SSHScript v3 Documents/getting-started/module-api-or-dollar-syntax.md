@@ -8,8 +8,10 @@ permalink: /v3a/getting-started/module-api-or-dollar-syntax/
 
 # Module API or Dollar Syntax?
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 SSHScript provides two interfaces to the same Session execution model:
 
@@ -33,6 +35,9 @@ clearer.
 
 ## Recommended default: Module API
 
+Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) for the
+version-labelled, CI-executed examples. The explanation below targets 3.1.5.
+
 ```python
 from sshscript import Session
 
@@ -40,8 +45,8 @@ from sshscript import Session
 session = Session()
 try:
     stdout, stderr, exitcode = session.exec_command(
-        "python3 --version",
-        shell=False,
+        ["python3", "--version"],
+        check=True,
     )
     if session.exitcode != 0:
         raise RuntimeError(
@@ -93,7 +98,7 @@ Python parser and should not be placed in a `.py` module.
 Both interfaces use the same Session, command, result, connection, console,
 transfer, and cleanup implementation:
 
-- a command is one non-empty `str`;
+- a command is one non-empty string or argv list/tuple;
 - the latest result is `session.stdout`/`stderr`/`exitcode` or
   `$.stdout`/`stderr`/`exitcode`;
 - common shell constructs are detected when `shell=None`;
@@ -162,4 +167,4 @@ Python.
 - For a mixed command-line project, use
   [CLI and Script Composition](../../how-to-guides/cli-and-script-composition/).
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

@@ -7,8 +7,10 @@ nav_order: 2
 
 # SSHScript v3.1 Release Notes
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 SSHScript 3.1.4 was published on 2026-09-24 as the first Production/Stable
 release in the supported v3.1 line. Install it from
@@ -18,10 +20,44 @@ release in the supported v3.1 line. Install it from
 The release requires Python 3.11 or newer and supports Python 3.11–3.14 on
 Linux and macOS.
 
-## Next release — source changes
+<a id="400dev0--unreleased-development-contract"></a>
 
-These changes are available in the updated source checkout; the published
-3.1.4 wheel retains its original behavior.
+## 4.0.1 — 2026-10-08
+
+- Confirm delayed local exit after macOS group-signal permission errors with a
+  bounded wait. Preserve genuine signal failures.
+- Attempt every local stream close and process reap independently. Preserve
+  primary exceptions and attach subsequent cleanup errors as exception notes.
+
+
+These incompatible changes target 4.0, not a 3.1.5 patch. See
+[version policy and migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
+- Legacy SSH calls feed stdin concurrently with stdout/stderr collection,
+  preventing flow-control deadlock when a child writes output before reading
+  input. Owned command channels and I/O workers are cleaned up on failure.
+- Missing SSH exit status raises `EOFError` instead of producing a completed
+  result with Paramiko's internal `-1` sentinel. Transport loss preserves
+  observed managed-job output and never falls back to local execution.
+- Boundary regressions cover bulk binary/Unicode transfer, EOF, missing status,
+  disconnection and repeated resource cleanup. Native OpenSSH cases add nested
+  SSH and ProxyJump cleanup/host-key rejection. Candidate CI/release jobs select
+  the minimum Paramiko 2.11.0 and supported 3.x/4.x dependencies; review actual
+  results before claiming platform coverage. See
+  [the boundary evidence and limits]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/development-and-testing/#transport-and-resource-boundaries-400dev0-unreleased).
+- Completed shell/su/sudo commands return immutable CommandResult snapshots,
+  matching single-dollar execution. Migrate two-value unpacking to three values
+  or named fields; check failures include `.result`.
+- Live console buffers and enter()/input()/send()/expect() retain interaction
+  semantics. A result is available after completion; use managed jobs or an
+  enter() scope for tcpdump with explicit stopping and cleanup.
+- See the [canonical guide]({{ site.baseurl }}/v3a/recommended-api/) for version
+  profiles, command selection and long-program best practice.
+
+## 3.1.5 — command API and SSH configuration
+
+These changes are available in the published 3.1.5 package. The 3.1.4 wheel
+retains its original behavior.
 
 - One-shot commands accept argv lists/tuples or command strings. Sequences
   preserve argument boundaries and reject shell mode.
@@ -120,4 +156,27 @@ Provenance establishes the origin and integrity of an artifact; it does not
 replace source review or validation against the target organization's SSH,
 PAM, `sudoers`, network, and host-key policies.
 
-Last Updated: 2026-09-26 16:11:31
+<a id="unreleased-authenticated-susudo-console-entry"></a>
+
+## 4.0: authenticated su/sudo console entry
+
+- `Session.su()`, `Session.sudo()`, and nested consoles accept a configurable
+  `enter_timeout=10`, with a shared deadline for authentication, shell readiness,
+  and initial commands.
+- Entry requires unique success markers and target UID/PID checks. Successful
+  authentication returns without a fixed password-verification delay.
+- Passwordless entry is supported. Supplied passwords are sent at most once;
+  rejection and repeated prompts fail without automatic retries.
+- Failed entry verifies parent recovery within a separate two-second budget;
+  unconfirmed channels reject later commands. Contexts are single-use.
+- su uses the `console_info` capability probe for `--pty`; BSD-compatible
+  argument ordering and PATH-based Bash lookup avoid distribution-name guesses.
+  Native Linux, FreeBSD, and macOS authentication checks remain required before
+  release; simulated protocol tests do not establish every PAM/policy variant.
+- Custom nested `command=` templates now require a bootstrap placeholder.
+
+These changes are absent from the published 3.1.5 package. See the
+[authenticated console API]({{ site.baseurl }}/v3a/reference/session-and-console-api/#authenticated-susudo-entry-unreleased)
+and [migration notes]({{ site.baseurl }}/v3a/migration-and-releases/migrating-to-v3-1/).
+
+Last Updated: 2026-10-08 23:48:09

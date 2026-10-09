@@ -7,8 +7,10 @@ nav_order: 3
 
 # Accounts
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 This collection starts with a read-only account audit. Add future account cases
 as separate Gallery pages; state the executing identity, target identity,
@@ -144,4 +146,4 @@ target, least-privilege rule, before/after audit evidence, idempotent behavior,
 secret handling, rollback, and a test on the site's actual directory/PAM
 stack.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

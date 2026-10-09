@@ -11,6 +11,55 @@ Long-running programs can produce output well before they exit.
 `Session.enter()` exposes that output as it arrives, so Python can process a
 log follower, monitor, backup tool, or packet capture incrementally.
 
+## Choosing live interaction or a completed result
+
+Completed shell commands return immutable CommandResult snapshots in 4.0
+source, matching single-dollar execution. A synchronous `$tcpdump ...` assignment
+waits for completion; three-value unpacking does not provide a running stream.
+The enter()/expect()/send()/live-buffer examples below retain their existing
+interaction semantics, including the published 3.1.5 API.
+
+For a separate continuous process, prefer the 4.0 managed job API with
+streaming output, explicit stop and a finite fallback deadline for unattended
+agents. In 4.0 source, use console.start() for a foreground job in the
+current shell/sudo/su context; enter() remains the interactive conversation API.
+Ctrl-C is a stop request, not proof of remote process termination. See the
+[canonical execution and long-program guide]({{ site.baseurl }}/v3a/recommended-api/#unreleased-command-results-and-long-running-programs)
+for bounded captures, output conditions, cleanup and termination reporting.
+
+<a id="unreleased-stream-in-the-current-console"></a>
+
+## 4.0: stream in the current console
+
+`console.start(command)` returns CommandJob while keeping the current Bash
+shell's cwd, environment and identity. Ordinary completed commands remain
+unchanged. A console has one foreground job; other console operations are
+rejected until it finishes or stops and verifies recovery. Job operations run
+on the creating thread. Console start defaults to a 60-second total deadline;
+prefer an explicit finite deadline for unattended agents.
+
+```spy
+from getpass import getpass
+
+with $.sudo(password=getpass("sudo password: ")):
+    with $.start("tcpdump -l -n -i INTERFACE", timeout=30) as job:
+        try:
+            for chunk in job.iter_stdout():
+                print(chunk, end="", flush=True)
+        finally:
+            result = job.stop()
+    result = $hostname
+```
+
+Replace INTERFACE and provide native account/capture permission. Use nested
+su/sudo APIs for identity changes; direct privilege shells and detached/background
+jobs are unsupported. Text chunks are not guaranteed lines. PTY stdout/stderr
+can merge. Ctrl-C recovery must verify the original UID/PID; unresolved recovery
+fails and disables the console. Pipe consoles support completion but cannot safely
+cancel a running program. A confirmed shell recovery does not establish that
+detached descendants stopped. See the
+[executable canonical example]({{ site.baseurl }}/v3a/recommended-api/#unreleased-foreground-jobs-inside-shell-sudo-and-su).
+
 ## Stream output
 
 ```python
@@ -149,4 +198,4 @@ with $.enter("journalctl -f -u nginx", exit=chr(3)):
             print(line, end="")
 ```
 
-Last Updated: 2026-09-17 12:13:56
+Last Updated: 2026-10-08 23:46:37

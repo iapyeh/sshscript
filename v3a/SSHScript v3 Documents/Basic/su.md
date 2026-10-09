@@ -86,4 +86,16 @@ with $.su("deploy", password=deploy_password):
 Never hard-code passwords in Python or `.spy` files. Use `getpass`, a secret
 manager, or narrowly scoped policy-based access.
 
-Last Updated: 2026-09-18 15:58:44
+<a id="unreleased-foreground-streaming-jobs"></a>
+
+## 4.0: foreground streaming jobs
+
+Inside this authenticated console, `$.start(command, timeout=30)` or
+`console.start(command, timeout=30)` returns CommandJob using its current identity
+and shell state. Read with job.iter_stdout(), wait() or stop(); ordinary `$command`
+continues returning a completed CommandResult. One job owns the console until
+completion and verified shell recovery. Use nested su/sudo APIs before a job;
+raw privilege shells, detached/background jobs and cross-thread console use
+are unsupported. See [the console job contract]({{ site.baseurl }}/v3a/recommended-api/#unreleased-foreground-jobs-inside-shell-sudo-and-su).
+
+Last Updated: 2026-10-08 23:46:37

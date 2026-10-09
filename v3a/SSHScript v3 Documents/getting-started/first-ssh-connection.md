@@ -8,8 +8,10 @@ permalink: /v3a/getting-started/first-ssh-connection/
 
 # Your First SSH Connection
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 This guide starts from the verified local installation and runs one
 deterministic command through SSH. It uses the regular Python Module API, the
@@ -188,7 +190,8 @@ stdout, stderr, exitcode = remote.exec_command(
 ```
 
 SSHScript is an execution library, not a sandbox. For dynamic values, assemble
-an argument list with `shlex.join()` and use `shell=False`. Review
+an argv list and pass it directly with `check=True`. Existing string callers
+may retain `shlex.join(argv)` with `shell=False`. Review
 [Direct Execution vs Shell Execution](../../concepts/direct-execution-vs-shell-execution/)
 before accepting external input.
 
@@ -209,4 +212,4 @@ with
 Before production use, read
 [Host Keys, Credentials, and Command Injection](../../security-and-operations/host-keys-credentials-and-command-injection/).
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

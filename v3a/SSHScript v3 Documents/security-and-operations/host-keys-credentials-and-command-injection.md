@@ -8,8 +8,10 @@ permalink: /v3a/security-and-operations/host-keys-credentials-and-command-inject
 
 # Host Keys, Credentials, and Command Injection
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 A successful login is not enough to make an SSH automation trustworthy. The
 client must authenticate the server, the server must authenticate the intended
@@ -140,20 +142,13 @@ protocol and failure cases.
 
 `Session.exec_command()` accepts strings or argument sequences. When shell
 syntax is unnecessary, pass a list/tuple directly. A string assembled with
-`shlex.join()` and `shell=False` is also supported:
+`shlex.join()` and `shell=False` is also supported for existing string callers.
+For new code:
 
 ```python
-import shlex
-
-
 arguments = ["install", "-m", "0644", source_path, destination_path]
-command = shlex.join(arguments)
-stdout, stderr, exitcode = remote.exec_command(command, shell=False, timeout=30)
-
-if remote.exitcode != 0:
-    raise RuntimeError(
-        f"install failed with exit status {remote.exitcode}"
-    )
+result = remote.exec_command(arguments, check=True, timeout=30)
+stdout, stderr, exitcode = result
 ```
 
 Passing the list directly or using `shlex.join()` with `shell=False` preserves
@@ -216,7 +211,7 @@ a narrowly scoped privileged command to install it. Remove the staged copy in a
 - [ ] Credentials come from an agent, protected key, certificate, or approved
       runtime secret source.
 - [ ] Commands and diagnostics never contain secrets.
-- [ ] Dynamic arguments use `shlex.join()` with `shell=False` where possible.
+- [ ] Dynamic arguments use argv directly; existing quoted-string callers specify `shell=False`.
 - [ ] Shell-mode data values are individually quoted and semantically
       validated.
 - [ ] Executables, operations, paths, and privilege transitions are allowlisted.
@@ -227,4 +222,4 @@ a narrowly scoped privileged command to install it. Remove the staged copy in a
 Continue with [Timeouts, Retries, and Cleanup](../timeouts-retries-and-cleanup/)
 and the [Failure Model and Production Checklist](../failure-model-and-production-checklist/).
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

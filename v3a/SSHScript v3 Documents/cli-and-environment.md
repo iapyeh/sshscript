@@ -7,8 +7,10 @@ nav_order: 3
 
 # CLI and Environment Variables
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 SSHScript v3.1 can run a regular Python file or a `.spy` file from the
 command line. The CLI deliberately accepts one script file at a time.
@@ -149,4 +151,4 @@ only by the CLI.
 See [Contributing and Testing](../development-and-testing/) for the
 credential-free release gate and isolated integration-test guidance.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

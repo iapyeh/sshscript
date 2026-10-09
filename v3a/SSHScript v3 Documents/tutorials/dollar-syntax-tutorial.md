@@ -8,8 +8,10 @@ permalink: /v3a/tutorials/dollar-syntax/
 
 # Dollar Syntax Tutorial
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 Dollar syntax is an optional notation for command-oriented `.spy` files. It is
 a concise layer over the Session model, not a separate execution engine. Learn
@@ -66,8 +68,7 @@ Outside persistent consoles, the parenthesized form accepts a nonempty string
 or a nonempty list/tuple of string arguments plus keyword options. A sequence
 is one direct command, not a command batch; shell mode is not accepted with argv.
 
-For dynamic arguments, build a list in Python, convert it with `shlex.join()`,
-and use direct mode:
+For dynamic arguments, pass an argv list directly:
 
 ```python
 import shlex
@@ -79,11 +80,12 @@ arguments = [
     "import sys; print(sys.argv[1])",
     "hello; still one argument",
 ]
-$(shlex.join(arguments), shell=False, timeout=10)
+$(arguments, check=True, timeout=10)
 ```
 
-`shlex.join()` preserves argument boundaries. It does not decide whether the
-requested executable or operation is authorized.
+An argv list preserves argument boundaries. It does not decide whether the
+requested executable or operation is authorized. The string-based
+`shlex.join()` form remains supported, but is not the recommended default.
 
 ## Read and retain results
 
@@ -190,24 +192,54 @@ when later commands depend on earlier shell state:
 ```python
 with $.shell("bash") as console:
     $cd /tmp
-    $PERSISTED=inside-context
-    $printf '%s:%s\n' "$PWD" "$PERSISTED"
-
     if console.exitcode != 0:
-        raise RuntimeError(
-            f"shell command failed with exit status {console.exitcode}"
-        )
+        raise RuntimeError("cd /tmp failed")
+
+    $pwd
+    if console.exitcode != 0:
+        raise RuntimeError("pwd failed")
+    saved_pwd = str(console.stdout)
+    saved_stderr = str(console.stderr)
+
+    $printf 'next command\n'
+    if console.exitcode != 0:
+        raise RuntimeError("printf failed")
+
+print(saved_pwd.strip())  # The saved text is independent of later output.
 ```
+
+The whole block owns one shell lifetime. Leaving it performs cleanup; it does
+not prove that every command succeeded. A failed command followed by a
+successful command can leave the latest exitcode at zero. Check each required
+step immediately, and preserve needed output as text before the next command.
+Use explicit exceptions, not `assert`, for these checks.
 
 Call the named console when command-specific options are needed:
 
 ```python
 with $.shell("bash") as console:
-    stdout, stderr = console("pwd", command_timeout=10)
+    stdout, stderr, exitcode = console("pwd", command_timeout=10)
+    status = console.exitcode
+    saved_stdout, saved_stderr = str(stdout), str(stderr)
+    if status != 0:
+        raise RuntimeError(f"pwd failed with exit status {status}")
 ```
 
+In 4.0 source, completed shell commands return immutable CommandResult
+snapshots with three-value unpacking, exactly like single-dollar commands.
+Published 3.1.5 console calls still return two buffers. `$.set(check=True)` checks
+shell commands; `console(command, check=False)` overrides that policy. Console
+`command_timeout` limits that command's wait; it does not make the block a job.
+For live output from tcpdump, use managed streaming or enter()/expect()/send(),
+with an explicit stop condition and cleanup. Assignment to a completed result
+cannot observe a still-running command. See the
+[long-program choices]({{ site.baseurl }}/v3a/recommended-api/#unreleased-command-results-and-long-running-programs).
+
 The outermost console context owns the channel. Do not retain `console` for use
-after its block.
+after its block. For interactive programs, a prompt means readiness for more
+input, not necessarily process completion. See
+[Results and Error Model]({{ site.baseurl }}/v3a/concepts/results-and-error-model/)
+for the lifetime/completion/success distinction and a checked Python helper.
 
 ## Put Dollar commands in functions
 
@@ -268,4 +300,4 @@ for lookup and
 [How `.spy` Transformation Works](../../concepts/how-spy-transformation-works/)
 when debugging transformed code.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

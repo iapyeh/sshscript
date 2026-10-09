@@ -7,8 +7,10 @@ nav_order: 1
 
 # System Administration
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 This collection starts with a read-only host-health snapshot. Add future system
 administration cases as separate Gallery pages so each script can state its own
@@ -141,4 +143,4 @@ target platform. Give each command its own stable name and status policy. For a
 state-changing operation, create a separate Gallery page with preconditions,
 backup, idempotency, verification, rollback, and partial-failure behavior.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09

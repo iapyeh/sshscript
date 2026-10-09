@@ -7,8 +7,10 @@ nav_order: 1
 
 # Module API Tutorial
 
-> **Next-release API:** This page describes the updated source checkout.
-> The published 3.1.4 wheel retains the earlier command/config/check behavior.
+> **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
+> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
+> examples for your installed version.
 
 This tutorial introduces SSHScript v3.1 through its primary Python
 `Session` API. The optional Dollar syntax is shown only after the module
@@ -16,10 +18,10 @@ workflow.
 
 ## Install SSHScript
 
-SSHScript v3.1 requires Python 3.11 or newer. Version 3.1.4 is the current
-Production/Stable release on PyPI. Complete
+SSHScript v3.1 requires Python 3.11 or newer. The examples use 3.1.5 as
+the published baseline. Complete
 [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/)
-and confirm that both the CLI and Python import report `3.1.4` before using
+and confirm that both the CLI and Python import report `3.1.5` before using
 this tutorial.
 
 ## Execute a local command
@@ -47,21 +49,20 @@ Pass argv directly for argument-preserving execution; `shlex.join()` with
 `shell=False` remains valid when an existing caller uses a string:
 
 ```python
-import shlex
+from contextlib import closing
 from sshscript import Session
 
 arguments = ["printf", "%s\n", "hello world"]
-command = shlex.join(arguments)
-
-session = Session()
-try:
-    session.exec_command(command, shell=False)
-    print(str(session.stdout), end="")
-finally:
-    session.close(strict=True)
+with closing(Session()) as session:
+    result = session.exec_command(arguments, check=True)
+    print(result.stdout, end="")
 ```
 
-Do not pass `arguments` directly; list and tuple commands raise `TypeError`.
+Pass one nonempty argv list/tuple directly; shell-looking values remain data.
+`closing(Session())` owns root cleanup. Plain `with Session()` activates a
+reusable local Session and does not close it. For cleanup reporting, inspect
+`close_errors` or use `close(strict=True)` while preserving the primary
+exception; see [Session Lifecycle]({{ site.baseurl }}/v3a/concepts/session-lifecycle/).
 
 ## Use shell features deliberately
 
@@ -195,4 +196,4 @@ In v3.1, one `$` handles both direct commands and shell features. The former
 `$$` form is deprecated. See the [Dollar Syntax Reference](../Basic/dollar/)
 if this notation suits the project.
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-08 23:48:09
