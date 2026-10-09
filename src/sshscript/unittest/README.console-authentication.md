@@ -1,6 +1,6 @@
 # Console authentication tests
 
-These tests cover the unreleased su/sudo handshake and failure recovery. Run
+These tests cover the 4.0 su/sudo handshake and failure recovery. Run
 them from the source directory with SSHScript's runtime dependencies installed:
 
 ```sh
@@ -48,7 +48,7 @@ signal handling. The following matrix still requires native-system checks:
 | macOS | BSD su behavior, PTY line handling, sudo login-shell argument reconstruction |
 | Local subprocess and SSH channel on each environment | Stdout/stderr routing, readiness, interruption, and recovery |
 
-Use the [manual interactive examples](../API_GUIDE.md#interactive-usage) on an
+Use the [manual interactive examples](https://iapyeh.github.io/sshscript/v3a/recommended-api/#interactive-usage) on an
 existing account permitted by that host's policy. For sudo, verify root and,
 where permitted, a non-root target through the retained sudo-to-su route.
 Exercise `login=True/False`, `get_pty=True/False`, and `shell=True/False` for

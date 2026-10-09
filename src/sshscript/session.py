@@ -1230,7 +1230,10 @@ class Session(object):
         execution; shell=True uses a POSIX shell; shell="bash" selects a named shell.
         Use shell() as a context manager when successive commands must share state.
 
-        input supplies stdin and env supplies explicit environment values. Remaining
+        input supplies stdin unchanged (str is UTF-8; bytes stay bytes). No newline
+        is added; include "\\n" explicitly for a line-oriented stdin consumer.
+        Terminal password prompts may require enter()/input() instead of stdin.
+        env supplies explicit environment values. Remaining
         keywords are backend-specific execution options. In .spy files, use $command;
         $$ and onedollar()/twodollars() are legacy forms.
 

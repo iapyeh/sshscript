@@ -7,6 +7,7 @@ it.  No repository credential or external host is used.
 
 from contextlib import suppress
 import os
+import hashlib
 from pathlib import Path
 import shlex
 import tempfile
@@ -145,6 +146,110 @@ class OpenSSHIntegrationTests(unittest.TestCase):
         self.assertEqual(caught.exception.termination_status, "unknown")
         self.assertEqual(remote.exec_command(["printf", "alive"], command_timeout=3).stdout, "alive")
 
+    def test_real_full_duplex_bulk_input_and_eof(self):
+        remote = self._connect()
+        payload = bytes(range(256)) * 16384 + '中文\r\n'.encode()
+        source = (
+            'import sys,hashlib; '
+            'sys.stdout.buffer.write(b"O"*3145728); sys.stdout.flush(); '
+            'sys.stderr.buffer.write(b"E"*3145728); sys.stderr.flush(); '
+            'data=sys.stdin.buffer.read(); '
+            'print("\\nINPUT:"+hashlib.sha256(data).hexdigest()); '
+            'sys.stderr.write("\\nEOF:"+str(len(data))+"\\n")'
+        )
+        for mode in ('legacy', 'managed'):
+            with self.subTest(mode=mode):
+                timing = {'timeout': 20} if mode == 'legacy' else {
+                    'command_timeout': 20, 'capture_limit': 4 * 1024 * 1024}
+                result = remote.exec_command(['python3', '-u', '-c', source],
+                                             input=payload, check=True, **timing)
+                self.assertEqual(result.stdout, 'O'*3145728 + '\nINPUT:' + hashlib.sha256(payload).hexdigest() + '\n')
+                self.assertEqual(result.stderr, 'E'*3145728 + '\nEOF:' + str(len(payload)) + '\n')
+                self.assertEqual(result.exitcode, 0)
+        for payload in ('', b''):
+            self.assertEqual(remote.exec_command(['cat'], input=payload,
+                                                command_timeout=5, check=True).stdout, '')
+
+    def test_real_transport_loss_is_not_completion_or_timeout(self):
+        remote = self._connect()
+        # Supply a finite server-side fallback: a lost transport cannot prove
+        # termination, and tests must not leave an indefinite remote command.
+        job = remote.start(['sh', '-c', 'echo ready; sleep 2'], timeout=10)
+        seen = ''
+        for chunk in job.iter_stdout():
+            seen += chunk
+            if 'ready' in seen:
+                break
+        remote._client.get_transport().close()
+        with self.assertRaises((EOFError, OSError, paramiko.SSHException)) as caught:
+            job.wait()
+        self.assertNotIsInstance(caught.exception, CommandTimeoutError)
+        self.assertIn('ready', job.stdout)
+        for worker in (job._worker, job._monitor):
+            worker.join(2)
+            self.assertFalse(worker.is_alive())
+        self.assertTrue(job._channel.closed)
+        with self.assertRaises(BrokenPipeError):
+            remote.exec_command(['printf', 'must-not-run-locally'])
+
+    def test_ci_forwarding_rejects_other_destinations(self):
+        if not os.environ.get('SSHSCRIPT_OPENSSH_CONFIG'):
+            self.skipTest('restricted forwarding applies to the disposable CI fixture')
+        parent = self._connect()
+        with self.assertRaises(paramiko.ChannelException) as caught:
+            parent._client.get_transport().open_channel(
+                'direct-tcpip', (self.host, self.port + 1), ('127.0.0.1', 0))
+        self.assertEqual(caught.exception.code, 1)  # administratively prohibited
+        self.assertEqual(parent.exec_command(['printf', 'parent'], command_timeout=5).stdout, 'parent')
+
+    def test_real_nested_ssh_closes_child_and_preserves_parent(self):
+        parent = self._connect()
+        with parent.connect(self.host, username=self.username, port=self.port,
+                            ssh_config=False, key_filename=str(self.key_path),
+                            look_for_keys=False, allow_agent=False, timeout=5,
+                            banner_timeout=5, auth_timeout=5) as nested:
+            transport = nested._client.get_transport()
+            result = nested.exec_command(['printf', 'nested'], command_timeout=5, check=True)
+            self.assertEqual(result.stdout, 'nested')
+            self.assertEqual(result.host, self.host)
+        transport.join(2)
+        self.assertFalse(transport.is_alive())
+        self.assertTrue(nested.closed)
+        self.assertEqual(parent.exec_command(['printf', 'parent'], command_timeout=5).stdout, 'parent')
+
+    def test_real_proxyjump_authentication_host_keys_and_cleanup(self):
+        with tempfile.TemporaryDirectory(prefix='sshscript-jump-config-') as folder:
+            config = Path(folder) / 'config'
+            config.write_text(
+                'Host jump\n'
+                f' HostName {self.host}\n User {self.username}\n Port {self.port}\n'
+                f' IdentityFile "{self.key_path}"\n'
+                f' UserKnownHostsFile "{self.known_hosts}"\n'
+                ' IdentitiesOnly yes\n'
+                'Host target\n'
+                f' HostName {self.host}\n User {self.username}\n Port {self.port}\n'
+                ' ProxyJump jump\n')
+            parent = self._new_parent()
+            with parent.connect('target', ssh_config=config, key_filename=str(self.key_path),
+                                look_for_keys=False, allow_agent=False, timeout=5,
+                                banner_timeout=5, auth_timeout=5) as remote:
+                proxy = remote._sock
+                transport = remote._client.get_transport()
+                self.assertEqual(remote.exec_command(['printf', 'jump'], command_timeout=5).stdout, 'jump')
+            transport.join(2)
+            self.assertFalse(transport.is_alive())
+            self.assertIsNotNone(proxy.process.poll())
+            self.assertTrue(all(getattr(proxy.process, name).closed
+                                for name in ('stdin', 'stdout', 'stderr')))
+            self.assertTrue(remote.closed)
+            # The jump host also requires a trusted key; a successful target
+            # connection must not conceal an unknown key on the proxy hop.
+            self.known_hosts.write_text('', encoding='utf-8')
+            with self.assertRaises((paramiko.SSHException, EOFError, OSError)):
+                parent.connect('target', ssh_config=config, key_filename=str(self.key_path),
+                               look_for_keys=False, allow_agent=False, timeout=5,
+                               banner_timeout=5, auth_timeout=5)
+
     def test_managed_timeout_preserves_observed_output(self):
         remote = self._connect()
         started = time.monotonic()
@@ -225,6 +330,17 @@ class OpenSSHIntegrationTests(unittest.TestCase):
                 banner_timeout=5,
                 auth_timeout=5,
             )
+
+    def test_exact_stdin_and_eof_on_real_ssh(self):
+        remote = self._connect()
+        command = ["python3", "-c", "import sys; print(sys.stdin.buffer.read().hex())"]
+        for payload in (None, '', 'abc', '中文\n', b'\x00\xff\n'):
+            for managed in (False, True):
+                with self.subTest(payload=payload, managed=managed):
+                    timing = {'command_timeout': 5} if managed else {'timeout': 5}
+                    result = remote.exec_command(command, input=payload, check=True, **timing)
+                    expected = payload.encode('utf-8') if isinstance(payload, str) else payload or b''
+                    self.assertEqual(result.stdout, expected.hex() + '\n')
 
     def test_real_command_stdout_stderr_and_exit_status(self):
         remote = self._connect()

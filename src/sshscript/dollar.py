@@ -127,6 +127,15 @@ class Dollar(object):
             if value is not None and not isinstance(value, bool):
                 raise TypeError('get_pty must be None or bool')
 
+    def _raise_worker_exception(self, thread):
+        # A worker publishes its error before event-loop/executor cleanup ends.
+        # Settle that owned thread before returning the failure to the caller.
+        thread.join(timeout=2)
+        if thread.is_alive():
+            self._worker_exception.add_note(
+                'Command worker cleanup did not finish within 2 seconds')
+        raise self._worker_exception
+
     def __call__(self,get_pty=None):
         self._validate_get_pty(get_pty)
         def r():
@@ -204,7 +213,11 @@ class Dollar(object):
                 try:
                     cleanup()
                 except BaseException as exc:
-                    self._worker_exception = exc
+                    if self._worker_exception is None:
+                        self._worker_exception = exc
+                    else:
+                        self._worker_exception.add_note(
+                            f'Command worker cleanup failed: {type(exc).__name__}: {exc}')
                     if self.channel is not None:
                         self.channel.fail(exc)
 
@@ -218,7 +231,7 @@ class Dollar(object):
         #print('#'*100,self.channel,t.is_alive())
         self.call_thread = t
         if self._worker_exception is not None:
-            raise self._worker_exception
+            self._raise_worker_exception(t)
         if self.channel is None:
             raise RuntimeError(
                 'Command worker exited before channel initialization'
@@ -234,7 +247,7 @@ class Dollar(object):
             ):
                 time.sleep(0.01)
             if self._worker_exception is not None:
-                raise self._worker_exception
+                self._raise_worker_exception(t)
             if not self.channel.closed:
                 raise RuntimeError(
                     'Command worker exited before closing the channel'
@@ -560,32 +573,46 @@ class Dollar(object):
             )
             self.channel = SSHChannel(self,None,get_pty)
             stdin, stdout,stderr = client.exec_command(command,**kw)
-            if kw_input is not None:
-                input_payload = kw_input
-                if isinstance(input_payload, str) and not input_payload.endswith('\n'):
-                    input_payload += '\n'
-                stdin.write(input_payload)
-                stdin.flush()
+            # stdin and both output streams share channel flow control. Start
+            # readers before feeding stdin: a child may fill stdout/stderr before
+            # it reads input, even when each individual stream is small enough.
+            def feed_stdin():
+                try:
+                    if kw_input is not None:
+                        stdin.write(kw_input)
+                        stdin.flush()
+                finally:
+                    stdin.channel.shutdown_write()
 
-            # Programs such as ``cat`` wait for EOF before producing their
-            # result.  Closing only the write side also lets stdout/stderr
-            # remain available for collection.
-            stdin.channel.shutdown_write()
-
-            # stdout and stderr share an SSH channel window.  Reading either
-            # stream to EOF before draining the other can deadlock when the
-            # unread stream fills that window, so drain them concurrently.
             loop = asyncio.get_running_loop()
-            stdout_future = loop.run_in_executor(None, stdout.read)
-            stderr_future = loop.run_in_executor(None, stderr.read)
-            stdout_data, stderr_data = await asyncio.gather(
-                stdout_future,
-                stderr_future,
-            )
+            streams = [loop.run_in_executor(None, stdout.read),
+                       loop.run_in_executor(None, stderr.read),
+                       loop.run_in_executor(None, feed_stdin)]
+            try:
+                stdout_data, stderr_data, _ = await asyncio.gather(*streams)
+            except BaseException:
+                # Wake ALL blocked executor threads before event-loop cleanup
+                # joins them. Preserve the initiating transport/timeout error.
+                stdout.channel.close()
+                await asyncio.gather(*streams, return_exceptions=True)
+                raise
+            finally:
+                # Reads reached EOF (or failed); this channel belongs to this
+                # one-shot command, not the shared SSH transport.
+                stdin.close()
+                stdout.close()
+                stderr.close()
+
             await self.channel._add_stdout_data(stdout_data)
             await self.channel._add_stderr_data(stderr_data)
             await self.channel._dump_stdout_err()
-            self.channel._exitcode = stdout.channel.recv_exit_status()
+            status = stdout.channel.recv_exit_status()
+            stdout.channel.close()
+            if status == -1:
+                # Paramiko uses -1 for a missing SSH exit-status message. It is
+                # not a command exit code and must not become a completed result.
+                raise EOFError('SSH channel closed without an exit status')
+            self.channel._exitcode = status
             self.logger.debug(
                 'SSH command completed (host=%s, exit_code=%s)',
                 host,

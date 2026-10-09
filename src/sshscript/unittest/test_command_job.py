@@ -1,5 +1,7 @@
 """Managed command contracts using processes and real Paramiko over socketpair."""
 import os
+import io
+import hashlib
 import signal
 import socket
 import subprocess
@@ -7,7 +9,7 @@ import sys
 import threading
 import time
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import paramiko
 from session import Session, CommandTimeoutError
@@ -20,6 +22,7 @@ class Server(paramiko.ServerInterface):
         self.processes = []
         self.workers = []
         self.release = threading.Event()
+        self.errors = []
 
     def check_auth_none(self, username):
         return paramiko.AUTH_SUCCESSFUL
@@ -34,34 +37,68 @@ class Server(paramiko.ServerInterface):
         if command == b'exec stall-ack':
             self.release.wait(3)
             return False
+        if command == b'exec drop-status':
+            def drop_status():
+                # EOF is sent only after the exec request was acknowledged.
+                while channel.recv(8192):
+                    pass
+                channel.sendall(b'observed-before-close')
+                channel.shutdown_write()
+                channel.close()
+            worker = threading.Thread(target=drop_status, daemon=True)
+            self.workers.append(worker)
+            worker.start()
+            return True
         def execute():
             process = subprocess.Popen(command.decode(), shell=True, stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE, stdin=subprocess.DEVNULL,
+                                       stderr=subprocess.PIPE, stdin=subprocess.PIPE,
                                        start_new_session=True)
             self.processes.append(process)
             def pump(stream, send):
                 try:
                     while data := os.read(stream.fileno(), 8192):
                         send(data)
-                except (OSError, EOFError):
+                except (OSError, EOFError) as exc:
+                    if not channel.closed:
+                        self.errors.append(exc)
+                finally:
+                    stream.close()
+            def feed_input():
+                try:
+                    while data := channel.recv(8192):
+                        process.stdin.write(data)
+                        process.stdin.flush()
+                except (BrokenPipeError, EOFError, OSError):
+                    # Early process exit / channel cancellation closes stdin.
                     pass
+                finally:
+                    try:
+                        process.stdin.close()
+                    except BrokenPipeError:
+                        pass
             pumps = [threading.Thread(target=pump, args=(process.stdout, channel.sendall), daemon=True),
-                     threading.Thread(target=pump, args=(process.stderr, channel.sendall_stderr), daemon=True)]
+                     threading.Thread(target=pump, args=(process.stderr, channel.sendall_stderr), daemon=True),
+                     threading.Thread(target=feed_input, daemon=True)]
+            self.workers.extend(pumps)
             for thread in pumps:
                 thread.start()
             try:
                 status = process.wait()
-                for thread in pumps:
-                    thread.join(1)
+                for thread in pumps[:2]:
+                    thread.join(3)
+                    if thread.is_alive():
+                        raise RuntimeError('fixture output pump did not finish')
                 if not channel.closed:
                     channel.send_exit_status(status)
                     channel.shutdown_write()
-            except (OSError, EOFError):
-                pass
+            except (OSError, EOFError) as exc:
+                if not channel.closed:
+                    self.errors.append(exc)
+            except Exception as exc:
+                self.errors.append(exc)
             finally:
                 channel.close()
-                for stream in (process.stdout, process.stderr):
-                    stream.close()
+                pumps[2].join(3)
         thread = threading.Thread(target=execute, daemon=True)
         self.workers.append(thread)
         thread.start()
@@ -76,8 +113,9 @@ class CommandJobTests(unittest.TestCase):
 
     def remote(self):
         left, right = socket.socketpair()
-        server_transport = paramiko.Transport(left)
-        client_transport = paramiko.Transport(right)
+        # Force flow control well before the bulk test payload is exhausted.
+        server_transport = paramiko.Transport(left, default_window_size=32768)
+        client_transport = paramiko.Transport(right, default_window_size=32768)
         server_transport.add_server_key(paramiko.RSAKey.generate(1024))
         server = Server()
         server_transport.start_server(event=threading.Event(), server=server)
@@ -97,6 +135,10 @@ class CommandJobTests(unittest.TestCase):
         session = self.local()
         session._client = client
         session.host = 'socketpair.test'
+        session._test_server = server
+        session._test_server_transport = server_transport
+        session._test_client_transport = client_transport
+        session._test_channels = channels
         def cleanup():
             server.release.set()
             client_transport.close()
@@ -110,11 +152,148 @@ class CommandJobTests(unittest.TestCase):
             acceptor.join(1)
             left.close()
             right.close()
+            self.assertFalse(acceptor.is_alive(), 'fixture acceptor leaked')
+            self.assertFalse(any(worker.is_alive() for worker in server.workers),
+                             'fixture process I/O worker leaked')
+            self.assertEqual(server.errors, [], 'fixture failed to deliver output')
         self.addCleanup(cleanup)
         return session
 
     def command(self, source):
         return [sys.executable, '-u', '-c', source]
+
+    def assert_job_released(self, job):
+        for thread in (job._worker, job._monitor):
+            thread.join(2)
+            self.assertFalse(thread.is_alive(), 'owned job thread leaked')
+        if job._process is not None:
+            self.assertIsNotNone(job._process.poll())
+            for stream in (job._process.stdin, job._process.stdout, job._process.stderr):
+                self.assertTrue(stream.closed, 'owned subprocess pipe leaked')
+        if job._channel is not None:
+            self.assertTrue(job._channel.closed, 'owned SSH channel leaked')
+
+    def test_full_duplex_bulk_transfer_and_eof(self):
+        # Write more than the SSH/pipe window BEFORE reading input. Sequential
+        # write-all-stdin then read-output implementations deadlock here.
+        payload = bytes(range(256)) * 2048 + '中文\r\n'.encode()
+        source = (
+            'import sys,hashlib; '
+            'sys.stdout.buffer.write(b"O"*262144); sys.stdout.flush(); '
+            'sys.stderr.buffer.write(b"E"*262144); sys.stderr.flush(); '
+            'data=sys.stdin.buffer.read(); '
+            'print("\\nINPUT:"+hashlib.sha256(data).hexdigest()); '
+            'sys.stderr.write("\\nEOF:"+str(len(data))+"\\n")'
+        )
+        for session in (self.local(), self.remote()):
+            for mode in ('legacy', 'managed', 'start'):
+                with self.subTest(host=session.host, mode=mode):
+                    if mode == 'start':
+                        with session.start(self.command(source), input=payload,
+                                           timeout=10, capture_limit=1048576, check=True) as job:
+                            result = job.wait()
+                        self.assert_job_released(job)
+                    else:
+                        timing = {'timeout': 10} if mode == 'legacy' else {'command_timeout': 10}
+                        result = session(self.command(source), input=payload, check=True, **timing)
+                    self.assertEqual(result.stdout, 'O'*262144 + '\nINPUT:' + hashlib.sha256(payload).hexdigest() + '\n')
+                    self.assertEqual(result.stderr, 'E'*262144 + '\nEOF:' + str(len(payload)) + '\n')
+                    self.assertEqual(result.exitcode, 0)
+
+    def test_empty_stdin_delivers_eof_on_both_backends(self):
+        for session in (self.local(), self.remote()):
+            for payload in ('', b''):
+                with self.subTest(host=session.host, payload=payload):
+                    with session.start(self.command('import sys; print(len(sys.stdin.buffer.read()))'),
+                                       input=payload, timeout=3, check=True) as job:
+                        self.assertEqual(job.wait().stdout, '0\n')
+                    self.assert_job_released(job)
+
+    def test_missing_ssh_exit_status_is_failure_not_a_completed_result(self):
+        session = self.remote()
+        for mode in ('legacy', 'managed'):
+            with self.subTest(mode=mode):
+                timing = {'timeout': 3} if mode == 'legacy' else {'command_timeout': 3}
+                with self.assertRaises(EOFError):
+                    session(['drop-status'], check=True, **timing)
+                self.assertIsNone(session.last_result)
+                self.assertIn('observed-before-close', str(session.stdout))
+                # Losing one channel's exit status must not close the transport.
+                self.assertEqual(session(['printf', 'alive'], command_timeout=3).stdout, 'alive')
+
+    def test_legacy_blocked_stdin_timeout_releases_io_workers_and_channel(self):
+        session = self.remote()
+        started = time.monotonic()
+        with self.assertRaises(TimeoutError):
+            session(self.command('import time; print("ready"); time.sleep(30)'),
+                    input=b'x'*1048576, timeout=.2)
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertFalse(session.dollar.call_thread.is_alive())
+        self.assertIsNone(session.last_result)
+        self.assertEqual(session(['printf', 'alive'], command_timeout=3).stdout, 'alive')
+
+    def test_disconnect_preserves_observed_output_and_never_falls_back_locally(self):
+        session = self.remote()
+        retained = session(['printf', 'previous'], command_timeout=3)
+        job = session.start(self.command('import time; print("ready"); time.sleep(30)'),
+                            timeout=5, stop_timeout=.2)
+        self.addCleanup(lambda: job.stop() if not job.done else None)
+        observed = ''
+        for chunk in job.iter_stdout():
+            observed += chunk
+            if 'ready' in observed:
+                break
+        session._test_server_transport.close()
+        with self.assertRaises((EOFError, OSError, paramiko.SSHException)) as caught:
+            job.wait()
+        self.assertNotIsInstance(caught.exception, CommandTimeoutError)
+        self.assertIn('ready', job.stdout)
+        self.assert_job_released(job)
+        self.assertIs(session.last_result, retained)
+        self.assertEqual(retained.stdout, 'previous')
+        with patch('commandjob.subprocess.Popen') as managed, patch('dollar.subprocess.run') as legacy:
+            for operation in (lambda: session(['printf', 'wrong-host']),
+                              lambda: session.start(['printf', 'wrong-host'])):
+                with self.assertRaises(BrokenPipeError):
+                    operation()
+            managed.assert_not_called()
+            legacy.assert_not_called()
+
+    def test_repeated_completion_timeout_and_stop_release_owned_resources(self):
+        fd_dir = '/proc/self/fd' if os.path.isdir('/proc/self/fd') else '/dev/fd'
+        baseline = len(os.listdir(fd_dir)) if os.path.isdir(fd_dir) else None
+        for backend in ('local', 'ssh'):
+            for cycle in range(3):
+                with self.subTest(backend=backend, cycle=cycle):
+                    session = self.local() if backend == 'local' else self.remote()
+                    with session.start(self.command('print("complete")'), timeout=3) as job:
+                        self.assertEqual(job.wait().stdout, 'complete\n')
+                    self.assert_job_released(job)
+                    with session.start(self.command('import time; print("ready"); time.sleep(30)'),
+                                       timeout=3, stop_timeout=.1) as job:
+                        for chunk in job.iter_stdout():
+                            if 'ready' in chunk:
+                                break
+                        stopped = job.stop()
+                        self.assertEqual(stopped.stop_reason, 'cancelled')
+                        self.assertEqual(stopped.termination_status,
+                                         'confirmed' if backend == 'local' else 'unknown')
+                    self.assert_job_released(job)
+                    job = session.start(self.command('import time; time.sleep(30)'),
+                                        timeout=.1, stop_timeout=.1)
+                    with self.assertRaises(CommandTimeoutError):
+                        job.wait()
+                    self.assert_job_released(job)
+                    session.close(strict=True)
+                    if backend == 'ssh':
+                        for transport in (session._test_client_transport, session._test_server_transport):
+                            transport.join(2)
+                            self.assertFalse(transport.is_alive(), 'SSH transport thread leaked')
+        # Dispose the fixture's server-side processes; channel closure alone
+        # intentionally does not promise their termination.
+        self.doCleanups()
+        if baseline is not None:
+            self.assertLessEqual(len(os.listdir(fd_dir)), baseline, 'file descriptors accumulated')
 
     def test_exports_and_success_on_both_backends(self):
         self.assertIs(sshscript.CommandTimeoutError, CommandTimeoutError)
@@ -129,14 +308,37 @@ class CommandJobTests(unittest.TestCase):
     def test_continuous_output_does_not_reset_deadline(self):
         for session in (self.local(), self.remote()):
             with self.subTest(host=session.host):
-                start = time.monotonic()
-                with self.assertRaises(CommandTimeoutError) as caught:
-                    session(self.command('import time\nwhile True:\n print("tick"); time.sleep(.01)'), command_timeout=.3, stop_timeout=.1)
-                self.assertLess(time.monotonic() - start, 2)
-                self.assertIn('tick', caught.exception.stdout)
-                self.assertEqual(caught.exception.result.stop_reason, 'timeout')
-                self.assertIsNone(session.last_result)
-                self.assertEqual(caught.exception.termination_status, 'confirmed' if session.host is None else 'unknown')
+                # Isolate the deadline contract from interpreter/SSH startup:
+                # hold only the job clock until output is actually observed.
+                clock = Mock(wraps=time)
+                origin = time.monotonic()
+                clock.monotonic.return_value = origin
+                with patch('commandjob.time', clock):
+                    job = session.start(self.command(
+                        'import time\nwhile True:\n print("tick"); time.sleep(.01)'),
+                        timeout=.3, stop_timeout=.1)
+                    try:
+                        with job._condition:
+                            self.assertTrue(job._condition.wait_for(
+                                lambda: 'tick' in job.stdout or job.done, timeout=5),
+                                'continuous-output process did not become ready')
+                        self.assertIn('tick', job.stdout)
+                        ready_at = time.monotonic()
+                        clock.monotonic.side_effect = lambda: origin + time.monotonic() - ready_at
+                        self.assertTrue(job._done.wait(2), 'output reset the total deadline')
+                        with self.assertRaises(CommandTimeoutError) as caught:
+                            job.wait()
+                        self.assertIn('tick', caught.exception.stdout)
+                        self.assertEqual(caught.exception.result.stop_reason, 'timeout')
+                        self.assertIsNone(session.last_result)
+                        self.assertEqual(caught.exception.termination_status,
+                                         'confirmed' if session.host is None else 'unknown')
+                        self.assert_job_released(job)
+                    finally:
+                        try:
+                            job.stop()
+                        except CommandTimeoutError:
+                            pass
 
     def test_silent_command_and_unconsumed_stdin_are_bounded(self):
         for session in (self.local(), self.remote()):
@@ -150,7 +352,8 @@ class CommandJobTests(unittest.TestCase):
         for status in (None, -signal.SIGINT):
             with self.subTest(status=status):
                 job = object.__new__(CommandJob)
-                job._process = Mock(pid=123, poll=Mock(return_value=status))
+                job._process = Mock(pid=123, poll=Mock(return_value=status),
+                                    wait=Mock(side_effect=subprocess.TimeoutExpired('sleep', 1)))
                 job._channel = None
                 job._signal_lock = threading.Lock()
                 job._sent_local_signals = set()
@@ -162,6 +365,145 @@ class CommandJobTests(unittest.TestCase):
                     else:
                         job._signal()
                         self.assertEqual(job._sent_local_signals, {signal.SIGINT})
+
+    def test_signal_permission_error_waits_for_delayed_child_exit(self):
+        job = object.__new__(CommandJob)
+        job._process = Mock(pid=123, poll=Mock(return_value=None),
+                            wait=Mock(return_value=-signal.SIGINT))
+        job._channel = None
+        job._signal_lock = threading.Lock()
+        job._sent_local_signals = set()
+        job._status = None
+        with patch('commandjob.os.killpg', side_effect=PermissionError):
+            job._signal(force=True)
+            job._signal()
+            job._signal(force=True)
+        job._process.wait.assert_called_once_with(timeout=1)
+        self.assertEqual(job._status, -signal.SIGINT)
+        self.assertEqual(job._sent_local_signals, {signal.SIGKILL})
+
+    def test_local_signal_failure_still_closes_all_streams(self):
+        job = object.__new__(CommandJob)
+        job._argv = ['sleep', '30']
+        job._env = None
+        job._reason = 'cancelled'
+        failure = PermissionError('signal denied')
+        job._signal = Mock(side_effect=failure)
+        streams = [io.BytesIO() for _ in range(3)]
+        process = Mock(poll=Mock(return_value=None),
+                       stdin=streams[0], stdout=streams[1], stderr=streams[2])
+        with patch('commandjob.subprocess.Popen', return_value=process):
+            with self.assertRaises(PermissionError) as caught:
+                job._run_local()
+        self.assertIs(caught.exception, failure)
+        self.assertTrue(all(stream.closed for stream in streams))
+
+    def test_stream_close_failures_do_not_replace_command_failure(self):
+        for failed_index in range(3):
+            with self.subTest(stream=failed_index):
+                job = object.__new__(CommandJob)
+                job._argv, job._env, job._reason = ['sleep', '30'], None, 'cancelled'
+                primary = PermissionError('signal denied')
+                job._signal = Mock(side_effect=primary)
+                streams = [Mock() for _ in range(3)]
+                streams[failed_index].close.side_effect = OSError('close denied')
+                process = Mock(poll=Mock(return_value=None),
+                               stdin=streams[0], stdout=streams[1], stderr=streams[2])
+                with patch('commandjob.subprocess.Popen', return_value=process):
+                    with self.assertRaises(PermissionError) as caught:
+                        job._run_local()
+                self.assertIs(caught.exception, primary)
+                for stream in streams:
+                    stream.close.assert_called_once_with()
+                self.assertTrue(any('close denied' in note for note in primary.__notes__))
+
+    def test_cleanup_only_failure_reports_all_stream_errors(self):
+        job = object.__new__(CommandJob)
+        job._argv, job._env, job._reason, job._input = ['true'], None, None, b'x'
+        failures = [OSError('stdin failed'), OSError('stdout failed'), OSError('stderr failed')]
+        streams = [Mock(close=Mock(side_effect=error)) for error in failures]
+        process = Mock(poll=Mock(return_value=0), wait=Mock(return_value=0),
+                       stdin=streams[0], stdout=streams[1], stderr=streams[2])
+        selector = MagicMock()
+        selector.__enter__.return_value.get_map.return_value = {}
+        with patch('commandjob.subprocess.Popen', return_value=process), \
+             patch('commandjob.os.set_blocking'), \
+             patch('commandjob.selectors.DefaultSelector', return_value=selector):
+            with self.assertRaises(OSError) as caught:
+                job._run_local()
+        self.assertIs(caught.exception, failures[0])
+        self.assertEqual(job._status, 0)
+        for stream in streams:
+            stream.close.assert_called_once_with()
+        self.assertTrue(any('stdout failed' in note for note in caught.exception.__notes__))
+        self.assertTrue(any('stderr failed' in note for note in caught.exception.__notes__))
+
+    def test_reap_and_stream_cleanup_continue_after_signal_failure(self):
+        job = object.__new__(CommandJob)
+        primary = RuntimeError('command failed')
+        signal_error = PermissionError('signal denied')
+        wait_error = OSError('wait denied')
+        job._signal = Mock(side_effect=signal_error)
+        streams = [Mock() for _ in range(3)]
+        process = Mock(poll=Mock(return_value=None), wait=Mock(side_effect=wait_error),
+                       stdin=streams[0], stdout=streams[1], stderr=streams[2])
+        job._cleanup_local(process, primary)
+        process.wait.assert_called_once_with(timeout=1)
+        for stream in streams:
+            stream.close.assert_called_once_with()
+        self.assertTrue(any('signal denied' in note for note in primary.__notes__))
+        self.assertTrue(any('wait denied' in note for note in primary.__notes__))
+
+    def test_timeout_reports_worker_and_cleanup_failures_without_changing_type(self):
+        from commandjob import JobResult
+        job = object.__new__(CommandJob)
+        job._done = threading.Event()
+        job._done.set()
+        job.timeout = .1
+        job._result = JobResult('', '', None, 'localhost', .2, 'sleep', 'timeout', 'unknown')
+        failure = PermissionError('signal denied')
+        failure.add_note('Local job cleanup failed during stdout.close(): close denied')
+        job._error = failure
+        with self.assertRaises(CommandTimeoutError) as caught:
+            job.wait()
+        self.assertIs(caught.exception.__cause__, failure)
+        self.assertTrue(any('close denied' in note for note in caught.exception.__notes__))
+        self.assertEqual(caught.exception.termination_status, 'unknown')
+
+    def test_legacy_error_waits_for_command_worker_cleanup(self):
+        from dollar import Dollar
+        import asyncio
+        session = self.local()
+        cleanup_started, release_cleanup, caller_done = (threading.Event() for _ in range(3))
+        failure = TimeoutError('worker timed out')
+        observed = []
+        async def fail(execution, get_pty=None):
+            execution.channel = Mock(closed=True)
+            raise failure
+        async def delayed_cleanup(loop):
+            cleanup_started.set()
+            if not release_cleanup.wait(2):
+                raise RuntimeError('test cleanup barrier was not released')
+        def invoke():
+            try:
+                session(['true'])
+            except BaseException as exc:
+                observed.append(exc)
+            finally:
+                caller_done.set()
+        with patch.object(Dollar, 'async_call_worker', fail), \
+             patch.object(asyncio.BaseEventLoop, 'shutdown_default_executor', delayed_cleanup):
+            caller = threading.Thread(target=invoke)
+            caller.start()
+            try:
+                self.assertTrue(cleanup_started.wait(2))
+                self.assertFalse(caller_done.wait(.1), 'returned before worker cleanup completed')
+            finally:
+                release_cleanup.set()
+                caller.join(3)
+        self.assertFalse(caller.is_alive())
+        self.assertEqual(observed, [failure])
+        self.assertFalse(session.dollar.call_thread.is_alive())
 
     def test_force_stop_does_not_send_later_sigint_to_dying_group(self):
         job = object.__new__(CommandJob)

@@ -20,7 +20,11 @@ if (root / '.git').exists():
         raise SystemExit('Private or unapproved test files are tracked:\n' +
                          '\n'.join(unexpected))
 env = os.environ.copy()
-env['PATH'] = str(Path(sys.executable).parent) + os.pathsep + env.get('PATH', '')
+# A user-bin symlink can sit beside a different 'python3'. Resolve it for
+# system interpreters, but retain a venv's bin so child commands use its deps.
+interpreter_bin = (Path(sys.executable).parent if sys.prefix != sys.base_prefix
+                   else Path(sys.executable).resolve().parent)
+env['PATH'] = str(interpreter_bin) + os.pathsep + env.get('PATH', '')
 commands = [
     ['-m', 'compileall', '-q', '-x', 'unittest-v3', str(source)],
     ['-m', 'unittest', 'discover', '-v', '-s', 'unittest', '-p', 'test_*.py'],

@@ -46,9 +46,11 @@ include src/sshscript/unittest/test_ssh_security.py
 include src/sshscript/unittest/test_sshscript_dollar_syntax.py
 include src/sshscript/unittest/test_sshscript_module.py
 include src/sshscript/unittest/test_stdio_dynamic_string.py
+include src/sshscript/unittest/test_stdin_contract.py
 include src/sshscript/unittest/test_syntax_error.spy
 include src/sshscript/unittest/test_update_check.py
 
-include API_GUIDE.md
+include API_GUIDE.md VERSIONING.md
+include src/sshscript/unittest/test_version_policy.py
 include src/sshscript/py.typed
 recursive-include src/sshscript *.pyi

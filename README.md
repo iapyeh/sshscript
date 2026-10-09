@@ -2,18 +2,21 @@
 
 [![PyPI](https://img.shields.io/pypi/v/sshscript)](https://pypi.org/project/sshscript/)
 [![Python](https://img.shields.io/pypi/pyversions/sshscript)](https://pypi.org/project/sshscript/)
-[![PyPI](https://img.shields.io/pypi/v/sshscript)](https://pypi.org/project/sshscript/)
-[![Python](https://img.shields.io/pypi/pyversions/sshscript)](https://pypi.org/project/sshscript/)
 [![CI](https://github.com/iapyeh/sshscript/actions/workflows/ci.yml/badge.svg?branch=release)](https://github.com/iapyeh/sshscript/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml/badge.svg?branch=release)](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/iapyeh/sshscript/blob/release/LICENSE.txt)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/iapyeh/sshscript/blob/release/LICENSE.txt)
 
 SSHScript is a Python automation library for running commands locally and over
 SSH through one `Session` API. It also provides optional dollar syntax for
 compact `.spy` automation files.
 
-**Current release:** [3.1.5](https://github.com/iapyeh/sshscript/releases/tag/v3.1.5)
+SSHScript aims to help engineers and AI agents execute, understand, and hand
+off automation reliably: identify the execution host, retain each command's
+output and status, distinguish failure from timeout, and make cleanup and
+unknown termination explicit. A successful command exit is evidence about
+that command; verify the deployment or other application outcome separately.
+
+**Current release:** [4.0.1](https://github.com/iapyeh/sshscript/releases/tag/v4.0.1)
 (Production/Stable) · **Python:** 3.11 or newer · **Tested:** Python
 3.11–3.14 on Linux and macOS
 
@@ -23,6 +26,10 @@ compact `.spy` automation files.
 [Security](https://github.com/iapyeh/sshscript/security/policy) ·
 [Support](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 
+**Version 4.0.1** introduces the incompatible 4.0 execution contract.
+Upgrade 3.1.5 automation using the migration guide and application regressions.
+See [version policy and migration](VERSIONING.md) before upgrading automation.
+
 ## Recommended API
 
 Start with [the canonical API guide](API_GUIDE.md): version-labelled examples,
@@ -30,17 +37,17 @@ recommended argv/check/result patterns, lifetime rules, and compatibility forms.
 Its executable examples run in CI. The same guide is available in the
 [website documentation](https://iapyeh.github.io/sshscript/v3a/recommended-api/).
 
-The unreleased source also ships `py.typed` and public `.pyi` declarations for
+The 4.0 source also ships `py.typed` and public `.pyi` declarations for
 Session, results, jobs, console calls and package entry points. Legacy live
 buffers and backend-specific keyword options retain `Any`; this is targeted
 public typing, not a claim that every internal module is fully annotated.
 
-In unreleased source, `su()` and `sudo()` accept `enter_timeout=10` and return a
+In 4.0 source, `su()` and `sudo()` accept `enter_timeout=10` and return a
 console only after authenticated startup and a target-shell UID/PID handshake.
 Passwords are sent at most once; an unconfirmed recovery makes the channel
 unusable. Custom nested `command=` strings now require a bootstrap placeholder.
 See [authenticated console usage and migration](API_GUIDE.md#unreleased-authenticated-susudo-consoles)
-and [the cross-system test guide](unittest/README.console-authentication.md).
+and [the cross-system test guide](src/sshscript/unittest/README.console-authentication.md).
 
 ## Why SSHScript?
 
@@ -85,9 +92,13 @@ it never installs an update by itself.
 
 ## 60-second local quickstart
 
+This example uses the published 3.1.5 command API.
+
+<!-- example: {"id":"readme-quickstart", "profile":"3.1.5", "stdout":"sshscript is ready\nexit code: 0\n"} -->
 ```python
 import sys
 
+from contextlib import closing
 from sshscript import Session
 
 command = [
@@ -96,14 +107,14 @@ command = [
     "print('sshscript is ready')",
 ]
 
-with Session() as local:
+with closing(Session()) as local:
     stdout, stderr, exitcode = local.exec_command(
         command,
         shell=False,
         check=True,
     )
     print(str(stdout).strip())
-    print(f"exit code: {local.exitcode}")
+    print(f"exit code: {exitcode}")
 ```
 
 Expected output:
@@ -113,6 +124,13 @@ sshscript is ready
 exit code: 0
 ```
 
+`closing(Session())` closes the local Session when the block ends. Plain
+`with Session()` only activates a reusable local Session; it does not close it.
+`closing` calls `close()` without inspecting its bool return. Inspect
+`close_errors` or use `close(strict=True)` when cleanup failure must be reported,
+while preserving an exception already raised by the block. See the
+[canonical lifetime rules](API_GUIDE.md#lifetime-and-failure-rules).
+
 `exec_command()` accepts one nonempty command string or a nonempty list/tuple
 of string arguments. An argument sequence means **one command**, not a batch.
 Sequences execute directly on the local host and are quoted for a POSIX login
@@ -121,7 +139,7 @@ only `shell=None` or `shell=False`, without `shell_executable`. Use a string
 with `shell=True` when you intentionally need shell operators.
 
 ```python
-with Session() as local:
+with closing(Session()) as local:
     result = local.exec_command(
         [sys.executable, "-c", "import sys; print(sys.argv[1])", "a; b"],
         check=True,
@@ -151,14 +169,36 @@ Compatibility: the returned object is no longer a tuple of live output
 buffers. Unpack exactly three values: stdout, stderr, exitcode. Indexing and
 slicing use that same three-value order; old two-value unpacking must change.
 Use `session.stdout`/`session.stderr` for the existing buffer interface.
-Unreleased persistent shell commands also return CommandResult snapshots.
+4.0 persistent shell commands also return CommandResult snapshots.
 Interactive console APIs retain their existing buffer
 and prompt semantics. For completed commands inside or outside a shell, save
 the result and read its fields. For continuous output such as tcpdump, choose
 a bounded capture, a managed streaming job, or an interactive enter() scope;
 see [the execution and long-command guide](API_GUIDE.md#unreleased-command-results-and-long-running-programs).
 
-## Session settings (unreleased)
+<a id="stdin-data-and-interactive-replies-unreleased"></a>
+
+## Stdin data and interactive replies (4.0)
+
+`exec_command(input=data)` and `start(input=data)` preserve stdin exactly on
+local and SSH backends: strings use UTF-8, bytes stay bytes, and no newline is
+added. To supply a line, write `input=answer + "\n"`. This fixes the legacy SSH
+string-input behavior; published 3.1.5 still appends a newline on that path.
+Stdin closes after the data is sent, including for empty input. `input=None`
+supplies no data and retains the backend's existing stdin policy; legacy local
+execution may inherit stdin. Use empty input when explicit EOF is needed.
+
+In a persistent shell, `shell(command)` executes a command and waits for its
+result. For a program's questions, enter it with `shell.enter(...)`, then use
+`program.input(answer)` to append one Enter and wait for readiness, exit, or
+silence; use `program.send(text)` for exact text. Existing newlines are retained:
+`input("answer\n")` sends two newlines. Interactive readiness is not command
+success. Some password prompts read a terminal, so supplying stdin is not a
+substitute for a PTY conversation. See the [input contract and migration](API_GUIDE.md#unreleased-exact-stdin-and-explicit-interactive-replies).
+
+<a id="session-settings-unreleased"></a>
+
+## Session settings (4.0)
 
 ```python
 session.set(check=True, verbose=False, log_level="DEBUG")
@@ -191,7 +231,9 @@ uses an override. Settings dictionaries are copied, but policy objects are
 shared; custom policies should support reuse. Existing connections keep their
 original policy.
 
-## Foreground jobs in persistent consoles (unreleased)
+<a id="foreground-jobs-in-persistent-consoles-unreleased"></a>
+
+## Foreground jobs in persistent consoles (4.0)
 
 `console.start(command)` and `$.start(command)` inside shell/sudo/su return a
 CommandJob in the current Bash console, retaining cwd/environment/identity.
@@ -203,7 +245,9 @@ recovery disables the channel. Pipe consoles cannot safely cancel a running job.
 See [console foreground jobs](API_GUIDE.md#unreleased-foreground-jobs-inside-shell-sudo-and-su)
 for executable examples, quoting, thread ownership and failure handling.
 
-## Managed deadlines and long-running commands (unreleased)
+<a id="managed-deadlines-and-long-running-commands-unreleased"></a>
+
+## Managed deadlines and long-running commands (4.0)
 
 The source checkout adds a total deadline shared by local and SSH commands:
 
@@ -248,7 +292,9 @@ See [Timeouts, cancellation, tcpdump, and cleanup](https://iapyeh.github.io/sshs
 for the timing contract, remote example, output limits, and migration details.
 These new APIs are not present in the published 3.1.5 package.
 
-## Session lifetime (unreleased close safeguards)
+<a id="session-lifetime-unreleased-close-safeguards"></a>
+
+## Session lifetime (4.0 close safeguards)
 
 Use console and remote Session contexts to manage their scoped resources.
 A local `with Session()` activates a reusable Session; leaving that block does
@@ -275,9 +321,10 @@ channel. Prefer an SSH agent, managed private key, or secret manager over a
 password embedded in source code.
 
 ```python
+from contextlib import closing
 from sshscript import Session
 
-with Session() as local:
+with closing(Session()) as local:
     with local.connect(
         "ops@example.net",
         timeout=30,
@@ -310,10 +357,13 @@ overrides a configured port. Explicit `pkey`, `pkey_path`, or `key_filename`
 overrides configured identity files. Host-key verification remains enabled.
 
 ```python
+from contextlib import closing
+from sshscript import Session
+
 # Inspect effective settings without connecting or starting a proxy process.
 settings = Session.resolve_connection("production", port=2222)
 
-with Session() as local:
+with closing(Session()) as local:
     with local.connect("production") as remote:
         result = remote(["uname", "-s"], check=True)
 ```
@@ -347,30 +397,16 @@ inputs; connecting may execute configured proxy programs.
 
 ## Optional dollar syntax
 
-Dollar syntax is not ordinary Python syntax. It is normally stored in `.spy`
-files; `run_script(source)` also accepts Dollar syntax from an in-memory string.
-Both forms use the same session and transport implementation as the module API:
+The regular Python Session API and optional `.spy` syntax share execution
+semantics. Save this as `health.spy` (Dollar syntax is not ordinary Python):
 
-```python
-import paramiko
-
-remote = session.connect(
-    "user@new-host.example",
-    policy=paramiko.AutoAddPolicy(),
-)
+```spy
+result = $(["printf", "%s", "ready"], check=True)
+print(result.stdout)
 ```
 
-Do this only in a trusted bootstrap environment. Interactive SSH sessions do
-not forward the complete local process environment; only terminal/locale
-defaults and values explicitly supplied through `env={...}` are sent.
-
-## Tests
-
-The canonical credential-free release gate is:
-
-```sh
-sshscript health.spy
-```
+Run it with `sshscript health.spy`; expected output is `ready`. This is a
+single-command example using the published 3.1.5 API, not the library test gate.
 
 Check one file without executing its Python, imports, or commands:
 
@@ -452,7 +488,9 @@ for scope, support channels, and the information needed in a useful bug report.
 
 ## Development and verification
 
-A release checkout uses the `src/sshscript/` package layout:
+The credential-free library gate is `python3 tools/run_checks.py`. A source
+checkout keeps modules and `unittest/` at the root; a release checkout uses
+`src/sshscript/`. The tools detect both layouts. From either repository root:
 
 ```sh
 python3 -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine
@@ -461,7 +499,7 @@ python3 tools/check_release.py --output /tmp/sshscript-candidate-UNIQUE
 ```
 
 The output directory must not already exist. `run_checks.py` locates the test
-suite under `src/sshscript/unittest/` automatically. See the
+suite under `unittest/` or `src/sshscript/unittest/` automatically. See the
 [contributing guide](https://github.com/iapyeh/sshscript/blob/release/CONTRIBUTING.md)
 before proposing a change and the
 [release guide](https://github.com/iapyeh/sshscript/blob/release/RELEASING.md)

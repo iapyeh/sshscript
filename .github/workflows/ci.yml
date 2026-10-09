@@ -46,13 +46,25 @@ jobs:
       - run: python -I tools/check_baseline_examples.py
 
   openssh-integration:
-    name: OpenSSH integration (Python ${{ matrix.python-version }})
+    name: OpenSSH integration (Python ${{ matrix.python-version }}, ${{ matrix.dependency-label }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.11', '3.14']
+        include:
+          - python-version: '3.11'
+            paramiko: 'paramiko==2.11.0'
+            dependency-label: minimum
+          - python-version: '3.14'
+            paramiko: 'paramiko==2.11.0'
+            dependency-label: minimum-new-python
+          - python-version: '3.11'
+            paramiko: 'paramiko>=3,<4'
+            dependency-label: 3.x
+          - python-version: '3.14'
+            paramiko: 'paramiko>=4,<5'
+            dependency-label: 4.x
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -61,11 +73,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install test and build dependencies
-        run: python -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine
+        run: python -m pip install "${{ matrix.paramiko }}" 'packaging>=21' build twine
+      - name: Test source with selected Paramiko
+        run: python tools/run_checks.py
       - name: Build and verify wheel
         run: python tools/check_release.py --output "$RUNNER_TEMP/verified-artifacts"
       - name: Install verified wheel
-        run: python -m pip install --force-reinstall "$RUNNER_TEMP"/verified-artifacts/*.whl
+        run: python -m pip install --force-reinstall "$RUNNER_TEMP"/verified-artifacts/*.whl "${{ matrix.paramiko }}"
       - name: Provision loopback OpenSSH server
         run: bash tools/setup_openssh_ci.sh "$GITHUB_ENV"
       - name: Test installed wheel against OpenSSH
@@ -82,14 +96,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-auth-python-${{ matrix.python-version }}
+          name: native-auth-python-${{ matrix.python-version }}-${{ matrix.dependency-label }}
           if-no-files-found: warn
           path: ${{ runner.temp }}/native-auth-report.json
       - name: Upload OpenSSH server log
         if: ${{ failure() && env.SSHSCRIPT_OPENSSH_LOG != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: openssh-log-python-${{ matrix.python-version }}
+          name: openssh-log-python-${{ matrix.python-version }}-${{ matrix.dependency-label }}
           if-no-files-found: warn
           path: ${{ env.SSHSCRIPT_OPENSSH_LOG }}
       - name: Remove disposable OpenSSH state
@@ -110,3 +124,21 @@ jobs:
           if [[ -n "${SSHSCRIPT_OPENSSH_ROOT:-}" && "$SSHSCRIPT_OPENSSH_ROOT" == "$RUNNER_TEMP"/sshscript-openssh.* ]]; then
             sudo rm -rf -- "$SSHSCRIPT_OPENSSH_ROOT"
           fi
+
+  # Preserve the required-check names configured on the protected release branch.
+  # Both gates require every supported Python/Paramiko integration leg to pass.
+  openssh-required-311:
+    name: OpenSSH integration (Python 3.11)
+    needs: openssh-integration
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.openssh-integration.result }}" = success
+
+  openssh-required-314:
+    name: OpenSSH integration (Python 3.14)
+    needs: openssh-integration
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.openssh-integration.result }}" = success

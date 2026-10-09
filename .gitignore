@@ -103,6 +103,7 @@ htmlcov/
 !/unittest/test_production_contract.py
 !/unittest/test_public_types.py
 !/unittest/test_python_version.py
+!/unittest/test_version_policy.py
 !/unittest/test_release_inputs.py
 !/unittest/test_recommended_examples.py
 !/unittest/test_session_close_reporting.py
@@ -115,5 +116,6 @@ htmlcov/
 !/unittest/test_sshscript_dollar_syntax.py
 !/unittest/test_sshscript_module.py
 !/unittest/test_stdio_dynamic_string.py
+!/unittest/test_stdin_contract.py
 !/unittest/test_syntax_error.spy
 !/unittest/test_update_check.py

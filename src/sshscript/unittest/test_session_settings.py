@@ -141,7 +141,10 @@ class SettingsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp)/'settings.spy'
             path.write_text('from sshscript import Session\nimport os\nprint($.get("verbose"), $.get("log_level"), Session().get("verbose"))\nprint(os.environ.get("VERBOSE"), os.environ.get("DEBUG"))\n$printf visible-output\n$.set(verbose=False)\n$printf hidden-output\n')
-            env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1]))
+            env = os.environ.copy()
+            # Preserve isolated/vendored runtime dependencies for the child.
+            env['PYTHONPATH'] = os.pathsep.join(filter(None, (
+                str(Path(__file__).resolve().parents[1]), env.get('PYTHONPATH'))))
             env.pop('VERBOSE', None); env.pop('DEBUG', None)
             result = subprocess.run([sys.executable, str(Path(sshscript.__file__)), str(path), '-v', '--debug'], env=env, text=True, capture_output=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)

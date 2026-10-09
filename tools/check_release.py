@@ -49,6 +49,10 @@ def main():
         env.pop('PYTHONHOME', None)
         run(python, '-m', 'pip', 'install', next(dist.glob('*.whl')), cwd=root, env=env)
         run(python, '-c', "import importlib.metadata as m; import sshscript; from sshscript import _version; assert sshscript.__version__ == _version.__version__ == m.version('sshscript'); s = sshscript.Session(); out, err, status = s.exec_command(['printf', 'release-smoke'], check=True); assert (out, err, status) == ('release-smoke', '', 0); s.close(strict=True); print('Installed wheel smoke test passed:', sshscript.__version__)", cwd=root, env=env)
+        cli_version = subprocess.check_output([str(root / 'venv/bin/sshscript'), '--version'], cwd=root, env=env, text=True).strip()
+        package_version = subprocess.check_output([str(python), '-c', "import importlib.metadata as m; print(m.version('sshscript'))"], cwd=root, env=env, text=True).strip()
+        if cli_version != package_version:
+            raise RuntimeError('CLI/package metadata version mismatch')
         run(root / 'venv/bin/sshscript', '--help', cwd=root, env=env)
         output.mkdir(parents=True)
         for item in artifacts:

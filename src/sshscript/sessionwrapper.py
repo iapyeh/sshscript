@@ -168,6 +168,10 @@ class SessionWrapper(object):
     def input(self,s,timeout=60):
         """Send a line and wait for an interactive prompt, exit, or output silence.
 
+        Append exactly one "\\n", even if s already ends in a newline. Use send()
+        for exact text. Prefer input() for replies inside enter(); console(command)
+        and send_line() keep their context-dependent behavior for compatibility.
+        "silent" only reports output silence, not command success or authentication.
         Return "prompt", "exited", or "silent" in an interactive console; otherwise
         return send()'s result (None). timeout bounds the wait in seconds.
         """
@@ -190,6 +194,8 @@ class SessionWrapper(object):
         command_timeout bounds command completion (default 60 seconds). Other keyword
         names are expected patterns and their values are reply strings.
         In an enter() context this delegates to input() and returns its status.
+        This is a compatibility form, not a raw line-write API: prefer input()
+        for interactive replies and send() for text without an added newline.
         """
         session = self.channel.owner.session
         enabled = session.check if check is UNSET else check

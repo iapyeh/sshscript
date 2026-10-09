@@ -50,11 +50,18 @@ caller-supplied code is not, by itself, a vulnerability.
 
 ### Commands and external data
 
-`Session.exec_command()` accepts a command string. With `shell=None`, SSHScript
-selects direct execution or a shell by inspecting the command syntax. When
-arguments contain external data, construct the string with `shlex.join()` and
-set `shell=False`. Treat remote output as untrusted input before passing it to
-another parser, shell, database, or template.
+For new code with external arguments, pass a list/tuple directly to
+`Session.exec_command(argv, check=True)`. Argument sequences bypass automatic
+shell selection. Existing string callers may retain `shlex.join(argv)` with
+`shell=False`; it remains supported. Use a string with explicit `shell=True`
+or `shell="bash"` only when shell features are needed, and quote dynamic values.
+See [the canonical API guide](API_GUIDE.md#recommended-choices).
+
+Argument boundaries do not validate an executable or authorize an operation.
+Treat remote output as untrusted input before passing it to another parser,
+shell, database, or template. Command exit status does not establish deployment
+success, and closing an SSH channel does not establish remote process
+termination. Verify application outcomes and reconcile unknown termination.
 
 ### SSH identity and host keys
 
