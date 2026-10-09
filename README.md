@@ -16,7 +16,7 @@ output and status, distinguish failure from timeout, and make cleanup and
 unknown termination explicit. A successful command exit is evidence about
 that command; verify the deployment or other application outcome separately.
 
-**Current release:** [4.0.1](https://github.com/iapyeh/sshscript/releases/tag/v4.0.1)
+**Current release:** [4.0.2](https://github.com/iapyeh/sshscript/releases/tag/v4.0.2)
 (Production/Stable) · **Python:** 3.11 or newer · **Tested:** Python
 3.11–3.14 on Linux and macOS
 
@@ -26,7 +26,8 @@ that command; verify the deployment or other application outcome separately.
 [Security](https://github.com/iapyeh/sshscript/security/policy) ·
 [Support](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 
-**Version 4.0.1** introduces the incompatible 4.0 execution contract.
+**Version 4.0.2** maintains the 4.0 execution contract introduced in 4.0.1.
+This patch aligns the published documentation and installation links.
 Upgrade 3.1.5 automation using the migration guide and application regressions.
 See [version policy and migration](VERSIONING.md) before upgrading automation.
 
@@ -83,7 +84,7 @@ pin SSHScript and all transitive dependencies in your application's lock file.
 To install this release explicitly:
 
 ```sh
-python3 -m pip install "sshscript==3.1.5"
+python3 -m pip install "sshscript==4.0.2"
 ```
 
 Use `python3 -m pip install --upgrade sshscript` to upgrade. The optional
@@ -92,7 +93,8 @@ it never installs an update by itself.
 
 ## 60-second local quickstart
 
-This example uses the published 3.1.5 command API.
+This example runs on 4.0.2 and retains compatibility with the 3.1.5 command API.
+The metadata below records that older compatibility baseline.
 
 <!-- example: {"id":"readme-quickstart", "profile":"3.1.5", "stdout":"sshscript is ready\nexit code: 0\n"} -->
 ```python
@@ -343,7 +345,7 @@ Unknown and changed host keys are rejected unless the caller explicitly
 supplies a different Paramiko policy. Do not use automatic key acceptance in a
 production workflow unless a separate trusted bootstrap process has already
 verified the key. See the
-[SSHScript v3 documentation](https://iapyeh.github.io/sshscript/v3a/) for
+[SSHScript documentation](https://iapyeh.github.io/sshscript/v3a/) for
 nested connections, timeouts, file transfer, `sudo`, `su`, and interactive
 programs.
 

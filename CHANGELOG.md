@@ -3,6 +3,16 @@
 This project records user-visible changes here. Release artifacts and their
 provenance are available from the linked GitHub Release and PyPI pages.
 
+## 4.0.2 — 2026-10-09
+
+- Align the README, current installation commands, website title, navigation,
+  footer, and version metadata with the current 4.0 release.
+- Point general PyPI and GitHub Release links to current entry points; retain
+  explicitly labelled historical releases and existing documentation URLs.
+- Check current website version labels and release links during documentation
+  validation, including rendered header/footer links and anchors.
+- Preserve the 4.0.1 public execution contract; no runtime behavior changes.
+
 ## 4.0.1 — 2026-10-08
 
 - Settle the legacy command worker before propagating timeout/transport errors;
