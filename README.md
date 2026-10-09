@@ -33,6 +33,12 @@ See [version policy and migration](VERSIONING.md) before upgrading automation.
 
 ## Recommended API
 
+For AI-assisted automation, start with [the AI agent entry](AI_GUIDE.md),
+the [portable skill](skills/sshscript/SKILL.md), or the
+[website landing page](https://iapyeh.github.io/sshscript/v3a/ai-agents/).
+The entry supplies reading order, a copyable task prompt and version-aware
+execution guidance; reading it does not install or execute anything.
+
 Start with [the canonical API guide](API_GUIDE.md): version-labelled examples,
 recommended argv/check/result patterns, lifetime rules, and compatibility forms.
 Its executable examples run in CI. The same guide is available in the

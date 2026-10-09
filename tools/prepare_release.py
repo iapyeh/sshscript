@@ -5,6 +5,8 @@ from pathlib import Path
 
 MODULES = '__init__ _runtime _version sshscript session sessionsettings commandresult commandjob consolejob sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
 ROOT_FILES = [
+    'AI_GUIDE.md', 'skills/sshscript/SKILL.md',
+    'skills/sshscript/references/agent-guide.md',
     'API_GUIDE.md', 'VERSIONING.md', 'pyproject.toml', 'README.md', 'LICENSE.txt', 'RELEASING.md',
     'MANIFEST.in', 'CHANGELOG.md', 'CONTRIBUTING.md', 'EXCEPTIONS.md',
     'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md', '.gitignore',
@@ -16,6 +18,7 @@ ROOT_FILES = [
     '.github/workflows/release.yml',
 ]
 TOOLS = [
+    'sync_ai_docs.py',
     'check_baseline_examples.py', 'sync_api_guide.py', 'check_public_types.py', 'prepare_release.py', 'check_release.py', 'run_checks.py',
     'publish_release.py', 'version_policy.py', 'setup_openssh_ci.sh', 'run_native_auth_ci.py',
 ]

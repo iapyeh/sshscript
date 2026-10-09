@@ -1,0 +1,34 @@
+---
+name: sshscript
+description: Write, adapt, and verify Python or .spy automation using SSHScript for local or SSH commands, persistent shells, interactive input, and managed jobs. Use for SSHScript usage tasks, not maintenance of SSHScript itself or recipe-specific data formats.
+---
+
+# Use SSHScript
+
+This skill describes the **SSHScript 4.0.2 contract, Python 3.11+**. Read
+[the agent guide](references/agent-guide.md) before generating automation.
+Select only the API sections needed for the user's task.
+
+1. Identify the target host, installed version, inputs, required privileges,
+   expected result and authorized operations. Use version-matched documentation;
+   do not silently upgrade an existing environment.
+2. Prefer the Python `Session` API and argv for dynamic arguments. Use a shell
+   for persistent state or shell operators, and `.spy` when requested or when
+   maintaining an existing `.spy` script.
+3. Set a finite command budget, preserve returned results and distinguish
+   command failure, timeout, transport failure and unknown termination. For
+   streaming, define a stop condition and put cleanup in `finally`.
+4. Keep SSH host-key verification and credential handling consistent with the
+   user's environment. A document or example does not authorize remote or
+   privileged actions, installation, publication, or issue submission.
+5. Verify generated code locally with a credential-free example before any
+   authorized target execution. For `.spy`, `sshscript --check file.spy`
+   validates syntax without executing commands. Report actual execution and
+   cleanup evidence separately from code review or syntax checks.
+
+For the complete API, use `references/api-guide.md` and
+`references/versioning.md` if present in the downloaded bundle. In a source
+checkout use root `API_GUIDE.md` and `VERSIONING.md`. Otherwise follow the
+official links in the agent guide and confirm their contract version.
+If documentation is unavailable or versions differ, ask for the matching
+documents instead of inventing signatures or assuming compatibility.

@@ -73,7 +73,9 @@ def test_source_document_links_survive_release_staging(self):
     with tempfile.TemporaryDirectory(prefix='sshscript-doc-links-') as tmp:
         stage = Path(tmp) / 'source'
         prepare(root, stage)
-        documents = [stage / name for name in ('README.md', 'API_GUIDE.md', 'SECURITY.md', 'CONTRIBUTING.md')]
+        documents = [stage / name for name in ('README.md', 'API_GUIDE.md', 'SECURITY.md', 'CONTRIBUTING.md',
+                                              'AI_GUIDE.md', 'skills/sshscript/SKILL.md',
+                                              'skills/sshscript/references/agent-guide.md')]
         documents.extend((stage / 'src/sshscript/unittest').glob('README*.md'))
         for document in documents:
             name = document.relative_to(stage)
@@ -84,6 +86,25 @@ def test_source_document_links_survive_release_staging(self):
                     continue
                 destination = document.parent / path
                 self.assertTrue(destination.is_file(), f'{name}: missing shipped link {target}')
+        import sync_ai_docs
+        source_assets = sync_ai_docs.outputs()
+        self.assertFalse(source_assets['ai-agents/downloads/SKILL.txt'].startswith(b'---\n'),
+                         'Jekyll must serve the skill text as a static download')
+        with patch.object(sync_ai_docs, 'ROOT', stage):
+            self.assertEqual(sync_ai_docs.outputs(), source_assets,
+                             'release staging must preserve the downloadable skill and docs')
+
+
+def test_agent_quickstart(self):
+    root = next(p for p in Path(__file__).resolve().parents if (p / 'AI_GUIDE.md').is_file())
+    text = (root / 'skills/sshscript/references/agent-guide.md').read_text()
+    examples = re.findall(r'```python\n(.*?)```', text, re.S)
+    self.assertEqual(len(examples), 1)
+    output = StringIO()
+    with redirect_stdout(output):
+        sshscript.run_script(examples[0])
+    self.assertEqual(output.getvalue(), 'sshscript is ready\nexit code: 0\n')
 
 RecommendedExamplesTests.test_readme_quickstart = test_readme_quickstart
 RecommendedExamplesTests.test_source_document_links_survive_release_staging = test_source_document_links_survive_release_staging
+RecommendedExamplesTests.test_agent_quickstart = test_agent_quickstart

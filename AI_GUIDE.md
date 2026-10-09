@@ -1,0 +1,58 @@
+# SSHScript for AI agents
+
+**Documentation contract: SSHScript 4.0.2; Python 3.11+.**
+
+Start with the [agent guide](skills/sshscript/references/agent-guide.md).
+It explains version checks, API selection, command results, input, deadlines,
+authentication and cleanup. Read only the task-relevant sections of the
+[canonical API guide](API_GUIDE.md) and [version policy](VERSIONING.md).
+
+The [SSHScript skill](skills/sshscript/SKILL.md) supplies a compact operating
+workflow. Its folder contains the supporting guide; copy the entire
+`skills/sshscript/` folder when installing it in an agent's skill directory.
+It teaches SSHScript usage, not development of SSHScript itself or a particular
+recipe library. Agents without skill support can read these Markdown files.
+
+## Share one URL
+
+The website entry is [SSHScript for AI Agents](https://iapyeh.github.io/sshscript/v3a/ai-agents/).
+After these files are published, users can give that URL and a task to an agent:
+
+> Read the SSHScript AI agent entry at
+> https://iapyeh.github.io/sshscript/v3a/ai-agents/ and follow its reading order.
+> Check the SSHScript version in my environment before selecting APIs. Help me
+> complete this task: [describe the task, target hosts and expected output].
+> If you cannot read a required document, report that limitation rather than
+> guessing its contents. Explain the proposed commands before execution and
+> stay within the operations I authorize.
+
+A URL supplies reference material for the current task. It does not install
+SSHScript, install a skill, grant execution permission, or guarantee persistent
+memory. An agent needs URL-reading tools, or the user must provide the files.
+
+## Maintain the source and website
+
+Maintain this entry, `skills/sshscript/SKILL.md`, and its reference guide in
+the designated `working_branch` checkout on branch `working_branch`.
+The landing page is maintained in `gh-pages/v3a/ai-agents/index.md` on branch
+`gh-pages`. The API guide remains authoritative for public behavior.
+
+From `working_branch`, synchronize the generated website guide, plain-text
+files and portable skill ZIP with:
+
+```sh
+python3 tools/sync_ai_docs.py ../gh-pages/v3a
+python3 tools/sync_ai_docs.py ../gh-pages/v3a --check
+```
+
+The ZIP includes the skill and its reference guide, plus snapshots of
+`API_GUIDE.md` and `VERSIONING.md` for offline use. These snapshots are generated
+from the source documents; do not edit the ZIP or generated website copies.
+The sync command checks the destination branch before writing. Website pages
+keep their Last Updated timestamp aligned with their mtime.
+
+When the execution contract changes, review the skill and guide, update their
+contract labels and the landing page, then regenerate the website assets.
+Validate links, skill structure, example behavior, source/ZIP equality and
+the rendered website. Source and website publishing are separate operations;
+copying files does not publish either of them.
