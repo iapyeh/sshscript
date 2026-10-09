@@ -37,6 +37,11 @@ SSHScript 4.0.2 emphasizes predictable and secure automation:
 
 ## Start here
 
+For AI-assisted automation, share the
+[SSHScript for AI Agents]({{ site.baseurl }}/v3a/ai-agents/) landing page.
+It provides a copyable task prompt, reading order, plain-text guide and
+portable skill download.
+
 1. Read [Installation and Verification](getting-started/installation-and-verification/)
    and confirm that both the CLI and import report `4.0.2`.
 2. Complete the credential-free [5-Minute Quickstart](getting-started/quickstart/).
@@ -74,4 +79,4 @@ MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-09 16:32:19

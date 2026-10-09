@@ -34,10 +34,11 @@ success, then use task guides, concepts, and reference for exact contracts.
 | [Example Gallery]({{ site.baseurl }}/v3a/Example%20Gallery/) | Use and extend safety-labelled operational recipes. |
 | [Migration and Releases]({{ site.baseurl }}/v3a/migration-and-releases/) | Update earlier code and review current and historical releases. |
 | [Contributing and Testing](development-and-testing/) | Run the release gate and work on SSHScript itself. |
+| [SSHScript for AI Agents]({{ site.baseurl }}/v3a/ai-agents/) | Share one URL, follow the agent reading order, or download the portable skill. |
 
 English is the maintained navigation language for this phase; existing
 translated files remain in source but are excluded from the published site and
 sidebar. The Example Gallery uses an append-only, one-page-per-case structure
 so future scripts can be published without reorganizing established links.
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-09 16:32:19
