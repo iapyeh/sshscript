@@ -8,7 +8,7 @@ from pathlib import Path
 
 HEADER = '''---
 title: "Recommended SSHScript API"
-parent: "SSHScript v3.1 Documentation"
+parent: "SSHScript Documentation"
 nav_order: 0
 permalink: /v3a/recommended-api/
 ---

@@ -9,11 +9,11 @@ claim that a command or deployment is safe or successful.
 | Version | Contract and status |
 | --- | --- |
 | 3.1.5 | Published baseline described in API_GUIDE.md; one-shot Session commands return CommandResult, but persistent console calls return two live buffers. |
-| 4.0.1 | Production contract: completed console results, settings, managed jobs and authenticated-console handshakes; incompatible with parts of 3.1.5. |
+| 4.0.2 | Production contract: completed console results, settings, managed jobs and authenticated-console handshakes; incompatible with parts of 3.1.5. |
 
-Version 4.0.1 is the first published 4.0 contract, promoted from the development
-line after release validation. The patch component was incremented once for
-this publication. Native-system validation limits remain documented.
+Version 4.0.1 introduced the published 4.0 contract after release validation.
+Version 4.0.2 is a documentation and link maintenance patch with the same public
+execution contract. Native-system validation limits remain documented.
 Use the normal Python Session API as the canonical entry point; optional .spy
 syntax follows the same versioned execution contract.
 
