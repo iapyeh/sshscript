@@ -31,7 +31,7 @@ success, then use task guides, concepts, and reference for exact contracts.
 | [Concepts]({{ site.baseurl }}/v3a/concepts/) | Understand lifecycle, execution modes, results, errors, and `.spy` transformation. |
 | [Reference]({{ site.baseurl }}/v3a/reference/) | Look up public signatures, options, results, and exceptions. |
 | [Security and Operations]({{ site.baseurl }}/v3a/security-and-operations/) | Prepare automation for failure, security review, and production operation. |
-| [Example Gallery]({{ site.baseurl }}/v3a/Example%20Gallery/) | Use and extend safety-labelled operational recipes. |
+| [Example Gallery]({{ site.baseurl }}/v3a/Example%20Gallery/) | Learn SSHScript through complete, safety-labelled teaching cases. |
 | [Migration and Releases]({{ site.baseurl }}/v3a/migration-and-releases/) | Update earlier code and review current and historical releases. |
 | [Contributing and Testing](development-and-testing/) | Run the release gate and work on SSHScript itself. |
 | [SSHScript for AI Agents]({{ site.baseurl }}/v3a/ai-agents/) | Share one URL, follow the agent reading order, or download the portable skill. |
@@ -39,6 +39,10 @@ success, then use task guides, concepts, and reference for exact contracts.
 English is the maintained navigation language for this phase; existing
 translated files remain in source but are excluded from the published site and
 sidebar. The Example Gallery uses an append-only, one-page-per-case structure
-so future scripts can be published without reorganizing established links.
+so future teaching cases can be published without reorganizing established
+links. [SSHScript Ops](https://github.com/iapyeh/sshscript-ops) is the companion
+project for reusable recipes and operations management workflows. It is
+currently an initial documentation scaffold, without executable recipes or an
+implemented management system.
 
-Last Updated: 2026-10-09 16:32:19
+Last Updated: 2026-10-09 20:13:20

@@ -53,9 +53,12 @@ portable skill download.
 The documentation is English-first. The current onboarding, tutorial,
 how-to, concept, reference, security, migration, and troubleshooting pages
 are available through the sidebar and search. The
-[Example Gallery](Example%20Gallery/) is an open collection: new operational
-cases can be added as independent, safety-labelled pages without moving
-existing URLs.
+[Example Gallery](Example%20Gallery/) teaches SSHScript through complete,
+safety-labelled cases while keeping existing URLs stable. For the companion
+operations management framework, see
+[SSHScript Ops](https://github.com/iapyeh/sshscript-ops), which plans reusable
+recipes, data formats, and maintenance workflows. Ops is currently an initial
+documentation scaffold, without executable recipes or an implemented system.
 
 ## Project status
 
@@ -79,4 +82,4 @@ MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-Last Updated: 2026-10-09 16:32:19
+Last Updated: 2026-10-09 20:13:20

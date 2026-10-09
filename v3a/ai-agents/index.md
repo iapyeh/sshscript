@@ -87,7 +87,14 @@ cannot fetch URLs, provide the plain-text guide or downloaded bundle instead.
    [host keys, credentials and command injection]({{ site.baseurl }}/v3a/security-and-operations/host-keys-credentials-and-command-injection/)
    and [timeouts and cleanup]({{ site.baseurl }}/v3a/security-and-operations/timeouts-retries-and-cleanup/).
 5. Use the [Example Gallery]({{ site.baseurl }}/v3a/Example%20Gallery/)
-   for task examples. Check each example's prerequisites and validation limits.
+   for teaching cases on SSHScript execution, result handling, and cleanup.
+   Check each example's prerequisites and validation limits.
+6. For operations management architecture, reusable recipes, and runbooks,
+   consult [SSHScript Ops](https://github.com/iapyeh/sshscript-ops). It is
+   currently an initial documentation scaffold; no executable recipes or
+   implemented management system are available yet. Use SSHScript documentation
+   as the authority for execution semantics, and Ops documentation for its
+   management workflows and data contracts as they are developed.
 
 The guide and API references are ordinary text with direct links; navigating
 this material does not require JavaScript, a search service, or skill support.
@@ -123,4 +130,4 @@ collection logic, schemas and vault updates belong to their recipe project.
 Follow the [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 for feedback; public submission requires the user's authorization.
 
-Last Updated: 2026-10-09 18:37:34
+Last Updated: 2026-10-09 20:13:20
