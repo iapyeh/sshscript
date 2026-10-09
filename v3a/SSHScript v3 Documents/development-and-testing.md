@@ -1,13 +1,13 @@
 ---
 title: "Contributing and Testing"
-parent: "SSHScript v3.1 Documentation"
+parent: "SSHScript Documentation"
 nav_order: 9
 ---
 
 # Contributing and Testing
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Session settings and managed jobs/deadlines are features available in 4.0.2.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -196,7 +196,7 @@ expressions, imported `.spy` modules, and tokenizer indentation failures.
 
 <a id="transport-and-resource-boundaries-400dev0-unreleased"></a>
 
-## Transport and resource boundaries (4.0.1, 4.0)
+## Transport and resource boundaries (4.0.2, 4.0)
 
 The development candidate adds regressions for execution contracts that humans
 and AI can inspect: exact input, retained output, completion versus transport
@@ -273,4 +273,4 @@ macOS, FreeBSD, BusyBox and site-specific PAM/sudo policies remain unverified
 until corresponding reports exist; the macOS unit job does not establish native
 privilege-authentication compatibility.
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

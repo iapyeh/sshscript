@@ -1,7 +1,7 @@
 ---
 title: "Streaming and Looping Output"
 parent: "How-to Guides"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 7
 ---
 
@@ -198,4 +198,4 @@ with $.enter("journalctl -f -u nginx", exit=chr(3)):
             print(line, end="")
 ```
 
-Last Updated: 2026-10-08 23:46:37
+Last Updated: 2026-10-09 10:40:03

@@ -1,7 +1,7 @@
 ---
 title: "Using Session.sudo()"
 parent: "How-to Guides"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 3
 ---
 
@@ -108,4 +108,4 @@ completion and verified shell recovery. Use nested su/sudo APIs before a job;
 raw privilege shells, detached/background jobs and cross-thread console use
 are unsupported. See [the console job contract]({{ site.baseurl }}/v3a/recommended-api/#unreleased-foreground-jobs-inside-shell-sudo-and-su).
 
-Last Updated: 2026-10-08 23:46:37
+Last Updated: 2026-10-09 10:40:03

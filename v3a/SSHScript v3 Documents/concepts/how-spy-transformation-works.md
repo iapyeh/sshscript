@@ -1,7 +1,7 @@
 ---
 title: "How .spy Transformation Works"
 parent: "Concepts"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 4
 permalink: /v3a/concepts/how-spy-transformation-works/
 ---
@@ -9,7 +9,7 @@ permalink: /v3a/concepts/how-spy-transformation-works/
 # How .spy Transformation Works
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Session settings and managed jobs/deadlines are features available in 4.0.2.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -242,4 +242,4 @@ closes afterward.
 Continue with the [Dollar Syntax Tutorial](../../tutorials/dollar-syntax/) or
 the [Session Lifecycle](../session-lifecycle/) concept.
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

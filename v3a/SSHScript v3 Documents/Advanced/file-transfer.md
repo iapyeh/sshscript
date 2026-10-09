@@ -1,7 +1,7 @@
 ---
 title: "Uploading and Downloading Files"
 parent: "How-to Guides"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 6
 ---
 
@@ -253,4 +253,4 @@ normal Python and `python -O`. Transfer failures do not change command
 `exitcode`; filesystem and Paramiko exceptions still propagate. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-10-09 10:40:03

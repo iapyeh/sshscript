@@ -1,6 +1,6 @@
 ---
 title: "Concepts"
-parent: "SSHScript v3.1 Documentation"
+parent: "SSHScript Documentation"
 nav_order: 4
 has_children: true
 has_toc: false
@@ -19,4 +19,4 @@ for the first successful command, but they support safe design and debugging.
 | [Results and Error Model](results-and-error-model/) | Available |
 | [How `.spy` Transformation Works](how-spy-transformation-works/) | Complete |
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-10-09 10:40:03

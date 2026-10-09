@@ -1,16 +1,19 @@
 ---
-title: "SSHScript v3.1 Release Notes"
+title: "Release Notes"
 parent: "Migration and Releases"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 2
 ---
 
-# SSHScript v3.1 Release Notes
+# Release Notes
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
 > Session settings and managed jobs/deadlines are features available in 4.0.1.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
+
+The current release is **4.0.2**. The sections below distinguish the current
+4.0 contract from historical 3.1 releases.
 
 SSHScript 3.1.4 was published on 2026-09-24 as the first Production/Stable
 release in the supported v3.1 line. Install it from
@@ -21,6 +24,14 @@ The release requires Python 3.11 or newer and supports Python 3.11–3.14 on
 Linux and macOS.
 
 <a id="400dev0--unreleased-development-contract"></a>
+
+## 4.0.2 — 2026-10-09
+
+This documentation maintenance patch preserves the 4.0.1 execution contract.
+It aligns installation commands, current version labels, navigation, and
+PyPI/Release entry links. Historical links below remain version-specific.
+See [PyPI](https://pypi.org/project/sshscript/) and
+[GitHub Release](https://github.com/iapyeh/sshscript/releases/latest).
 
 ## 4.0.1 — 2026-10-08
 
@@ -179,4 +190,4 @@ These changes are absent from the published 3.1.5 package. See the
 [authenticated console API]({{ site.baseurl }}/v3a/reference/session-and-console-api/#authenticated-susudo-entry-unreleased)
 and [migration notes]({{ site.baseurl }}/v3a/migration-and-releases/migrating-to-v3-1/).
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

@@ -1,7 +1,7 @@
 ---
 title: "Runtime Troubleshooting"
 parent: "Security and Operations"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 4
 permalink: /v3a/security-and-operations/runtime-troubleshooting/
 ---
@@ -9,7 +9,7 @@ permalink: /v3a/security-and-operations/runtime-troubleshooting/
 # Runtime Troubleshooting
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Session settings and managed jobs/deadlines are features available in 4.0.2.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -200,4 +200,4 @@ consult the [Session and Console API Reference](../../reference/session-and-cons
 and open a report using the project's
 [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md).
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

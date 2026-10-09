@@ -63,6 +63,11 @@ def main():
         if not (output / relative).is_file():
             errors.append(f'missing build artifact: {relative}')
 
+    for relative in ('index.html', '404.html'):
+        path = output / relative
+        if path.is_file() and 'SSHScript v3.1' in path.read_text(encoding='utf-8'):
+            errors.append(f'{relative}: stale documentation entry label')
+
     links = 0
     for page in pages:
         path = output / page.url.lstrip('/') / 'index.html'
@@ -70,6 +75,15 @@ def main():
             errors.append(f'missing rendered page: {page.url}')
             continue
         html = read_html(path)
+        rendered = path.read_text(encoding='utf-8')
+        if f'SSHScript {check_docs.CURRENT_VERSION} documentation.' not in rendered:
+            errors.append(f'{page.url}: footer version does not match current release')
+        for required in ('href="https://pypi.org/project/sshscript/"',
+                         'href="https://github.com/iapyeh/sshscript/releases/latest"'):
+            if required not in rendered:
+                errors.append(f'{page.url}: missing current release entry: {required}')
+        if '<title>' in rendered and 'SSHScript v3.1 Documentation</title>' in rendered:
+            errors.append(f'{page.url}: stale site title')
         if 'main-content' not in html.ids:
             errors.append(f'{page.url}: missing theme layout')
         if html.navigation != expected_nav:

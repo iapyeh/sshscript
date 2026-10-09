@@ -1,6 +1,6 @@
 ---
 title: "Tutorials"
-parent: "SSHScript v3.1 Documentation"
+parent: "SSHScript Documentation"
 nav_order: 2
 has_children: true
 has_toc: false
@@ -17,4 +17,4 @@ API is the primary learning path.
 | [Module API Tutorial]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/tutorial/) | Available |
 | [Dollar Syntax Tutorial](dollar-syntax/) | Complete |
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-10-09 10:40:03

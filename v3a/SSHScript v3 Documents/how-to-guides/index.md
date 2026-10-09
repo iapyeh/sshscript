@@ -1,6 +1,6 @@
 ---
 title: "How-to Guides"
-parent: "SSHScript v3.1 Documentation"
+parent: "SSHScript Documentation"
 nav_order: 3
 has_children: true
 has_toc: false
@@ -23,4 +23,4 @@ Use these task-oriented pages after completing the quickstart.
 | [Concurrency and Threading]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Advanced/threading/) | Available |
 | [CLI and Script Composition](cli-and-script-composition/) | Complete |
 
-Last Updated: 2026-09-25 16:37:52
+Last Updated: 2026-10-09 10:40:03

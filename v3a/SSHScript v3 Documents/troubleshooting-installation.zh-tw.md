@@ -1,6 +1,6 @@
 ---
 title: "安裝疑難排解 (zh-TW)"
-parent: "SSHScript v3.1 Documentation"
+parent: "SSHScript Documentation"
 nav_order: 10
 nav_exclude: true
 search_exclude: true
@@ -93,4 +93,4 @@ sshscript --version
 只有在受保護的除錯環境才使用 `--traceback`，因為完整 traceback
 可能包含程式碼、命令、路徑或秘密。
 
-Last Updated: 2026-09-21 17:45:03
+Last Updated: 2026-10-09 10:40:03

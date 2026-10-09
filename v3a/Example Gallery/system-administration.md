@@ -1,14 +1,14 @@
 ---
 title: "System Administration"
 parent: "Example Gallery"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 1
 ---
 
 # System Administration
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.1.
+> Session settings and managed jobs/deadlines are features available in 4.0.2.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -34,7 +34,7 @@ handling.
 
 ### Prerequisites
 
-- SSHScript 3.1.4 and Python 3.11 or newer on the runner;
+- SSHScript 4.0.2 and Python 3.11 or newer on the runner;
 - a target account authenticated by an agent or configured key;
 - the target's independently verified key in `known_hosts`; and
 - permission to collect the selected operational data.
@@ -143,4 +143,4 @@ target platform. Give each command its own stable name and status policy. For a
 state-changing operation, create a separate Gallery page with preconditions,
 backup, idempotency, verification, rollback, and partial-failure behavior.
 
-Last Updated: 2026-10-08 23:48:09
+Last Updated: 2026-10-09 10:40:03

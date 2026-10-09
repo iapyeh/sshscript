@@ -1,11 +1,11 @@
 ---
 layout: default
-title: "SSHScript Documentation"
+title: "Documentation Repository"
 nav_exclude: true
 search_exclude: true
 ---
 
-# SSHScript Documentation
+# Documentation Repository
 
 [![Documentation](https://github.com/iapyeh/sshscript/actions/workflows/docs.yml/badge.svg?branch=gh-pages)](https://github.com/iapyeh/sshscript/actions/workflows/docs.yml)
 
@@ -15,10 +15,10 @@ primary source-code branch.
 
 ## Published documentation
 
-SSHScript 3.1.4 is the current Production/Stable release in the supported
-v3.1 line:
+SSHScript 4.0.2 is the current Production/Stable release. The website also
+retains explicitly labelled 3.1 compatibility examples and historical notes:
 
-**[Open the SSHScript v3.1 documentation](https://iapyeh.github.io/sshscript/v3a/)**
+**[Open the SSHScript documentation](https://iapyeh.github.io/sshscript/v3a/)**
 
 Recommended entry points:
 
@@ -27,20 +27,20 @@ Recommended entry points:
 - [Module API Tutorial](https://iapyeh.github.io/sshscript/v3a/SSHScript%20v3%20Documents/tutorial/)
 - [Session and Console API Reference](https://iapyeh.github.io/sshscript/v3a/reference/session-and-console-api/)
 - [Production Checklist](https://iapyeh.github.io/sshscript/v3a/security-and-operations/failure-model-and-production-checklist/)
-- [v3.1.4 on PyPI](https://pypi.org/project/sshscript/3.1.4/)
+- [Current release on PyPI](https://pypi.org/project/sshscript/)
 
 ## About SSHScript
 
 SSHScript is a Python automation library and `.spy` script runner for
 executing commands locally or over SSH. The regular Python `Session` API is
-the primary interface in v3.1. Dollar syntax is an optional shorthand for
+the primary interface in 4.0. Dollar syntax is an optional shorthand for
 concise operational scripts.
 
 ## Branch layout
 
 | Path | Purpose |
 | --- | --- |
-| `v3a/` | Actively maintained SSHScript v3.1 website |
+| `v3a/` | Actively maintained SSHScript website; stable legacy URL |
 | `v1/`, `v2/`, `v3/` | Historical documentation; excluded from current navigation and search |
 | `_config.yml` | GitHub Pages and Just the Docs configuration |
 | `tools/check_docs.py` | Source-level documentation validation |
@@ -61,7 +61,7 @@ targets branch-level publishing files such as this README or `_config.yml`.
 - Do not duplicate the sidebar with a manually maintained child-page table of
   contents.
 - End each maintained v3a Markdown document with
-  `Last Updated: 2026-09-27 14:35:49
+  `Last Updated: YYYY-MM-DD HH:MM:SS` and match its filesystem mtime.
 
 ## Sidebar navigation
 
@@ -74,7 +74,7 @@ use the exact parent title; third-level pages also declare `grand_parent`.
 ---
 title: "Session and Console API Reference"
 parent: "Reference"
-grand_parent: "SSHScript v3.1 Documentation"
+grand_parent: "SSHScript Documentation"
 nav_order: 1
 ---
 ```
@@ -108,7 +108,7 @@ local assets, links, and anchors. The current `v3a` scope explicitly enables nav
 the historical `v3` prefix under Jekyll 4 while remaining compatible with
 GitHub Pages (Jekyll 3).
 
-Before publishing, also review examples for current v3.1 behavior, credentials,
+Before publishing, also review examples for current 4.0 behavior, credentials,
 internal infrastructure details, and unsafe defaults. Changes pushed to
 `gh-pages` become public through GitHub Pages.
 
@@ -124,4 +124,4 @@ SSHScript source code, releases, and issue tracking are available in the
 [iapyeh/sshscript repository](https://github.com/iapyeh/sshscript).
 SSHScript is released under the MIT License.
 
-Last Updated: 2026-09-27 14:35:49
+Last Updated: 2026-10-09 10:41:00

@@ -18,7 +18,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC_ROOT = ROOT / "v3a"
-CURRENT_VERSION = "3.1.4"
+CURRENT_VERSION = "4.0.2"
 PLACEHOLDER_MARKER = "> **Documentation status: Placeholder**"
 LAST_UPDATED_RE = re.compile(
     r"(?:^|\n)Last Updated: "
@@ -245,12 +245,12 @@ def check_navigation(pages: list[Page], errors: list[str]) -> None:
 
     visible = [page for page in pages if page.visible]
     roots = [page for page in visible if page.metadata.get("parent") is None]
-    if len(roots) != 1 or roots[0].metadata.get("title") != "SSHScript v3.1 Documentation":
+    if len(roots) != 1 or roots[0].metadata.get("title") != "SSHScript Documentation":
         details = ", ".join(
             f"{page.metadata.get('title')!r} ({page.relative_path})" for page in roots
         )
         errors.append(
-            "visible navigation must have only the SSHScript v3.1 Documentation "
+            "visible navigation must have only the SSHScript Documentation "
             f"root; found: {details or 'none'}"
         )
 
@@ -341,6 +341,9 @@ def check_repository_metadata(errors: list[str]) -> None:
     for relative in ("_config.yml", "index.html", "404.html", "README.md"):
         if not (ROOT / relative).is_file():
             errors.append(f"repository root is missing {relative}")
+    for relative in ("index.html", "404.html"):
+        if "SSHScript v3.1" in (ROOT / relative).read_text(encoding="utf-8"):
+            errors.append(f"{relative}: stale documentation entry label")
     info_path = ROOT / "info.json"
     try:
         version = json.loads(info_path.read_text(encoding="utf-8")).get("version")
@@ -353,6 +356,23 @@ def check_repository_metadata(errors: list[str]) -> None:
             )
 
     config = (ROOT / "_config.yml").read_text(encoding="utf-8")
+    if not re.search(r'^title: SSHScript Documentation$', config, re.MULTILINE):
+        errors.append("website title must be SSHScript Documentation")
+    if f'sshscript_version: "{CURRENT_VERSION}"' not in config:
+        errors.append("website version must match info.json and current release")
+    if 'https://pypi.org/project/sshscript/' not in config or re.search(
+        r'https://pypi.org/project/sshscript/[^\s\"\']+', config
+    ):
+        errors.append("general PyPI entry must not pin a historical release")
+    if 'https://github.com/iapyeh/sshscript/releases/latest' not in config:
+        errors.append("general Release entry must point to the latest release")
+    footer = (ROOT / "_includes/footer_custom.html").read_text(encoding="utf-8")
+    for required in ("SSHScript {{ site.sshscript_version }} documentation.",
+                     'href="https://pypi.org/project/sshscript/"',
+                     'href="https://github.com/iapyeh/sshscript/releases/latest"'):
+        if required not in footer:
+            errors.append("footer must use the shared current version and current release links")
+
     if not re.search(
         r"^remote_theme:\s+\S+@[0-9a-f]{40}(?:\s+#.*)?$",
         config,

@@ -1,6 +1,6 @@
 ---
 title: "Dollar Syntax Tutorial (zh-TW)"
-parent: "SSHScript v3.1 Documentation"
+parent: "SSHScript Documentation"
 nav_order: 3
 nav_exclude: true
 search_exclude: true
@@ -759,4 +759,4 @@ SSHScript v3.1 把 shell 擅長的「直接操作系統」和 Python 擅長的�
 未連線存取 SFTP 拋出 `SSHScriptException`。完整例外分類請參考
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/)。
 
-Last Updated: 2026-09-26 16:11:31
+Last Updated: 2026-10-09 10:40:03
