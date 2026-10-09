@@ -88,6 +88,8 @@ def test_source_document_links_survive_release_staging(self):
                 self.assertTrue(destination.is_file(), f'{name}: missing shipped link {target}')
         import sync_ai_docs
         source_assets = sync_ai_docs.outputs()
+        self.assertFalse(source_assets['ai-agents/downloads/SKILL.txt'].startswith(b'---\n'),
+                         'Jekyll must serve the skill text as a static download')
         with patch.object(sync_ai_docs, 'ROOT', stage):
             self.assertEqual(sync_ai_docs.outputs(), source_assets,
                              'release staging must preserve the downloadable skill and docs')

@@ -46,7 +46,9 @@ def outputs():
     return {
         'ai-agents/guide.md': HEADER.encode() + guide,
         'ai-agents/downloads/agent-guide.txt': guide,
-        'ai-agents/downloads/SKILL.txt': skill,
+        # A leading YAML fence makes Jekyll render even .txt as a page.
+        'ai-agents/downloads/SKILL.txt':
+            b'SSHScript skill instructions (use the ZIP for installation)\n\n' + skill,
         'ai-agents/downloads/sshscript-skill.zip': stream.getvalue(),
     }
 
