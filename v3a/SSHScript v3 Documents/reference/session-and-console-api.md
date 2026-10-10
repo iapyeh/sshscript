@@ -21,7 +21,7 @@ signatures, results, errors, and lifetime rules.
 ## Session settings (4.0 source API)
 
 `session.set(check=..., verbose=..., verbose_stderr=..., log_level=...,
-policy=...)` validates all supplied settings before applying changes.
+policy=..., known_hosts=..., known_hosts_path=...)` validates all supplied settings before applying changes.
 `session.get()` returns a copy of the settings dictionary; `session.get(name)`
 reads one setting. Matching properties use the same storage. Unknown setting
 names raise `ValueError`; invalid policy values raise `TypeError`.
@@ -32,6 +32,8 @@ names raise `ValueError`; invalid policy values raise `TypeError`.
 | `verbose` | bool | application/environment default |
 | `verbose_stderr` | bool | application/environment default |
 | `log_level` | logging integer or level name | application logger level |
+| `known_hosts` (unreleased) | `"parent"`, `"local"`, `"chain"` | `"parent"` |
+| `known_hosts_path` (unreleased) | text path, `PathLike[str]`, or `None` | `None` |
 | `policy` | Paramiko `MissingHostKeyPolicy` instance, subclass, or `None` | `None` (RejectPolicy) |
 
 ```python
@@ -47,7 +49,8 @@ finally:
     session.close()
 ```
 
-Child Sessions copy the parent's settings at creation. A policy object itself
+Child Sessions copy the parent's settings at creation, except for the
+unreleased host-specific `known_hosts_path`, which resets to `None`. A policy object itself
 is shared, so custom policies with mutable state must account for reuse.
 Changes affect future connections only. These settings are not in published
 3.1.5; see the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/).
@@ -238,6 +241,7 @@ session.connect(
     policy=...,  # 4.0: omitted argument uses the Session setting.
     *,
     ssh_config=None,
+    known_hosts=...,  # Unreleased: omitted argument uses the Session setting.
     **connect_options,
 ) -> Session
 ```
@@ -263,9 +267,32 @@ with local.connect(
     remote.exec_command("hostname", shell=False)
 ```
 
-System host keys are loaded and unknown or changed keys are rejected by
-default. Passing a permissive Paramiko policy must be an explicit, limited
+Published 4.0.2 loads localhost system host keys. Unknown or changed keys
+are rejected by default. Passing a permissive Paramiko policy must be an explicit, limited
 bootstrap decision.
+
+### Host-key sources (unreleased)
+
+The development checkout defaults to `known_hosts="parent"`, reading the
+calling Session host's `~/.ssh/known_hosts` (over SFTP for a remote Session),
+consistent with `pkey_path`. Set each source Session's `known_hosts_path` to
+select another file; paths are not inherited. Strategies are inherited.
+`connect(known_hosts=...)` overrides only the current connection.
+
+`"local"` uses only localhost and preserves previous behavior. `"chain"` uses
+the caller, then ancestors through localhost: host2 → host1 → localhost when
+host2 connects to host3. The nearest source with the target hostname/port
+record is authoritative; mismatches and read/parse errors stop immediately.
+Only absence of a target record allows fallback. `pkey_path` remains only on
+the calling host regardless of strategy. Authentication and verification
+still run locally. `policy` handles unknown keys only after all sources lack
+the target. AutoAddPolicy does not write these trust files.
+
+Missing or unreadable files are errors in all strategies; an empty file
+allows the missing-key policy to decide. See the
+[full contract and migration]({{ site.baseurl }}/v3a/recommended-api/#host-key-sources-unreleased)
+for strict parsing and supported known_hosts formats. Published 4.0.2 does not
+provide these settings.
 
 A connection created from an already connected Session tunnels through its
 parent, enabling bastion workflows. `proxyCommand=...` is supported only from
@@ -774,4 +801,4 @@ Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
 Paramiko failures retain their original exception and traceback. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-10-10 12:42:31
+Last Updated: 2026-10-10 17:22:28
