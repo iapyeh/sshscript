@@ -109,6 +109,102 @@ remote argv is quoted for a POSIX login shell. Shell operators inside argv
 are literal data. Console commands accept strings; quote dynamic arguments
 with `shlex.join()`. Do not interpolate untrusted values into shell syntax.
 
+## SSH connections and private-key paths
+
+Before choosing an authentication parameter, identify the host containing the
+private-key file. `parent.connect(target, pkey_path=path)` calls
+`parent.pkey(path)` to load an RSA private key from the **calling parent
+Session's host**:
+
+| Calling Session | Where `pkey_path` is read |
+| --- | --- |
+| Local Session | Localhost, where the Python process runs |
+| Session connected to host1 | Host1, through that Session's SFTP connection |
+
+`connect()` returns a new child Session. The parent keeps its original host;
+calling `local.connect(...)` again still reads `pkey_path` on localhost.
+For a nested connection, call `host1.connect(...)` to read it on host1.
+
+The following example requires authorized SSH access, verified host keys and
+RSA key files at the indicated locations; it is not a local smoke test:
+
+```python
+from contextlib import closing
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.connect(
+        "ops@host1.example.net",
+        pkey_path="/home/localuser/.ssh/host1_rsa",  # File on localhost.
+        timeout=10, banner_timeout=10, auth_timeout=10,
+    ) as host1:
+        with host1.connect(
+            "deploy@host2.example.net",
+            pkey_path="/home/ops/.ssh/host2_rsa",  # File on host1, read via SFTP.
+            timeout=10, banner_timeout=10, auth_timeout=10,
+        ) as host2:
+            result = host2.exec_command(["hostname"], check=True, command_timeout=10)
+            print(result.stdout)
+```
+
+In `.spy`, nested `with $.connect(...)` scopes select the current parent
+Session, so an inner `pkey_path` is read from the outer scope's connected host.
+`key_filename=` has different semantics: Paramiko reads it from the local
+Python process's filesystem, including for nested SSH connections. It supports
+key formats beyond RSA. To use an encrypted RSA key with `pkey_path` semantics,
+load it explicitly with `parent.pkey(path, password=key_passphrase)` and pass
+the returned object as `pkey=`; do not supply both `pkey` and `pkey_path`.
+
+### Keys readable only after sudo/su
+
+SFTP uses the original SSH login account. `sudo()` and `su()` change the
+console command identity, not SFTP permissions. Calling `$.pkey()` inside
+either scope still delegates to the owning Session, so a root-only key can
+fail with a permission error even when console commands run as root.
+
+Console objects yielded by `shell()`/`sudo()`/`su()`/`enter()` do not provide
+`connect()`. In those `.spy` scopes, `$.connect()` therefore fails. A retained
+Python Session's `connect()` is not blocked by an active console, but it uses
+the original SSH transport and does not inherit sudo/su identity. Prefer
+leaving the console before opening the child connection.
+
+When authorized to use a privileged key, read it as a console command, check
+that the command succeeded, parse its captured output, then pass the resulting
+Paramiko key as `pkey=`. This avoids an SFTP read during `connect()`.
+The `.spy` example below requires authorized sudo and SSH access, verified
+host keys, and an RSA key that authenticates `deploy` on host2:
+
+```spy
+from io import StringIO
+import paramiko
+
+with $.connect("ops@host1.example.net", timeout=10,
+               banner_timeout=10, auth_timeout=10) as host1:
+    with $.sudo():
+        key_result = $("cat /root/.ssh/id_rsa", check=True, command_timeout=10)
+        key = paramiko.RSAKey.from_private_key(StringIO(key_result.stdout))
+
+    with host1.connect("deploy@host2.example.net", pkey=key,
+                       timeout=10, banner_timeout=10, auth_timeout=10):
+        $hostname
+```
+
+After a successful `$cat /root/.ssh/id_rsa`, `StringIO($.stdout)` can also
+supply the key text; check `$.exitcode` before parsing and capture stdout
+before another command replaces it. The saved result above retains the
+specific command's output. In Python, use
+`with host1.sudo() as root:` and
+`key_result = root("cat /root/.ssh/id_rsa", check=True, command_timeout=10)`.
+The same approach works with an authorized `su()` scope. For an encrypted
+RSA key, add `password=key_passphrase` to `from_private_key()`; use the
+appropriate Paramiko key class for other key formats.
+
+Private-key text enters console buffers and the captured result. Configure
+output logging/display so it does not expose this command's output before
+reading the key; do not print, persist, or include that output in diagnostics
+or handoff reports. Console privilege only permits reading the file; host2
+authentication is determined by the supplied key and target username.
+
 ## Retain evidence and handle failure
 
 Save each returned result; read `stdout`, `stderr`, `exitcode`, `host`,

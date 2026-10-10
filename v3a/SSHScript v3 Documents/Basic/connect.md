@@ -237,6 +237,47 @@ For a nested connection, `pkey_path` refers to an RSA private key readable
 from the currently connected parent host; SSHScript reads that file through
 SFTP. Prefer Paramiko's normal key options for top-level connections.
 
+## Private keys readable only in a privileged console
+
+Remote `pkey()` and `pkey_path` use SFTP with the original SSH login account.
+Entering `sudo()` or `su()` does not change that identity, so even
+`$.pkey("/root/.ssh/id_rsa")` inside a root console can fail with a permission
+error. When authorized, read the file with a console command and construct
+the Paramiko key from its captured text:
+
+```python
+from contextlib import closing
+from io import StringIO
+import paramiko
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.connect("ops@host1.example.net", timeout=10,
+                       banner_timeout=10, auth_timeout=10) as host1:
+        with host1.sudo() as root:
+            key_result = root("cat /root/.ssh/id_rsa", check=True, command_timeout=10)
+            key = paramiko.RSAKey.from_private_key(StringIO(key_result.stdout))
+        with host1.connect("deploy@host2.example.net", pkey=key, timeout=10,
+                           banner_timeout=10, auth_timeout=10) as host2:
+            result = host2.exec_command(["hostname"], check=True, command_timeout=10)
+            print(result.stdout)
+```
+
+The example requires authorized sudo/SSH access and verified host keys.
+Configure output logging/display to keep private-key text out of logs before
+running the read; do not print or report `key_result` or its stdout. Key text
+also remains in console buffers. Use the matching Paramiko key class for
+other formats; encrypted RSA keys need `password=` on `from_private_key()`.
+An authorized `su()` console can supply the text in the same way.
+
+The console returned by `shell()`/`sudo()`/`su()`/`enter()` has no `connect()`
+method, so `$.connect()` is unavailable while a console is current in `.spy`.
+A retained Python Session can still call `connect()` during an active console;
+the connection uses its original SSH transport and does not inherit console
+privilege. The example leaves the console first and calls the retained
+`host1.connect(pkey=key)`, which needs no SFTP key read. See the
+[agent guide's `.spy` equivalent](https://iapyeh.github.io/sshscript/v3a/ai-agents/guide/#keys-readable-only-after-sudosu).
+
 ## ProxyCommand and keepalives
 
 A top-level connection may use `proxyCommand`:
@@ -269,4 +310,4 @@ with $.connect("ops@example.net"):
 Nested `$.connect()` blocks and the host-key policy follow the same Session
 API behavior.
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 12:42:49

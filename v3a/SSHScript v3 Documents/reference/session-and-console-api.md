@@ -300,7 +300,14 @@ session.pkey(pathOfRsaPrivate, password=None) -> paramiko.RSAKey
 
 Reads an RSA key locally for a local Session or through SFTP for a connected
 Session. Missing files become `SSHScriptException`; parsing and decryption
-errors propagate.
+errors propagate. Remote reads always use the original SSH login account's
+SFTP permissions, including when `pkey()` is called through a sudo/su console.
+For a key readable only by the privileged console account, use an authorized
+console command to capture its text, parse it with the appropriate Paramiko
+key class, leave the console, then call the retained Session's
+`connect(pkey=key)`. See the
+[privileged-key example]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Basic/connect/#private-keys-readable-only-in-a-privileged-console).
+Keep the captured private-key text out of logs and diagnostics.
 
 ```python
 session.upload(src, dst, makedirs=False, overwrite=True) -> tuple[str, str]
@@ -696,7 +703,12 @@ shared SSHScript logger with channel context.
 
 The console can create nested `shell()`, `su()`, `sudo()`, and `enter()`
 contexts. Its `upload()`, `download()`, and `pkey()` methods delegate to the
-owning Session.
+owning Session. SFTP retains the SSH login identity even inside sudo/su.
+Console objects do not expose `connect()`, so `$.connect()` is unavailable
+while a shell/sudo/su/enter console is current. A retained Python Session's
+`connect()` can still be called; it uses the original SSH transport and does
+not inherit the console's privilege. Prefer leaving the console before
+connecting to the next host.
 
 ## Exception model
 
@@ -762,4 +774,4 @@ Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
 Paramiko failures retain their original exception and traceback. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 12:42:31
