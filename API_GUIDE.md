@@ -88,6 +88,74 @@ with closing(Session()) as local:
         print(result.stdout)
 ```
 
+### Private-key paths and nested connections
+
+`parent.connect(..., pkey_path=path)` loads an RSA private key from the
+**calling parent Session's host**. A local Session reads the file on localhost;
+a Session connected to host1 reads it on host1 through SFTP before connecting
+to host2. `connect()` returns a child Session and leaves the parent on its
+original host. Calling the original local Session again therefore still reads
+the key on localhost.
+
+For example, `local.connect("host1", pkey_path="/local/key_rsa")` reads
+`/local/key_rsa` locally and returns `host1`. Then
+`host1.connect("host2", pkey_path="/remote/key_rsa")` reads `/remote/key_rsa`
+on host1. In `.spy`, an inner `with $.connect(...)` uses the outer scope's
+current Session as its parent.
+
+`key_filename=` is forwarded to Paramiko and reads from the local Python
+process's filesystem even for nested connections; it supports additional key
+formats. For an encrypted RSA key, use
+`pkey=parent.pkey(path, password=key_passphrase)` to retain the same host-based
+reading rule. Supplying both `pkey_path` and `pkey` raises `ValueError`.
+See the [agent guide's complete nested example](https://iapyeh.github.io/sshscript/v3a/ai-agents/guide/#ssh-connections-and-private-key-paths).
+
+### Private keys readable only in a privileged console
+
+Remote `pkey()` and `pkey_path` use SFTP with the original SSH login account.
+Entering `sudo()` or `su()` does not change that identity, so even
+`$.pkey("/root/.ssh/id_rsa")` inside a root console can fail with a permission
+error. When authorized, read the file with a console command and construct
+the Paramiko key from its captured text:
+
+This manual example requires a real privileged console and SSH endpoints;
+it is excluded from credential-free executable examples.
+
+```py
+from contextlib import closing
+from io import StringIO
+import paramiko
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.connect("ops@host1.example.net", timeout=10,
+                       banner_timeout=10, auth_timeout=10) as host1:
+        with host1.sudo() as root:
+            key_result = root("cat /root/.ssh/id_rsa", check=True, command_timeout=10)
+            key = paramiko.RSAKey.from_private_key(StringIO(key_result.stdout))
+        with host1.connect("deploy@host2.example.net", pkey=key, timeout=10,
+                           banner_timeout=10, auth_timeout=10) as host2:
+            result = host2.exec_command(["hostname"], check=True, command_timeout=10)
+            print(result.stdout)
+```
+
+The example requires authorized sudo/SSH access and verified host keys.
+Configure output logging/display to keep private-key text out of logs before
+running the read; do not print or report `key_result` or its stdout. Key text
+also remains in console buffers. Use the matching Paramiko key class for
+other formats; encrypted RSA keys need `password=` on `from_private_key()`.
+An authorized `su()` console can supply the text in the same way.
+
+The console returned by `shell()`/`sudo()`/`su()`/`enter()` has no `connect()`
+method, so `$.connect()` is unavailable while a console is current in `.spy`.
+A retained Python Session can still call `connect()` during an active console;
+the connection uses its original SSH transport and does not inherit console
+privilege. The example leaves the console first and calls the retained
+`host1.connect(pkey=key)`, which needs no SFTP key read. See the
+[agent guide's `.spy` equivalent](https://iapyeh.github.io/sshscript/v3a/ai-agents/guide/#keys-readable-only-after-sudosu).
+
+### Optional dollar syntax
+
 Save dollar syntax as `.spy`, run with `sshscript file.spy`, and syntax-check
 without execution using `sshscript --check file.spy`.
 
