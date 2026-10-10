@@ -5,7 +5,8 @@ import subprocess
 import sys
 import tempfile
 
-VALID = '''from typing import assert_type
+VALID = '''from typing import assert_type, Literal
+from pathlib import Path
 from paramiko import MissingHostKeyPolicy, AutoAddPolicy
 from sshscript import Session, CommandResult, JobResult, CommandJob
 s = Session()
@@ -13,6 +14,11 @@ s.set(check=True, log_level="DEBUG")
 s.verbose = False
 s.log_level = "WARNING"
 s.set(policy=AutoAddPolicy())
+s.set(known_hosts="chain", known_hosts_path=Path("/trust/known_hosts"))
+s.known_hosts = "parent"
+s.known_hosts_path = None
+assert_type(s.get("known_hosts"), Literal["local", "parent", "chain"])
+assert_type(s.get("known_hosts_path"), str | None)
 s.policy = AutoAddPolicy
 s.policy = None
 assert_type(s.get("policy"), MissingHostKeyPolicy | type[MissingHostKeyPolicy] | None)
@@ -35,7 +41,7 @@ with s.shell() as console:
     if isinstance(shell_result, CommandResult):
         assert_type(shell_result, CommandResult[int])
         assert_type(shell_result.stdout, str)
-with s.connect("host") as remote:
+with s.connect("host", known_hosts="local") as remote:
     assert_type(remote, Session)
 '''
 INVALID = '''from sshscript import Session
@@ -44,6 +50,9 @@ s.set(chek=True)
 s.verbose = "yes"
 s.exec_command(123)
 s.exec_command(["true"], check="yes")
+s.set(known_hosts="typo")
+s.set(known_hosts_path=123)
+s.connect("host", known_hosts="typo")
 '''
 
 def main():
@@ -67,9 +76,9 @@ def main():
             output = result.stdout + result.stderr
             if name == 'valid' and result.returncode:
                 raise RuntimeError(output)
-            if name == 'invalid' and (result.returncode != 1 or 'Found 4 errors' not in output):
-                raise RuntimeError('Expected all four invalid uses to be rejected:\n' + output)
-        print('Public types: valid consumer accepted; four invalid uses rejected')
+            if name == 'invalid' and (result.returncode != 1 or 'Found 7 errors' not in output):
+                raise RuntimeError('Expected all seven invalid uses to be rejected:\n' + output)
+        print('Public types: valid consumer accepted; seven invalid uses rejected')
 
 if __name__ == '__main__':
     main()

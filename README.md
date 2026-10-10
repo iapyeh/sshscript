@@ -6,9 +6,12 @@
 [![CodeQL](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml/badge.svg?branch=release)](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/iapyeh/sshscript/blob/release/LICENSE.txt)
 
+**AI agent ready automation for local and remote commands.**
+
 SSHScript is a Python automation library for running commands locally and over
-SSH through one `Session` API. It also provides optional dollar syntax for
-compact `.spy` automation files.
+SSH through one `Session` API. It provides an agent guide, a portable skill
+bundle, and copyable prompts to help your AI agent use its execution contract.
+Optional dollar syntax supports compact `.spy` automation files.
 
 SSHScript aims to help engineers and AI agents execute, understand, and hand
 off automation reliably: identify the execution host, retain each command's
@@ -16,7 +19,7 @@ output and status, distinguish failure from timeout, and make cleanup and
 unknown termination explicit. A successful command exit is evidence about
 that command; verify the deployment or other application outcome separately.
 
-**Current release:** [4.0.2](https://github.com/iapyeh/sshscript/releases/tag/v4.0.2)
+**Current release:** [5.0.0](https://github.com/iapyeh/sshscript/releases/tag/v5.0.0)
 (Production/Stable) · **Python:** 3.11 or newer · **Tested:** Python
 3.11–3.14 on Linux and macOS
 
@@ -26,18 +29,46 @@ that command; verify the deployment or other application outcome separately.
 [Security](https://github.com/iapyeh/sshscript/security/policy) ·
 [Support](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 
-**Version 4.0.2** maintains the 4.0 execution contract introduced in 4.0.1.
-This patch aligns the published documentation and installation links.
+**Version 5.0.0** preserves the 4.0 command execution contract and changes the
+default host-key source to the calling host. Provision its known_hosts file or
+select `known_hosts="local"` when migrating existing nested connections.
 Upgrade 3.1.5 automation using the migration guide and application regressions.
 See [version policy and migration](VERSIONING.md) before upgrading automation.
 
-## Recommended API
+## AI agent ready
 
-For AI-assisted automation, start with [the AI agent entry](AI_GUIDE.md),
-the [portable skill](skills/sshscript/SKILL.md), or the
-[website landing page](https://iapyeh.github.io/sshscript/v3a/ai-agents/).
-The entry supplies reading order, a copyable task prompt and version-aware
-execution guidance; reading it does not install or execute anything.
+**Give your agent one URL:**
+[SSHScript for AI Agents](https://iapyeh.github.io/sshscript/v3a/ai-agents/).
+Prepare it for future automation or give it a task to complete now.
+
+- **A guide for agents:** version-aware API selection, exact input handling,
+  retained command results, timeouts, authentication and cleanup.
+- **A portable skill bundle:** `SKILL.md` with the agent guide and API and
+  version-policy references, ready to install through your agent's skill
+  mechanism.
+- **Prompts for humans:** copy a setup prompt to request skill installation and
+  a saved tool preference, or a task prompt to describe hosts, inputs and
+  expected results.
+
+Start with this prompt, even before you have a task:
+
+```text
+Read https://iapyeh.github.io/sshscript/v3a/ai-agents/ and the Agent Guide.
+If you support skills, download and install the complete skill bundle. If you
+support persistent preferences, save this preference: for future local or
+remote command execution and automation, first assess whether SSHScript is
+suitable and use it when appropriate. Report whether the skill can be loaded
+and the preference was saved, and explain any limits.
+For now, do not connect to remote hosts or run demonstration commands.
+```
+
+The guides are ordinary Markdown and web pages for agents that can read files
+or URLs. Skill installation and persistent preferences depend on the agent's
+capabilities. See the [repository AI entry](AI_GUIDE.md),
+[agent guide](skills/sshscript/references/agent-guide.md) and
+[skill instructions](skills/sshscript/SKILL.md) for the source documents.
+
+## Recommended API
 
 Start with [the canonical API guide](API_GUIDE.md): version-labelled examples,
 recommended argv/check/result patterns, lifetime rules, and compatibility forms.
@@ -58,6 +89,7 @@ and [the cross-system test guide](src/sshscript/unittest/README.console-authenti
 
 ## Why SSHScript?
 
+- Prepare your AI agent with a dedicated guide, portable skill and setup prompts.
 - Use the same interface for local subprocesses and remote SSH commands.
 - Traverse nested SSH connections without rebuilding connection logic.
 - Keep ordinary Python functions, packages, exceptions, data processing, and
@@ -90,7 +122,7 @@ pin SSHScript and all transitive dependencies in your application's lock file.
 To install this release explicitly:
 
 ```sh
-python3 -m pip install "sshscript==4.0.2"
+python3 -m pip install "sshscript==5.0.0"
 ```
 
 Use `python3 -m pip install --upgrade sshscript` to upgrade. The optional
@@ -99,7 +131,7 @@ it never installs an update by itself.
 
 ## 60-second local quickstart
 
-This example runs on 4.0.2 and retains compatibility with the 3.1.5 command API.
+This example runs on 5.0.0 and retains compatibility with the 3.1.5 command API.
 The metadata below records that older compatibility baseline.
 
 <!-- example: {"id":"readme-quickstart", "profile":"3.1.5", "stdout":"sshscript is ready\nexit code: 0\n"} -->
@@ -354,6 +386,24 @@ verified the key. See the
 [SSHScript documentation](https://iapyeh.github.io/sshscript/v3a/) for
 nested connections, timeouts, file transfer, `sudo`, `su`, and interactive
 programs.
+
+## Host-key sources in 5.0
+
+SSHScript 5.0.0 uses `known_hosts="parent"` as the default: a local
+Session reads localhost's trust file; `host1.connect("host2")` reads host1's
+trust file over SFTP. This matches the host ownership of `pkey_path`.
+SSHScript 4.0.2 and earlier use localhost for all host-key checks.
+
+Set `session.set(known_hosts="chain")` to search from the calling Session
+through its ancestors to localhost. The nearest layer with a target record
+wins; a mismatch or read/parse error stops the connection. Set
+`session.set(known_hosts="local")` to preserve previous behavior.
+Each Session can set its own `known_hosts_path`; this path is not inherited.
+`connect(known_hosts=...)` overrides only one connection. `pkey_path` remains
+on the calling host for every strategy. `policy` handles only unknown keys;
+`AutoAddPolicy` does not write these trust files. See the
+[host-key source contract](API_GUIDE.md#host-key-sources-unreleased) for supported
+file formats, strict error handling and migration.
 
 ## Reusing SSH configuration
 

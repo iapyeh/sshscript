@@ -1,8 +1,8 @@
 # Recommended SSHScript API
 
 This is the canonical entry point for new code and AI-generated examples.
-**Current contract: 4.0.2**, Python 3.11+. Sections marked **4.0** require
-SSHScript 4.0.2; installing `sshscript==3.1.5` does not provide them.
+**Current contract: 5.0.0**, Python 3.11+. Sections marked **4.0** require
+SSHScript 4.0.2 or newer; installing `sshscript==3.1.5` does not provide them.
 Examples labelled 3.1.5 remain verified compatibility examples for that baseline.
 Pin the exact artifact version and record it with execution diagnostics when
 handing off automation. See [version policy and migration](VERSIONING.md).
@@ -31,7 +31,7 @@ identifiers and handoff reports are future work, not a current API guarantee.
 
 ## One command, one retained result (4.0; compatible with 3.1.5)
 
-Install the current release with `python -m pip install "sshscript==4.0.2"`.
+Install the current release with `python -m pip install "sshscript==5.0.0"`.
 For reproducing only the historical compatibility baseline, explicitly install
 `sshscript==3.1.5`; the 4.0 sections require the current release.
 An argv list is one command, not a batch. Shell-looking argument text stays data.
@@ -88,6 +88,139 @@ with closing(Session()) as local:
         print(result.stdout)
 ```
 
+### Private-key paths and nested connections
+
+`parent.connect(..., pkey_path=path)` loads an RSA private key from the
+**calling parent Session's host**. A local Session reads the file on localhost;
+a Session connected to host1 reads it on host1 through SFTP before connecting
+to host2. `connect()` returns a child Session and leaves the parent on its
+original host. Calling the original local Session again therefore still reads
+the key on localhost.
+
+For example, `local.connect("host1", pkey_path="/local/key_rsa")` reads
+`/local/key_rsa` locally and returns `host1`. Then
+`host1.connect("host2", pkey_path="/remote/key_rsa")` reads `/remote/key_rsa`
+on host1. In `.spy`, an inner `with $.connect(...)` uses the outer scope's
+current Session as its parent.
+
+`key_filename=` is forwarded to Paramiko and reads from the local Python
+process's filesystem even for nested connections; it supports additional key
+formats. For an encrypted RSA key, use
+`pkey=parent.pkey(path, password=key_passphrase)` to retain the same host-based
+reading rule. Supplying both `pkey_path` and `pkey` raises `ValueError`.
+See the [agent guide's complete nested example](https://iapyeh.github.io/sshscript/v3a/ai-agents/guide/#ssh-connections-and-private-key-paths).
+
+<a id="host-key-sources-unreleased"></a>
+
+### Host-key sources (5.0)
+
+This section requires SSHScript 5.0.0 or newer.
+`known_hosts` selects the host-key trust source independently of `policy`:
+
+| Value | Sources, in order |
+| --- | --- |
+| `"parent"` (new default) | Only the calling Session's host |
+| `"local"` | Only the root localhost Session |
+| `"chain"` | Calling Session, then each ancestor through localhost |
+
+For localhost → host1 → host2 → host3, `host2.connect("host3",
+known_hosts="chain")` consults host2, host1, then localhost. The nearest source
+with a record for the resolved target hostname and port is authoritative.
+A matching key is accepted; a changed key is rejected even if a more distant
+source matches. Only absence of a target record permits continuing the chain.
+Different key algorithms do not permit falling back to another source.
+
+Each source reads its own `known_hosts_path`, or `~/.ssh/known_hosts` if unset.
+Remote files are read over SFTP as that Session's original SSH login account;
+SSH handshakes, user authentication and host-key verification still run in the
+local Python process. Neither sudo/su nor a nested connection changes the SFTP
+account. Remote `~/` paths refer to the login account's SFTP home; `~user` paths
+are unsupported. Relative remote paths use the SFTP working directory.
+
+```py
+local.set(known_hosts="chain")
+# After connecting to host1 and host2:
+host1.set(known_hosts_path="/home/ops/.ssh/known_hosts")
+host2.set(known_hosts_path="/etc/ssh/ssh_known_hosts")
+with host2.connect("deploy@host3", pkey_path="/home/ops/.ssh/host3_rsa") as host3:
+    result = host3.exec_command(["hostname"], check=True, command_timeout=10)
+```
+
+The strategy is inherited by future child Sessions; the path is host-specific
+and is **not inherited**. `known_hosts_path=None` restores the standard path.
+A `connect(known_hosts=...)` override affects only that connection; it does not
+change the parent setting or the child's inherited strategy. `set()`, `get()`
+and matching properties expose both settings. `known_hosts_path` accepts text
+paths and `PathLike[str]`; it is a Session setting, not a `connect()` keyword.
+
+`pkey_path` always reads only from the calling Session's host, including with
+`known_hosts="chain"`; private keys are never searched through ancestors.
+
+An absent trust file, permission failure, read failure, invalid UTF-8 or invalid
+entry raises an error; no distant source or permissive policy bypasses it.
+Empty files, comments, plain host-key entries (including comma-separated names)
+and hashed hostnames are supported. OpenSSH markers such as `@cert-authority`
+and `@revoked`, wildcard/negated host patterns and unsupported key types raise
+an error rather than being silently ignored. A source file is fully parsed
+before its records are used. Nonstandard ports use `[hostname]:port` records.
+
+When every selected source lacks the target, `policy` handles the unknown key.
+`AutoAddPolicy` accepts it into the new client's memory only; these trust files
+are read-only and are not automatically updated locally or remotely.
+
+**Migration from 4.0.2:** earlier releases always load localhost host keys. The new default
+`"parent"` makes nested host-key sources consistent with `pkey_path`. To retain
+the previous behavior, set `local.set(known_hosts="local")` before connecting.
+All strategies require a readable, valid file, including the default localhost
+path. Unlike 4.0.2, a missing local file is an error; create an empty
+file if the configured missing-key policy should handle unknown hosts.
+
+### Private keys readable only in a privileged console
+
+Remote `pkey()` and `pkey_path` use SFTP with the original SSH login account.
+Entering `sudo()` or `su()` does not change that identity, so even
+`$.pkey("/root/.ssh/id_rsa")` inside a root console can fail with a permission
+error. When authorized, read the file with a console command and construct
+the Paramiko key from its captured text:
+
+This manual example requires a real privileged console and SSH endpoints;
+it is excluded from credential-free executable examples.
+
+```py
+from contextlib import closing
+from io import StringIO
+import paramiko
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.connect("ops@host1.example.net", timeout=10,
+                       banner_timeout=10, auth_timeout=10) as host1:
+        with host1.sudo() as root:
+            key_result = root("cat /root/.ssh/id_rsa", check=True, command_timeout=10)
+            key = paramiko.RSAKey.from_private_key(StringIO(key_result.stdout))
+        with host1.connect("deploy@host2.example.net", pkey=key, timeout=10,
+                           banner_timeout=10, auth_timeout=10) as host2:
+            result = host2.exec_command(["hostname"], check=True, command_timeout=10)
+            print(result.stdout)
+```
+
+The example requires authorized sudo/SSH access and verified host keys.
+Configure output logging/display to keep private-key text out of logs before
+running the read; do not print or report `key_result` or its stdout. Key text
+also remains in console buffers. Use the matching Paramiko key class for
+other formats; encrypted RSA keys need `password=` on `from_private_key()`.
+An authorized `su()` console can supply the text in the same way.
+
+The console returned by `shell()`/`sudo()`/`su()`/`enter()` has no `connect()`
+method, so `$.connect()` is unavailable while a console is current in `.spy`.
+A retained Python Session can still call `connect()` during an active console;
+the connection uses its original SSH transport and does not inherit console
+privilege. The example leaves the console first and calls the retained
+`host1.connect(pkey=key)`, which needs no SFTP key read. See the
+[agent guide's `.spy` equivalent](https://iapyeh.github.io/sshscript/v3a/ai-agents/guide/#keys-readable-only-after-sudosu).
+
+### Optional dollar syntax
+
 Save dollar syntax as `.spy`, run with `sshscript file.spy`, and syntax-check
 without execution using `sshscript --check file.spy`.
 
@@ -101,7 +234,7 @@ print(result.stdout)
 
 ## 4.0: settings and managed jobs
 
-Use SSHScript 4.0.2 for the following examples. CLI `-v`, `--stderr`, and
+Use SSHScript 5.0.0 for the following examples. CLI `-v`, `--stderr`, and
 `--debug` override root defaults only for that execution. Child Sessions copy
 their parent's settings. `set()` validates before changing anything; `get()`
 returns a copy. Explicit command options override Session policy.
@@ -120,7 +253,7 @@ the settings dictionary at creation; the policy object itself is shared, so
 custom policies with mutable state must account for reuse. Changing the setting
 does not reconfigure existing connections.
 
-<!-- example: {"id":"settings", "profile":"4.0.2", "stdout":"True\n1\n"} -->
+<!-- example: {"id":"settings", "profile":"5.0.0", "stdout":"True\n1\n"} -->
 ```python
 from contextlib import closing
 import paramiko
@@ -142,7 +275,7 @@ semantics; do not combine it with `command_timeout`.
 For an indefinite command such as tcpdump, use `start(timeout=None)`. This safe
 local example uses a small Python process instead of capturing network traffic:
 
-<!-- example: {"id":"stop", "profile":"4.0.2", "stdout":"cancelled confirmed\n"} -->
+<!-- example: {"id":"stop", "profile":"5.0.0", "stdout":"cancelled confirmed\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -181,7 +314,7 @@ legacy SSH behavior which appended a newline to strings: if a consumer
 needs a line, migrate `input=password` to `input=password + "\n"` explicitly.
 Published 3.1.5 still has the legacy SSH behavior.
 
-<!-- example: {"id":"exact-stdin", "profile":"4.0.2", "stdout":"'abc'\n'abc\\n'\n"} -->
+<!-- example: {"id":"exact-stdin", "profile":"5.0.0", "stdout":"'abc'\n'abc\\n'\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -250,7 +383,7 @@ or unpack exactly `stdout, stderr, exitcode`. This changes the released 3.1.5
 console contract: old `stdout, stderr = shell(command)` must be migrated.
 Shell calls accept command strings; argv execution belongs to Session.
 
-<!-- example: {"id":"shell-result", "profile":"4.0.2", "stdout":"first 0\n"} -->
+<!-- example: {"id":"shell-result", "profile":"5.0.0", "stdout":"first 0\n"} -->
 ```python
 from contextlib import closing
 from sshscript import Session
@@ -306,7 +439,7 @@ matching: `iter_stdout()` yields chunks, not packets or lines. Put `stop()` in
 `finally`, so condition matches, exceptions, and KeyboardInterrupt all trigger
 cleanup. This credential-free example uses a continuous Python process:
 
-<!-- example: {"id":"stream-condition", "profile":"4.0.2", "stdout":"cancelled confirmed\n"} -->
+<!-- example: {"id":"stream-condition", "profile":"5.0.0", "stdout":"cancelled confirmed\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -371,7 +504,7 @@ the current Bash console's channel, cwd, environment and identity. It does not
 launch through the underlying Session. Ordinary `console(command)` / `$command`
 still waits and returns `CommandResult`; no migration is needed for finite commands.
 
-<!-- example: {"id":"console-stream", "profile":"4.0.2", "stdout":"cancelled confirmed\nconsole-alive\n"} -->
+<!-- example: {"id":"console-stream", "profile":"5.0.0", "stdout":"cancelled confirmed\nconsole-alive\n"} -->
 ```python
 from contextlib import closing
 import shlex
@@ -511,7 +644,7 @@ remains available for other authentication prompt formats.
 These transcripts require a real local account and its authentication policy;
 they are manual examples, separate from the credential-free CI examples above.
 Read passwords with `getpass` rather than storing them in the script. The new
-behavior requires 4.0.2 and does not apply to the installed 3.1.5 release.
+behavior requires 4.0.2 or newer and does not apply to the installed 3.1.5 release.
 
 Open a root console through sudo and allow up to 15 seconds for entry:
 

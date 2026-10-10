@@ -7,7 +7,8 @@ from paramiko import MissingHostKeyPolicy
 from types import MappingProxyType
 
 DEFAULTS = MappingProxyType(dict(check=False, verbose=False, verbose_stderr=False,
-                                log_level=logging.INFO, policy=None))
+                                log_level=logging.INFO, policy=None,
+                                known_hosts='parent', known_hosts_path=None))
 UNSET = object()
 _defaults = ContextVar('sshscript_execution_defaults', default={})
 
@@ -23,6 +24,21 @@ def validate(values):
                 (isinstance(value, type) and issubclass(value, MissingHostKeyPolicy))
             ):
                 raise TypeError('policy must be a MissingHostKeyPolicy instance, subclass, or None')
+        elif key == 'known_hosts':
+            if not isinstance(value, str):
+                raise TypeError('known_hosts must be local, parent, or chain')
+            if value not in ('local', 'parent', 'chain'):
+                raise ValueError('known_hosts must be local, parent, or chain')
+        elif key == 'known_hosts_path':
+            if value is not None:
+                if not isinstance(value, (str, os.PathLike)):
+                    raise TypeError('known_hosts_path must be a text path or None')
+                value = os.fspath(value)
+                if not isinstance(value, str):
+                    raise TypeError('known_hosts_path must be a text path or None')
+                if not value or '\x00' in value:
+                    raise ValueError('known_hosts_path must be nonempty and contain no NUL')
+                result[key] = value
         elif key == 'log_level':
             if isinstance(value, str):
                 value = logging.getLevelName(value.upper())

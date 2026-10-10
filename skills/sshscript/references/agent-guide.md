@@ -1,6 +1,6 @@
 # SSHScript Agent Guide
 
-**Documentation contract: SSHScript 4.0.2; Python 3.11+.**
+**Documentation contract: SSHScript 5.0.0; Python 3.11+.**
 
 SSHScript runs commands locally and over SSH with a Python `Session` API.
 Optional `.spy` dollar syntax exposes the same execution model. Use it when
@@ -45,7 +45,7 @@ For a new environment, when installation is authorized:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install 'sshscript==4.0.2'
+python3 -m pip install 'sshscript==5.0.0'
 ```
 
 Pin transitive dependencies in the application's lock file for repeatable
@@ -108,6 +108,167 @@ An argv list is **one command**, not a batch. Local argv executes directly;
 remote argv is quoted for a POSIX login shell. Shell operators inside argv
 are literal data. Console commands accept strings; quote dynamic arguments
 with `shlex.join()`. Do not interpolate untrusted values into shell syntax.
+
+## SSH connections and private-key paths
+
+Before choosing an authentication parameter, identify the host containing the
+private-key file. `parent.connect(target, pkey_path=path)` calls
+`parent.pkey(path)` to load an RSA private key from the **calling parent
+Session's host**:
+
+| Calling Session | Where `pkey_path` is read |
+| --- | --- |
+| Local Session | Localhost, where the Python process runs |
+| Session connected to host1 | Host1, through that Session's SFTP connection |
+
+`connect()` returns a new child Session. The parent keeps its original host;
+calling `local.connect(...)` again still reads `pkey_path` on localhost.
+For a nested connection, call `host1.connect(...)` to read it on host1.
+
+The following example requires authorized SSH access, verified host keys and
+RSA key files at the indicated locations; it is not a local smoke test:
+
+```py
+from contextlib import closing
+from sshscript import Session
+
+with closing(Session()) as local:
+    with local.connect(
+        "ops@host1.example.net",
+        pkey_path="/home/localuser/.ssh/host1_rsa",  # File on localhost.
+        timeout=10, banner_timeout=10, auth_timeout=10,
+    ) as host1:
+        with host1.connect(
+            "deploy@host2.example.net",
+            pkey_path="/home/ops/.ssh/host2_rsa",  # File on host1, read via SFTP.
+            timeout=10, banner_timeout=10, auth_timeout=10,
+        ) as host2:
+            result = host2.exec_command(["hostname"], check=True, command_timeout=10)
+            print(result.stdout)
+```
+
+In `.spy`, nested `with $.connect(...)` scopes select the current parent
+Session, so an inner `pkey_path` is read from the outer scope's connected host.
+`key_filename=` has different semantics: Paramiko reads it from the local
+Python process's filesystem, including for nested SSH connections. It supports
+key formats beyond RSA. To use an encrypted RSA key with `pkey_path` semantics,
+load it explicitly with `parent.pkey(path, password=key_passphrase)` and pass
+the returned object as `pkey=`; do not supply both `pkey` and `pkey_path`.
+
+<a id="host-key-sources-unreleased"></a>
+
+### Host-key sources (5.0)
+
+This section requires SSHScript 5.0.0 or newer.
+`known_hosts` selects the host-key trust source independently of `policy`:
+
+| Value | Sources, in order |
+| --- | --- |
+| `"parent"` (new default) | Only the calling Session's host |
+| `"local"` | Only the root localhost Session |
+| `"chain"` | Calling Session, then each ancestor through localhost |
+
+For localhost → host1 → host2 → host3, `host2.connect("host3",
+known_hosts="chain")` consults host2, host1, then localhost. The nearest source
+with a record for the resolved target hostname and port is authoritative.
+A matching key is accepted; a changed key is rejected even if a more distant
+source matches. Only absence of a target record permits continuing the chain.
+Different key algorithms do not permit falling back to another source.
+
+Each source reads its own `known_hosts_path`, or `~/.ssh/known_hosts` if unset.
+Remote files are read over SFTP as that Session's original SSH login account;
+SSH handshakes, user authentication and host-key verification still run in the
+local Python process. Neither sudo/su nor a nested connection changes the SFTP
+account. Remote `~/` paths refer to the login account's SFTP home; `~user` paths
+are unsupported. Relative remote paths use the SFTP working directory.
+
+```py
+local.set(known_hosts="chain")
+# After connecting to host1 and host2:
+host1.set(known_hosts_path="/home/ops/.ssh/known_hosts")
+host2.set(known_hosts_path="/etc/ssh/ssh_known_hosts")
+with host2.connect("deploy@host3", pkey_path="/home/ops/.ssh/host3_rsa") as host3:
+    result = host3.exec_command(["hostname"], check=True, command_timeout=10)
+```
+
+The strategy is inherited by future child Sessions; the path is host-specific
+and is **not inherited**. `known_hosts_path=None` restores the standard path.
+A `connect(known_hosts=...)` override affects only that connection; it does not
+change the parent setting or the child's inherited strategy. `set()`, `get()`
+and matching properties expose both settings. `known_hosts_path` accepts text
+paths and `PathLike[str]`; it is a Session setting, not a `connect()` keyword.
+
+`pkey_path` always reads only from the calling Session's host, including with
+`known_hosts="chain"`; private keys are never searched through ancestors.
+
+An absent trust file, permission failure, read failure, invalid UTF-8 or invalid
+entry raises an error; no distant source or permissive policy bypasses it.
+Empty files, comments, plain host-key entries (including comma-separated names)
+and hashed hostnames are supported. OpenSSH markers such as `@cert-authority`
+and `@revoked`, wildcard/negated host patterns and unsupported key types raise
+an error rather than being silently ignored. A source file is fully parsed
+before its records are used. Nonstandard ports use `[hostname]:port` records.
+
+When every selected source lacks the target, `policy` handles the unknown key.
+`AutoAddPolicy` accepts it into the new client's memory only; these trust files
+are read-only and are not automatically updated locally or remotely.
+
+**Migration from 4.0.2:** earlier releases always load localhost host keys. The new default
+`"parent"` makes nested host-key sources consistent with `pkey_path`. To retain
+the previous behavior, set `local.set(known_hosts="local")` before connecting.
+All strategies require a readable, valid file, including the default localhost
+path. Unlike 4.0.2, a missing local file is an error; create an empty
+file if the configured missing-key policy should handle unknown hosts.
+
+### Keys readable only after sudo/su
+
+SFTP uses the original SSH login account. `sudo()` and `su()` change the
+console command identity, not SFTP permissions. Calling `$.pkey()` inside
+either scope still delegates to the owning Session, so a root-only key can
+fail with a permission error even when console commands run as root.
+
+Console objects yielded by `shell()`/`sudo()`/`su()`/`enter()` do not provide
+`connect()`. In those `.spy` scopes, `$.connect()` therefore fails. A retained
+Python Session's `connect()` is not blocked by an active console, but it uses
+the original SSH transport and does not inherit sudo/su identity. Prefer
+leaving the console before opening the child connection.
+
+When authorized to use a privileged key, read it as a console command, check
+that the command succeeded, parse its captured output, then pass the resulting
+Paramiko key as `pkey=`. This avoids an SFTP read during `connect()`.
+The `.spy` example below requires authorized sudo and SSH access, verified
+host keys, and an RSA key that authenticates `deploy` on host2:
+
+```spy
+from io import StringIO
+import paramiko
+
+with $.connect("ops@host1.example.net", timeout=10,
+               banner_timeout=10, auth_timeout=10) as host1:
+    with $.sudo():
+        key_result = $("cat /root/.ssh/id_rsa", check=True, command_timeout=10)
+        key = paramiko.RSAKey.from_private_key(StringIO(key_result.stdout))
+
+    with host1.connect("deploy@host2.example.net", pkey=key,
+                       timeout=10, banner_timeout=10, auth_timeout=10):
+        $hostname
+```
+
+After a successful `$cat /root/.ssh/id_rsa`, `StringIO($.stdout)` can also
+supply the key text; check `$.exitcode` before parsing and capture stdout
+before another command replaces it. The saved result above retains the
+specific command's output. In Python, use
+`with host1.sudo() as root:` and
+`key_result = root("cat /root/.ssh/id_rsa", check=True, command_timeout=10)`.
+The same approach works with an authorized `su()` scope. For an encrypted
+RSA key, add `password=key_passphrase` to `from_private_key()`; use the
+appropriate Paramiko key class for other key formats.
+
+Private-key text enters console buffers and the captured result. Configure
+output logging/display so it does not expose this command's output before
+reading the key; do not print, persist, or include that output in diagnostics
+or handoff reports. Console privilege only permits reading the file; host2
+authentication is determined by the supplied key and target username.
 
 ## Retain evidence and handle failure
 

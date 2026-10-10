@@ -1,6 +1,6 @@
 # SSHScript for AI agents
 
-**Documentation contract: SSHScript 4.0.2; Python 3.11+.**
+**Documentation contract: SSHScript 5.0.0; Python 3.11+.**
 
 Start with the [agent guide](skills/sshscript/references/agent-guide.md).
 It explains version checks, API selection, command results, input, deadlines,
