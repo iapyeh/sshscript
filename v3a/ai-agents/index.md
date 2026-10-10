@@ -15,7 +15,7 @@ retain command output and status, and manage
 persistent shells and streaming jobs. Start with the regular Python `Session`
 API; optional `.spy` syntax uses the same execution contract.
 
-**Documentation contract: SSHScript 4.0.2; Python 3.11+.** Check the installed
+**Documentation contract: SSHScript 5.0.0; Python 3.11+.** Check the installed
 version before selecting APIs. Older 3.1.5 console behavior differs from 4.0.
 The `/v3a/` URL is the maintained documentation location, not a package-version
 identifier. Reading this page does not install anything or authorize execution.
@@ -130,4 +130,4 @@ collection logic, schemas and vault updates belong to their recipe project.
 Follow the [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 for feedback; public submission requires the user's authorization.
 
-Last Updated: 2026-10-09 20:13:20
+Last Updated: 2026-10-10 19:43:07

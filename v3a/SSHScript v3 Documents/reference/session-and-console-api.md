@@ -9,7 +9,7 @@ permalink: /v3a/reference/session-and-console-api/
 # Session and Console API Reference
 
 > **Version scope:** The base command API is available in 3.1.5.
-> Session settings, managed deadlines, and jobs below are features available in 4.0.2.
+> Session settings, managed deadlines, and jobs below are features available in 5.0.0.
 
 This page defines the supported core Session and Console API for the SSHScript
 v3.1 line, including the explicitly marked 4.0 managed-command API. Examples that teach a
@@ -32,8 +32,8 @@ names raise `ValueError`; invalid policy values raise `TypeError`.
 | `verbose` | bool | application/environment default |
 | `verbose_stderr` | bool | application/environment default |
 | `log_level` | logging integer or level name | application logger level |
-| `known_hosts` (unreleased) | `"parent"`, `"local"`, `"chain"` | `"parent"` |
-| `known_hosts_path` (unreleased) | text path, `PathLike[str]`, or `None` | `None` |
+| `known_hosts` (5.0) | `"parent"`, `"local"`, `"chain"` | `"parent"` |
+| `known_hosts_path` (5.0) | text path, `PathLike[str]`, or `None` | `None` |
 | `policy` | Paramiko `MissingHostKeyPolicy` instance, subclass, or `None` | `None` (RejectPolicy) |
 
 ```python
@@ -50,7 +50,7 @@ finally:
 ```
 
 Child Sessions copy the parent's settings at creation, except for the
-unreleased host-specific `known_hosts_path`, which resets to `None`. A policy object itself
+5.0 host-specific `known_hosts_path`, which resets to `None`. A policy object itself
 is shared, so custom policies with mutable state must account for reuse.
 Changes affect future connections only. These settings are not in published
 3.1.5; see the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/).
@@ -241,7 +241,7 @@ session.connect(
     policy=...,  # 4.0: omitted argument uses the Session setting.
     *,
     ssh_config=None,
-    known_hosts=...,  # Unreleased: omitted argument uses the Session setting.
+    known_hosts=...,  # 5.0: omitted argument uses the Session setting.
     **connect_options,
 ) -> Session
 ```
@@ -267,13 +267,15 @@ with local.connect(
     remote.exec_command("hostname", shell=False)
 ```
 
-Published 4.0.2 loads localhost system host keys. Unknown or changed keys
-are rejected by default. Passing a permissive Paramiko policy must be an explicit, limited
+SSHScript 5.0.0 reads the calling host's known_hosts by default. Unknown or
+changed keys are rejected by default. Passing a permissive Paramiko policy must be an explicit, limited
 bootstrap decision.
 
-### Host-key sources (unreleased)
+<a id="host-key-sources-unreleased"></a>
 
-The development checkout defaults to `known_hosts="parent"`, reading the
+### Host-key sources (5.0)
+
+SSHScript 5.0.0 defaults to `known_hosts="parent"`, reading the
 calling Session host's `~/.ssh/known_hosts` (over SFTP for a remote Session),
 consistent with `pkey_path`. Set each source Session's `known_hosts_path` to
 select another file; paths are not inherited. Strategies are inherited.
@@ -291,8 +293,7 @@ the target. AutoAddPolicy does not write these trust files.
 Missing or unreadable files are errors in all strategies; an empty file
 allows the missing-key policy to decide. See the
 [full contract and migration]({{ site.baseurl }}/v3a/recommended-api/#host-key-sources-unreleased)
-for strict parsing and supported known_hosts formats. Published 4.0.2 does not
-provide these settings.
+for strict parsing and supported known_hosts formats. SSHScript 4.0.2 and earlier do not provide these settings.
 
 A connection created from an already connected Session tunnels through its
 parent, enabling bastion workflows. `proxyCommand=...` is supported only from
@@ -437,7 +438,7 @@ session.sudo(
 These open identity-changing consoles. `initials` may be one command or an
 iterable of setup commands. The host's PAM and `sudoers` policies remain
 authoritative. `enter_timeout` and the authenticated entry contract below are
-**features available in 4.0.2**, unavailable in the published 3.1.5 package.
+**features available in 5.0.0**, unavailable in the published 3.1.5 package.
 
 <a id="authenticated-susudo-entry-unreleased"></a>
 
@@ -468,7 +469,7 @@ remains available for other authentication prompt formats.
 These transcripts require a real local account and its authentication policy;
 they are manual examples, separate from credential-free CI coverage.
 Read passwords with `getpass` rather than storing them in the script. The new
-behavior requires 4.0.2 and does not apply to the installed 3.1.5 release.
+behavior requires 5.0.0 and does not apply to the installed 3.1.5 release.
 
 Open a root console through sudo and allow up to 15 seconds for entry:
 
@@ -801,4 +802,4 @@ Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
 Paramiko failures retain their original exception and traceback. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-10-10 17:22:28
+Last Updated: 2026-10-10 19:43:07

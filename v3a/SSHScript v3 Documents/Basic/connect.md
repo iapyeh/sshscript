@@ -8,7 +8,7 @@ nav_order: 2
 # Connections, Authentication, and Bastions
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.2.
+> Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -145,8 +145,11 @@ password for compatibility. Prefer the explicit `password=` form in new code.
 
 ## Host-key verification
 
-SSHScript loads system host keys and rejects unknown or changed host keys by
-default. Add the server key to `known_hosts` before a normal connection.
+SSHScript 5.0.0 reads the calling host's known_hosts and rejects unknown or
+changed host keys by default. Provision a readable, valid file before every
+connection, including on each parent host for nested connections.
+A missing file is an error even with AutoAddPolicy; the policy does not write
+these trust files. See [host-key sources]({{ site.baseurl }}/v3a/recommended-api/#host-key-sources-unreleased).
 
 Accepting a previously unknown key must be an explicit decision:
 
@@ -310,4 +313,4 @@ with $.connect("ops@example.net"):
 Nested `$.connect()` blocks and the host-key policy follow the same Session
 API behavior.
 
-Last Updated: 2026-10-10 12:42:49
+Last Updated: 2026-10-10 19:43:07

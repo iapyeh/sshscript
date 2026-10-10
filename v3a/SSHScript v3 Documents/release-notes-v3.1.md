@@ -12,8 +12,8 @@ nav_order: 2
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
-The current release is **4.0.2**. The sections below distinguish the current
-4.0 contract from historical 3.1 releases.
+The current release is **5.0.0**. The sections below distinguish the current
+5.0 trust-source contract, the 4.0 execution contract and historical 3.1 releases.
 
 SSHScript 3.1.4 was published on 2026-09-24 as the first Production/Stable
 release in the supported v3.1 line. Install it from
@@ -24,6 +24,26 @@ The release requires Python 3.11 or newer and supports Python 3.11–3.14 on
 Linux and macOS.
 
 <a id="400dev0--unreleased-development-contract"></a>
+
+## 5.0.0 — 2026-10-10
+
+- Default nested host-key lookup now reads the calling host's known_hosts,
+  matching `pkey_path`. `known_hosts="local"` selects localhost; `"chain"`
+  searches the caller and its ancestors through localhost.
+- Add per-Session `known_hosts_path`. The nearest target hostname/port record
+  decides; mismatches and file errors never fall back.
+- Require readable, valid trust files in all strategies. Provision files before
+  connecting; an explicit empty file allows the configured unknown-key policy
+  to decide. AutoAddPolicy keeps accepted keys in memory and writes no file.
+- Preserve the 4.0 command execution contract. Review the
+  [5.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/)
+  before upgrading existing SSH workflows.
+- Full Linux/macOS Python 3.11–3.14 CI and the formal release workflow passed.
+  Release OpenSSH and native su/sudo coverage tested Paramiko 2.11, 3.x and 4.x.
+
+[PyPI 5.0.0](https://pypi.org/project/sshscript/5.0.0/) ·
+[GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v5.0.0) ·
+[Release verification](https://github.com/iapyeh/sshscript/actions/runs/38047762078)
 
 ## 4.0.2 — 2026-10-09
 
@@ -190,4 +210,4 @@ These changes are absent from the published 3.1.5 package. See the
 [authenticated console API]({{ site.baseurl }}/v3a/reference/session-and-console-api/#authenticated-susudo-entry-unreleased)
 and [migration notes]({{ site.baseurl }}/v3a/migration-and-releases/migrating-to-v3-1/).
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 19:43:07

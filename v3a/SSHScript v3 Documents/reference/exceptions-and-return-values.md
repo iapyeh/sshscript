@@ -9,7 +9,7 @@ permalink: /v3a/reference/exceptions-and-return-values/
 # Exceptions and Return Values
 
 > **Version scope:** The base command API is available in 3.1.5.
-> Managed deadlines and jobs described below are features available in 4.0.2.
+> Managed deadlines and jobs described below are features available in 5.0.0.
 
 This contract describes the source API in both normal Python and `python -O`.
 Managed-command additions are marked 4.0; the base result/check API
@@ -46,7 +46,7 @@ for bounded output, cleanup guarantees, and a remote tcpdump/Ctrl-C example.
 | Invalid Session/console/channel lifecycle state | `RuntimeError` |
 | Operation on a closed channel/transport | `BrokenPipeError` |
 | Channel ends while waiting | `EOFError` |
-| SSH command closes without an exit-status message (4.0.2, 4.0) | `EOFError`; no completed command result |
+| SSH command closes without an exit-status message (5.0.0; introduced in 4.0) | `EOFError`; no completed command result |
 | Legacy one-shot timeout | `subprocess.TimeoutExpired` locally; original Paramiko/socket timeout remotely |
 | Managed command deadline | `CommandTimeoutError`, a `TimeoutError` subclass, with partial `JobResult` |
 | Managed streaming queue overflow | `BufferError` |
@@ -127,4 +127,4 @@ not alter their associated state.
 See [Session and Console API Reference](../session-and-console-api/) for
 operation signatures and cleanup details.
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 19:43:07

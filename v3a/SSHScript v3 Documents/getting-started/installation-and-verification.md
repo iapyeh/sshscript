@@ -8,8 +8,8 @@ permalink: /v3a/getting-started/installation-and-verification/
 
 # Installation and Verification
 
-> **Version scope:** The argv/CommandResult/check/config API is available in 4.0.2.
-> Session settings and managed jobs/deadlines are features available in 4.0.2.
+> **Version scope:** The argv/CommandResult/check/config API is available in 5.0.0.
+> Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -18,15 +18,15 @@ program, Python import, and dependency set before any SSH connection is made.
 
 ## Version status
 
-> **SSHScript 4.0.2 is the baseline for these examples.** It is available
-> from [PyPI](https://pypi.org/project/sshscript/4.0.2/) and the corresponding
-> [GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v4.0.2).
-> Settings and managed-job APIs are available in 4.0.2. See the canonical
+> **SSHScript 5.0.0 is the baseline for these examples.** It is available
+> from [PyPI](https://pypi.org/project/sshscript/5.0.0/) and the corresponding
+> [GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v5.0.0).
+> Settings and managed-job APIs are available in 5.0.0. See the canonical
 > guide and migration notes before upgrading 3.1.5 automation.
 
 ## Requirements
 
-SSHScript 4.0.2 declares:
+SSHScript 5.0.0 declares:
 
 - Python 3.11 or newer;
 - macOS or a POSIX Linux environment;
@@ -66,11 +66,11 @@ For a deployment that must remain reproducible, pin the exact release in the
 environment's requirements or lock file:
 
 ```sh
-python3 -m pip install "sshscript==4.0.2"
+python3 -m pip install "sshscript==5.0.0"
 ```
 
 To accept future compatible maintenance releases within the supported line,
-use `sshscript>=4.0.2,<5` and preserve the resolver output in a lock file.
+use `sshscript>=5.0.0,<6` and preserve the resolver output in a lock file.
 Do not rely on an unbounded dependency in a production deployment.
 
 ## Install the tagged source
@@ -79,7 +79,7 @@ Ordinary users should prefer the PyPI wheel. Contributors who need to inspect
 or test the released source can use the immutable release tag:
 
 ```sh
-git clone --branch v4.0.2 --depth 1 https://github.com/iapyeh/sshscript.git
+git clone --branch v5.0.0 --depth 1 https://github.com/iapyeh/sshscript.git
 cd sshscript
 python3 -m pip install .
 ```
@@ -97,12 +97,11 @@ sshscript --version
 Expected output:
 
 ```text
-4.0.2
+5.0.0
 ```
 
 If the command is missing, make sure the virtual environment is active. If it
-prints another version, stop and identify the environment before running 4.0
-examples.
+prints another version, stop and identify the environment before running 5.0 examples.
 
 ## Verify the Python import
 
@@ -110,7 +109,7 @@ examples.
 python3 -c "import sshscript; print(sshscript.__version__); print(sshscript.__file__)"
 ```
 
-The first line must be `4.0.2`. The second line identifies the package being
+The first line must be `5.0.0`. The second line identifies the package being
 imported and should point into the active virtual environment for a PyPI
 installation. This catches a common problem in which an older installation or
 a local `sshscript.py` file shadows the intended package.
@@ -129,7 +128,7 @@ before posting diagnostics publicly.
 
 ## Verify release provenance
 
-The 4.0.2 distributions were built and tested by the repository's public
+The 5.0.0 distributions were built and tested by the repository's public
 release workflow. The workflow:
 
 1. runs the credential-free checks and package assertion gate;
@@ -140,8 +139,8 @@ release workflow. The workflow:
    Trusted Publisher; and
 6. publishes the GitHub Release only after PyPI accepts the distributions.
 
-Review the [v4.0.2 release](https://github.com/iapyeh/sshscript/releases/tag/v4.0.2),
-the [successful release workflow](https://github.com/iapyeh/sshscript/actions/runs/35963068790),
+Review the [v5.0.0 release](https://github.com/iapyeh/sshscript/releases/tag/v5.0.0),
+the [successful release workflow](https://github.com/iapyeh/sshscript/actions/runs/38047762078),
 and PyPI's distribution metadata before adopting an artifact. Provenance
 confirms where an artifact came from; it does not replace source review or
 site-specific validation.
@@ -159,10 +158,10 @@ above.
 
 ## Upgrade an existing installation
 
-Upgrade within the supported 3.1 line with:
+Upgrade within the supported 5.x line with:
 
 ```sh
-python3 -m pip install --upgrade "sshscript>=4.0.2,<5"
+python3 -m pip install --upgrade "sshscript>=5.0.0,<6"
 sshscript --version
 python3 -m pip check
 ```
@@ -178,4 +177,4 @@ credential-free command. See
 if the
 version or import path is not what you expect.
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 19:44:40

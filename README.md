@@ -15,7 +15,7 @@ primary source-code branch.
 
 ## Published documentation
 
-SSHScript 4.0.2 is the current Production/Stable release. The website also
+SSHScript 5.0.0 is the current Production/Stable release. The website also
 retains explicitly labelled 3.1 compatibility examples and historical notes:
 
 **[Open the SSHScript documentation](https://iapyeh.github.io/sshscript/v3a/)**
@@ -124,4 +124,4 @@ SSHScript source code, releases, and issue tracking are available in the
 [iapyeh/sshscript repository](https://github.com/iapyeh/sshscript).
 SSHScript is released under the MIT License.
 
-Last Updated: 2026-10-09 10:41:00
+Last Updated: 2026-10-10 19:43:59

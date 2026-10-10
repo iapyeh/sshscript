@@ -9,7 +9,7 @@ permalink: /v3a/security-and-operations/host-keys-credentials-and-command-inject
 # Host Keys, Credentials, and Command Injection
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.2.
+> Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -20,15 +20,18 @@ argument boundary.
 
 ## Verify the server before sending credentials
 
-`Session.connect()` loads the account's system host-key database and rejects an
-unknown or changed key by default. Prepare `known_hosts` before the automation
+`Session.connect()` in 5.0.0 reads the calling host's known_hosts and rejects
+an unknown or changed key by default. Authentication and verification run
+locally; remote trust files are read over SFTP with the original login account. Prepare `known_hosts` before the automation
 runs:
 
 1. Obtain the server fingerprint through an independent trusted channel, such
    as an administrator-controlled console or configuration inventory.
 2. Compare it with the key presented for the exact hostname and port used by
    the automation.
-3. Install the verified key in the automation account's `known_hosts` file.
+3. Install the verified key in a readable, valid `known_hosts` file on the
+   calling host. For host1 → host2, this is host1's file. Missing files,
+   permission failures and parse errors stop the connection.
 4. Test that the expected key succeeds and a deliberately different key fails.
 
 `ssh-keyscan` can collect a key, but the scan itself does not authenticate that
@@ -62,6 +65,11 @@ appropriate only in a controlled bootstrap process that authenticates the key
 by another trusted mechanism and persists the verified result. Treat a changed
 key as a security event until rotation or compromise has been independently
 resolved.
+
+`known_hosts="chain"` searches the caller then its ancestors through localhost.
+The nearest target record is authoritative; mismatches and file errors never
+fall back. `known_hosts="local"` keeps trust lookup on localhost.
+`AutoAddPolicy` accepts unknown keys in memory only and writes no trust file.
 
 Each hop has its own trust boundary. A nested connection through a bastion must
 verify the destination key as well as the bastion key. A `proxyCommand` is a
@@ -222,4 +230,4 @@ a narrowly scoped privileged command to install it. Remove the staged copy in a
 Continue with [Timeouts, Retries, and Cleanup](../timeouts-retries-and-cleanup/)
 and the [Failure Model and Production Checklist](../failure-model-and-production-checklist/).
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 19:43:07

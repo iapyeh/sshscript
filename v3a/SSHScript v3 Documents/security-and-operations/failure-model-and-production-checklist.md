@@ -9,7 +9,7 @@ permalink: /v3a/security-and-operations/failure-model-and-production-checklist/
 # Failure Model and Production Checklist
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.2.
+> Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -259,7 +259,7 @@ controlled diagnostic environment, and review all output before sharing it.
 
 ### Version and deployment
 
-- [ ] The installed version is explicitly verified as `4.0.2`.
+- [ ] The installed version is explicitly verified as `5.0.0`.
 - [ ] Python and dependency versions are pinned or otherwise reproducible.
 - [ ] The credential-free test gate passes in the deployment artifact.
 - [ ] Real SSH behavior is tested against an isolated representative host.
@@ -307,4 +307,4 @@ timeout, and transport failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-10-09 10:40:43
+Last Updated: 2026-10-10 19:43:07

@@ -1,9 +1,9 @@
 ---
-title: "SSHScript 4.0.2"
+title: "SSHScript 5.0.0"
 nav_exclude: true
 ---
 
-# SSHScript 4.0.2
+# SSHScript 5.0.0
 
 SSHScript aims to help engineers and AI agents execute, understand, and hand
 off automation reliably. Use the regular Python Session API first; optional
@@ -13,7 +13,7 @@ reconcile unknown termination. A zero exit status does not prove deployment
 success; closing an SSH channel does not prove its remote process stopped.
 
 The published example baseline is **3.1.5**. The current production
-contract is **4.0.2**, with incompatible changes from 3.1.5; see
+contract is **5.0.0**, with host-key source changes from 4.0.2 and execution changes from 3.1.5; see
 [version policy and migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
 Start with the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/)
 for version-labelled examples and lifetime rules.
@@ -26,7 +26,7 @@ cleanly through nested context managers. Python remains available for data
 processing, branching, exceptions, testing, and integration with existing
 applications.
 
-SSHScript 4.0.2 emphasizes predictable and secure automation:
+SSHScript 5.0.0 emphasizes predictable and secure automation:
 
 - one-shot commands accept nonempty strings or argv lists/tuples;
 - argument sequences preserve data boundaries without caller-side quoting;
@@ -43,7 +43,7 @@ It provides a copyable task prompt, reading order, plain-text guide and
 portable skill download.
 
 1. Read [Installation and Verification](getting-started/installation-and-verification/)
-   and confirm that both the CLI and import report `4.0.2`.
+   and confirm that both the CLI and import report `5.0.0`.
 2. Complete the credential-free [5-Minute Quickstart](getting-started/quickstart/).
 3. Continue with the
    [Module API Tutorial](SSHScript%20v3%20Documents/tutorial/).
@@ -62,7 +62,7 @@ documentation scaffold, without executable recipes or an implemented system.
 
 ## Project status
 
-The current 4.0.2 release is classified Production/Stable for Python
+The current 5.0.0 release is classified Production/Stable for Python
 3.11–3.14 on Linux and macOS. It introduces an incompatible execution contract;
 review the migration guide before upgrading 3.1.5 automation. Review the candidate's CI
 reports and validate site-specific PAM, `sudoers`, network, and host-key policy
@@ -82,4 +82,4 @@ MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-Last Updated: 2026-10-09 20:13:20
+Last Updated: 2026-10-10 19:43:07

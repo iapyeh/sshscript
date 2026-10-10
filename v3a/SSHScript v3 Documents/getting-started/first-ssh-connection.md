@@ -9,7 +9,7 @@ permalink: /v3a/getting-started/first-ssh-connection/
 # Your First SSH Connection
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.2.
+> Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -29,8 +29,10 @@ and the [5-Minute Quickstart](../quickstart/) first. You also need:
 - permission to run the example command.
 
 Obtain the host-key fingerprint through an independent trusted channel before
-installing a new key. SSHScript loads system host keys and rejects unknown or
-changed keys by default. Do not disable that protection just to make an example
+installing a new key. SSHScript 5.0.0 reads the calling host's `~/.ssh/known_hosts` and rejects
+unknown or changed keys by default. The file must be readable and valid;
+missing files are errors. For a direct connection the calling host is localhost.
+For host1 → host2, provision host2's verified key on host1. Do not disable that protection just to make an example
 connect.
 
 ## Connect and run one command
@@ -212,4 +214,4 @@ with
 Before production use, read
 [Host Keys, Credentials, and Command Injection](../../security-and-operations/host-keys-credentials-and-command-injection/).
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 19:43:07

@@ -15,7 +15,7 @@ reconcile unknown termination. A zero exit status does not prove deployment
 success; closing an SSH channel does not prove its remote process stopped.
 
 The published example baseline is **3.1.5**. The current production
-contract is **4.0.2**, with incompatible changes from 3.1.5; see
+contract is **5.0.0**, with host-key source changes from 4.0.2 and execution changes from 3.1.5; see
 [version policy and migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
 Start with the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/)
 for version-labelled examples and lifetime rules.
@@ -45,4 +45,4 @@ project for reusable recipes and operations management workflows. It is
 currently an initial documentation scaffold, without executable recipes or an
 implemented management system.
 
-Last Updated: 2026-10-09 20:13:20
+Last Updated: 2026-10-10 19:43:07

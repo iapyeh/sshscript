@@ -9,7 +9,7 @@ permalink: /v3a/security-and-operations/timeouts-retries-and-cleanup/
 # Timeouts, Cancellation, and Cleanup
 
 > **4.0 source API:** `Session.start()`, `command_timeout`,
-> `CommandJob`, `JobResult`, and `CommandTimeoutError` are features available in 4.0.2.
+> `CommandJob`, `JobResult`, and `CommandTimeoutError` are features available in 5.0.0.
 > They are not available in the published 3.1.5 package.
 
 ## Design: a deadline and a stop request are independent
@@ -333,4 +333,4 @@ is accepted while the job is active. PTY output may merge streams. Native
 su/sudo validation remains environment-specific; protocol fixtures are not proof
 of all PAM/sudoers compatibility. See [console foreground jobs]({{ site.baseurl }}/v3a/recommended-api/#unreleased-foreground-jobs-inside-shell-sudo-and-su).
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 19:43:07

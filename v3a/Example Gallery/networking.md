@@ -8,7 +8,7 @@ nav_order: 2
 # Networking
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.2.
+> Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -36,7 +36,7 @@ sequence before it succeeds or fails.
 ### Prerequisites
 
 - explicit authorization to connect to the endpoint;
-- SSHScript 4.0.2 and Python 3.11 or newer on the runner;
+- SSHScript 5.0.0 and Python 3.11 or newer on the runner;
 - `python3` on the remote host;
 - the SSH host's verified key in `known_hosts`; and
 - a firewall policy that permits the intended test.
@@ -160,4 +160,4 @@ inspection, packet capture, and firewall changes have different permissions
 and data exposure; publish each as its own case with protocol-specific
 verification and cleanup.
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 19:43:07

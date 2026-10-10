@@ -18,7 +18,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC_ROOT = ROOT / "v3a"
-CURRENT_VERSION = "4.0.2"
+CURRENT_VERSION = "5.0.0"
 PLACEHOLDER_MARKER = "> **Documentation status: Placeholder**"
 LAST_UPDATED_RE = re.compile(
     r"(?:^|\n)Last Updated: "

@@ -10,10 +10,10 @@ nav_order: 5
 SSHScript 4.0 requires Python 3.11 or newer. Use the same Python interpreter
 for installation and execution to avoid most environment problems.
 
-> **Example baseline:** Installation commands below pin 4.0.2. Start with
+> **Example baseline:** Installation commands below pin 5.0.0. Start with
 > [Installation and Verification]({{ site.baseurl }}/v3a/getting-started/installation-and-verification/)
 > and the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/)
-> to distinguish published APIs from features available in 4.0.2.
+> to distinguish published APIs from features available in 5.0.0.
 
 ## Confirm the interpreter
 
@@ -31,7 +31,7 @@ virtual environment.
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip install "sshscript==4.0.2"
+python3 -m pip install "sshscript==5.0.0"
 ```
 
 A virtual environment avoids system-package permissions and makes the Python
@@ -44,7 +44,7 @@ First verify that the package is installed for the current interpreter:
 
 ```sh
 python3 -m pip show sshscript
-python3 -m pip install --force-reinstall "sshscript==4.0.2"
+python3 -m pip install --force-reinstall "sshscript==5.0.0"
 ```
 
 If the package is present but the command is unavailable, activate the
@@ -79,7 +79,7 @@ Upgrade packaging tools, then retry:
 
 ```sh
 python3 -m pip install --upgrade pip setuptools wheel
-python3 -m pip install --force-reinstall "sshscript==4.0.2"
+python3 -m pip install --force-reinstall "sshscript==5.0.0"
 ```
 
 If installation still fails, record the Python version, operating system, and
@@ -106,4 +106,4 @@ sshscript --version
 Use `--traceback` only in a protected diagnostic environment because a full
 trace can expose source, commands, paths, or secrets.
 
-Last Updated: 2026-10-09 10:40:43
+Last Updated: 2026-10-10 19:43:07

@@ -9,7 +9,7 @@ permalink: /v3a/concepts/session-lifecycle/
 # Session Lifecycle
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.2.
+> Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -229,4 +229,4 @@ for the normative contract and
 [Timeouts, Retries, and Cleanup](../../security-and-operations/timeouts-retries-and-cleanup/)
 for production patterns.
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 19:43:07

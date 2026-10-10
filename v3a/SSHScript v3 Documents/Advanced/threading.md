@@ -8,7 +8,7 @@ nav_order: 8
 # Concurrency and Threading
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 4.0.2.
+> Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -118,4 +118,4 @@ python3 -m unittest discover -v -s unittest -p 'test_*.py'
 See [Contributing and Testing](../../development-and-testing/) for the complete
 release gate and the separate manual integration modes.
 
-Last Updated: 2026-10-09 10:40:03
+Last Updated: 2026-10-10 19:43:07
