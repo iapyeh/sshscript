@@ -53,7 +53,7 @@ jobs:
           subject-path: |
             ${{ runner.temp }}/sshscript-release/*.whl
             ${{ runner.temp }}/sshscript-release/*.tar.gz
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: python-package-distributions
           if-no-files-found: error
@@ -107,14 +107,14 @@ jobs:
         run: python tools/run_native_auth_ci.py --wheel dist/*.whl --report "$RUNNER_TEMP/native-auth-report.json"
       - name: Save native authentication evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: release-native-auth-python-${{ matrix.python-version }}-${{ matrix.dependency-label }}
           if-no-files-found: warn
           path: ${{ runner.temp }}/native-auth-report.json
       - name: Upload OpenSSH server log
         if: ${{ failure() && env.SSHSCRIPT_OPENSSH_LOG != '' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-openssh-log-python-${{ matrix.python-version }}-${{ matrix.dependency-label }}
           if-no-files-found: warn
