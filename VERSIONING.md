@@ -1,4 +1,4 @@
-# Version policy and 4.0 migration
+# Version policy and 5.0 migration
 
 SSHScript aims to let engineers and AI reliably execute, understand, and take
 over automation. A version identifies a public execution contract, not a
@@ -36,7 +36,9 @@ preserves the previous source location, while still requiring a readable file.
 
 ## Numbering and compatibility
 
-Versions follow PEP 440 with major.minor.patch compatibility semantics:
+Versions follow PEP 440 with major.minor.patch compatibility semantics.
+Propose and discuss a major-version promotion with the maintainer before
+changing the version; a request to publish does not itself choose a major bump:
 
 - Major: incompatible public return types/unpacking, input data, exceptions,
   lifecycle/cleanup guarantees, authentication or accepted command templates.

@@ -40,7 +40,10 @@ for the localhost → host1 → host2 example before generating nested connectio
 SSHScript 4.0.2 and earlier load localhost known_hosts for every connection.
 SSHScript 5.0.0 adds `known_hosts="parent"` as its default, reading the calling Session's
 trust file over SFTP for nested connections, consistent with `pkey_path`.
-Use these settings only with SSHScript 5.0.0 or newer.
+Use these settings only with SSHScript 5.0.0 or newer. Check the installed
+version before applying them to a 4.x environment. Provision a readable, valid
+trust file on every selected source host before attempting the connection;
+a permissive policy cannot bypass a missing file.
 
 - `"parent"`: only the calling Session's host; `"local"`: only localhost;
   `"chain"`: calling host, then ancestors through localhost.
