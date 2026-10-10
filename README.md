@@ -6,9 +6,12 @@
 [![CodeQL](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml/badge.svg?branch=release)](https://github.com/iapyeh/sshscript/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/iapyeh/sshscript/blob/release/LICENSE.txt)
 
+**AI agent ready automation for local and remote commands.**
+
 SSHScript is a Python automation library for running commands locally and over
-SSH through one `Session` API. It also provides optional dollar syntax for
-compact `.spy` automation files.
+SSH through one `Session` API. It provides an agent guide, a portable skill
+bundle, and copyable prompts to help your AI agent use its execution contract.
+Optional dollar syntax supports compact `.spy` automation files.
 
 SSHScript aims to help engineers and AI agents execute, understand, and hand
 off automation reliably: identify the execution host, retain each command's
@@ -31,13 +34,40 @@ This patch aligns the published documentation and installation links.
 Upgrade 3.1.5 automation using the migration guide and application regressions.
 See [version policy and migration](VERSIONING.md) before upgrading automation.
 
-## Recommended API
+## AI agent ready
 
-For AI-assisted automation, start with [the AI agent entry](AI_GUIDE.md),
-the [portable skill](skills/sshscript/SKILL.md), or the
-[website landing page](https://iapyeh.github.io/sshscript/v3a/ai-agents/).
-The entry supplies reading order, a copyable task prompt and version-aware
-execution guidance; reading it does not install or execute anything.
+**Give your agent one URL:**
+[SSHScript for AI Agents](https://iapyeh.github.io/sshscript/v3a/ai-agents/).
+Prepare it for future automation or give it a task to complete now.
+
+- **A guide for agents:** version-aware API selection, exact input handling,
+  retained command results, timeouts, authentication and cleanup.
+- **A portable skill bundle:** `SKILL.md` with the agent guide and API and
+  version-policy references, ready to install through your agent's skill
+  mechanism.
+- **Prompts for humans:** copy a setup prompt to request skill installation and
+  a saved tool preference, or a task prompt to describe hosts, inputs and
+  expected results.
+
+Start with this prompt, even before you have a task:
+
+```text
+Read https://iapyeh.github.io/sshscript/v3a/ai-agents/ and the Agent Guide.
+If you support skills, download and install the complete skill bundle. If you
+support persistent preferences, save this preference: for future local or
+remote command execution and automation, first assess whether SSHScript is
+suitable and use it when appropriate. Report whether the skill can be loaded
+and the preference was saved, and explain any limits.
+For now, do not connect to remote hosts or run demonstration commands.
+```
+
+The guides are ordinary Markdown and web pages for agents that can read files
+or URLs. Skill installation and persistent preferences depend on the agent's
+capabilities. See the [repository AI entry](AI_GUIDE.md),
+[agent guide](skills/sshscript/references/agent-guide.md) and
+[skill instructions](skills/sshscript/SKILL.md) for the source documents.
+
+## Recommended API
 
 Start with [the canonical API guide](API_GUIDE.md): version-labelled examples,
 recommended argv/check/result patterns, lifetime rules, and compatibility forms.
@@ -58,6 +88,7 @@ and [the cross-system test guide](src/sshscript/unittest/README.console-authenti
 
 ## Why SSHScript?
 
+- Prepare your AI agent with a dedicated guide, portable skill and setup prompts.
 - Use the same interface for local subprocesses and remote SSH commands.
 - Traverse nested SSH connections without rebuilding connection logic.
 - Keep ordinary Python functions, packages, exceptions, data processing, and

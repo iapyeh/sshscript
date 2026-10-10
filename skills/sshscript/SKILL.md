@@ -26,6 +26,25 @@ Select only the API sections needed for the user's task.
    validates syntax without executing commands. Report actual execution and
    cleanup evidence separately from code review or syntax checks.
 
+Before generating SSH authentication code, identify which host owns the key.
+`parent.connect(..., pkey_path=path)` reads an RSA private key from the
+**calling parent Session's host**: localhost for a local Session, or the
+connected host through SFTP for a remote Session. `connect()` returns a child
+Session; it does not change the parent into that child. `key_filename=` reads
+from the local Python process's filesystem even for nested connections.
+Read [SSH connections and private-key paths](references/agent-guide.md#ssh-connections-and-private-key-paths)
+for the localhost → host1 → host2 example before generating nested connections.
+
+Console objects from `shell()`/`sudo()`/`su()`/`enter()` do not provide
+`connect()`; `$.connect()` is unavailable while such a console is current.
+Their `pkey()` delegates to the owning Session: SFTP still uses the original
+SSH login account, including after sudo/su. For a key readable only by the
+console's privileged account, read it with an authorized console command,
+parse the captured text into a Paramiko key, then leave the console and call
+the retained parent Session's `connect(pkey=key)`. Follow the guide's
+[privileged-key example](references/agent-guide.md#keys-readable-only-after-sudosu)
+and keep private-key output out of logs and handoff reports.
+
 For the complete API, use `references/api-guide.md` and
 `references/versioning.md` if present in the downloaded bundle. In a source
 checkout use root `API_GUIDE.md` and `VERSIONING.md`. Otherwise follow the
