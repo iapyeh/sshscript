@@ -138,7 +138,7 @@ For a nested connection, call `host1.connect(...)` to read it on host1.
 The following example requires authorized SSH access, verified host keys and
 RSA key files at the indicated locations; it is not a local smoke test:
 
-```python
+```py
 from contextlib import closing
 from sshscript import Session
 
@@ -304,4 +304,4 @@ for reporting issues. Recipe-specific schemas and vault updates belong to that
 recipe's own documentation. Reading this guide does not authorize executing
 examples or submitting a public report.
 
-Last Updated: 2026-10-10 12:42:49
+Last Updated: 2026-10-10 12:51:31

@@ -127,7 +127,10 @@ Entering `sudo()` or `su()` does not change that identity, so even
 error. When authorized, read the file with a console command and construct
 the Paramiko key from its captured text:
 
-```python
+This manual example requires a real privileged console and SSH endpoints;
+it is excluded from credential-free executable examples.
+
+```py
 from contextlib import closing
 from io import StringIO
 import paramiko
@@ -704,4 +707,4 @@ The same source is mirrored into the website; edit this file, then use
 `tools/sync_api_guide.py` to refresh the website copy. Additional protocol and
 production details remain in the full documentation.
 
-Last Updated: 2026-10-10 12:42:49
+Last Updated: 2026-10-10 12:51:31

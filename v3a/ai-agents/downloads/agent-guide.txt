@@ -128,7 +128,7 @@ For a nested connection, call `host1.connect(...)` to read it on host1.
 The following example requires authorized SSH access, verified host keys and
 RSA key files at the indicated locations; it is not a local smoke test:
 
-```python
+```py
 from contextlib import closing
 from sshscript import Session
 
