@@ -159,7 +159,11 @@ the returned object as `pkey=`; do not supply both `pkey` and `pkey_path`.
 
 ### Host-key sources (5.0)
 
-This section requires SSHScript 5.0.0 or newer.
+This section requires SSHScript 5.0.0 or newer, published on
+[PyPI](https://pypi.org/project/sshscript/5.0.0/). Before a nested connection,
+provision the target key in the calling host's readable trust file. For
+localhost → host1 → host2, localhost needs host1's key and host1 needs host2's
+key under the default `"parent"` strategy.
 `known_hosts` selects the host-key trust source independently of `policy`:
 
 | Value | Sources, in order |
