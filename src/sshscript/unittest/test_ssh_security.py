@@ -1,7 +1,10 @@
 """Credential-free tests for SSH trust boundaries and remote I/O."""
 
 import asyncio
-from io import StringIO
+from io import StringIO, BytesIO
+from pathlib import Path
+import socket
+import tempfile
 import os
 import threading
 import unittest
@@ -14,6 +17,7 @@ import dollar as dollar_module
 import session as session_module
 from dollar import Dollar
 from session import Session
+from errorutils import SSHScriptException
 
 
 class HostKeyPolicyTests(unittest.TestCase):
@@ -46,7 +50,7 @@ class HostKeyPolicyTests(unittest.TestCase):
         def close(self):
             pass
 
-    def test_secure_host_key_verification_is_the_default(self):
+    def test_local_mode_reads_root_trust_file(self):
         created = []
 
         def factory():
@@ -55,24 +59,28 @@ class HostKeyPolicyTests(unittest.TestCase):
             return client
 
         parent = Session()
+        parent.set(known_hosts='local')
         self.addCleanup(parent.close)
-        with patch.object(session_module.paramiko, 'SSHClient', factory):
+        with patch.object(session_module.paramiko, 'SSHClient', factory), \
+             patch.object(parent, '_read_known_hosts', return_value=paramiko.HostKeys()) as read_keys:
             child = parent.connect('example.test', username='user', ssh_config=False)
 
-        self.assertTrue(created[0].loaded_system_keys)
+        read_keys.assert_called_once()
+        self.assertFalse(created[0].loaded_system_keys)
         self.assertIsNone(created[0].policy)
         child.close()
 
     def test_auto_add_policy_requires_explicit_opt_in(self):
         client = self.Client()
         parent = Session()
+        parent.set(known_hosts='local')
         self.addCleanup(parent.close)
         policy = paramiko.AutoAddPolicy()
         with patch.object(
             session_module.paramiko,
             'SSHClient',
             return_value=client,
-        ):
+        ), patch.object(parent, '_read_known_hosts', return_value=paramiko.HostKeys()):
             child = parent.connect(
                 'example.test',
                 ssh_config=False,
@@ -82,6 +90,234 @@ class HostKeyPolicyTests(unittest.TestCase):
 
         self.assertIs(client.policy, policy)
         child.close()
+
+
+class KnownHostsTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.good = paramiko.RSAKey.generate(1024)
+        cls.stale = paramiko.RSAKey.generate(1024)
+
+    def setUp(self):
+        self.folder = self.enterContext(tempfile.TemporaryDirectory())
+        self.local = Session()
+        self.addCleanup(self.local.close)
+        self.path = Path(self.folder) / 'known_hosts'
+        self.path.write_text('')
+        self.local.known_hosts_path = self.path
+        self.host1 = self.remote(self.local, 'host1')
+        self.host2 = self.remote(self.host1, 'host2')
+
+    def remote(self, parent, host):
+        session = Session(parent)
+        self.addCleanup(session.close)
+        session._host = host
+        session._client = Mock()
+        session._client.get_transport.return_value.is_active.return_value = True
+        session._sftp = Mock()
+        session._sftp.normalize.return_value = '/home/login'
+        self.trust(session, '')
+        return session
+
+    def line(self, host, key=None):
+        key = key or self.good
+        return f'{host} {key.get_name()} {key.get_base64()}\n'
+
+    def trust(self, source, data):
+        if source._client is None:
+            Path(source.known_hosts_path).write_text(data)
+        else:
+            source._sftp.open.side_effect = lambda *args: BytesIO(data.encode())
+
+    def loaded(self, strategy='chain', host='host3', port=22):
+        client = paramiko.SSHClient()
+        self.addCleanup(client.close)
+        self.host2._load_connection_host_keys(client, host, port, strategy)
+        return client.get_host_keys()
+
+    def test_default_and_settings_validation_path_is_not_inherited(self):
+        self.assertEqual(self.local.known_hosts, 'parent')
+        self.assertIsNone(self.host1.known_hosts_path)
+        self.host1.set(known_hosts='chain', known_hosts_path='/trust/host1')
+        child = Session(self.host1)
+        self.addCleanup(child.close)
+        self.assertEqual(child.known_hosts, 'chain')
+        self.assertIsNone(child.known_hosts_path)
+        before = child.get()
+        for value, exception in [('other', ValueError), (None, TypeError), (1, TypeError)]:
+            with self.assertRaises(exception):
+                child.set(check=True, known_hosts=value)
+            self.assertEqual(child.get(), before)
+        for value, exception in [('', ValueError), ('x\x00', ValueError), (b'path', TypeError), (True, TypeError)]:
+            with self.assertRaises(exception):
+                child.set(check=True, known_hosts_path=value)
+            self.assertEqual(child.get(), before)
+
+    def test_nearest_source_wins_and_distant_files_are_not_read(self):
+        self.trust(self.local, self.line('host3', self.stale))
+        self.trust(self.host1, self.line('host3', self.stale))
+        self.trust(self.host2, self.line('host3'))
+        self.assertEqual(self.loaded()['host3']['ssh-rsa'], self.good)
+        self.host1._sftp.open.assert_not_called()
+        self.host2._sftp.open.assert_called_once_with('/home/login/.ssh/known_hosts', 'rb')
+        self.host2._client.exec_command.assert_not_called()
+
+    def test_chain_falls_back_only_when_target_is_absent(self):
+        self.trust(self.host2, self.line('unrelated'))
+        self.trust(self.host1, self.line('host3', self.stale))
+        self.trust(self.local, self.line('host3'))
+        self.assertEqual(self.loaded()['host3']['ssh-rsa'], self.stale)
+        self.trust(self.host1, '')
+        self.assertEqual(self.loaded()['host3']['ssh-rsa'], self.good)
+
+    def test_parent_has_no_fallback_and_local_uses_root_path(self):
+        self.trust(self.local, self.line('host3'))
+        self.assertIsNone(self.loaded('parent').lookup('host3'))
+        self.assertEqual(self.loaded('local')['host3']['ssh-rsa'], self.good)
+        self.host1._sftp.open.assert_not_called()
+
+    def test_hashed_hostname_nonstandard_port_and_whitespace(self):
+        identity = '[host3]:2222'
+        hashed = paramiko.HostKeys.hash_host(identity)
+        text = self.line(hashed).replace(' ', '  \t') + '# comment\n'
+        self.trust(self.host2, text)
+        self.assertEqual(self.loaded(host='host3', port=2222)[identity]['ssh-rsa'], self.good)
+        self.assertIsNone(self.loaded().lookup('host3'))
+
+    def test_read_failures_stop_chain_and_identify_source(self):
+        self.trust(self.local, self.line('host3'))
+        for error in (PermissionError(), FileNotFoundError(), OSError('read failed')):
+            self.host2._sftp.open.side_effect = error
+            with self.assertRaisesRegex(SSHScriptException, 'Unable to read known_hosts on host2'):
+                self.loaded()
+            self.host1._sftp.open.assert_not_called()
+        self.host2._sftp.open.side_effect = lambda *args: BytesIO(b'\xff')
+        with self.assertRaisesRegex(SSHScriptException, 'UnicodeDecodeError'):
+            self.loaded()
+
+    def test_parse_errors_stop_even_when_an_earlier_line_matches(self):
+        invalid = ['broken', 'host3 ssh-rsa !!!', 'host3 unsupported AAAA',
+                   '@revoked ' + self.line('host3'), self.line('*.example'),
+                   self.line('|1|bad|bad')]
+        for line in invalid:
+            self.trust(self.host2, self.line('host3') + line)
+            with self.assertRaisesRegex(SSHScriptException, 'host2: .*line 2'):
+                self.loaded()
+            self.host1._sftp.open.assert_not_called()
+
+    def test_explicit_remote_path_uses_sftp_without_shell(self):
+        path = '/trust/key\"; injected-command; #'
+        self.host2.known_hosts_path = path
+        self.trust(self.host2, self.line('host3'))
+        self.loaded()
+        self.host2._sftp.open.assert_called_once_with(path, 'rb')
+        self.host2._client.exec_command.assert_not_called()
+
+    def handshake(self, policy=None, strategy=None, pkey_path=None):
+        client_socket, server_socket = socket.socketpair()
+        self.addCleanup(client_socket.close)
+        self.addCleanup(server_socket.close)
+        server = paramiko.Transport(server_socket)
+        server.add_server_key(self.good)
+        event = threading.Event()
+
+        class AuthServer(paramiko.ServerInterface):
+            def check_auth_password(self, username, password):
+                return paramiko.AUTH_SUCCESSFUL
+
+        server.start_server(event=event, server=AuthServer())
+        def close_server():
+            server.close()
+            server.join(3)
+            self.assertFalse(server.is_alive())
+        self.addCleanup(close_server)
+        self.host2._client.get_transport.return_value.open_channel.return_value = client_socket
+        options = dict(username='fixture', password='fixture', ssh_config=False,
+                       look_for_keys=False, allow_agent=False, timeout=3,
+                       banner_timeout=3, auth_timeout=3)
+        if policy is not None:
+            options['policy'] = policy
+        if strategy is not None:
+            options['known_hosts'] = strategy
+        if pkey_path is not None:
+            options['pkey_path'] = pkey_path
+        child = self.host2.connect('host3', **options)
+        self.addCleanup(child.close)
+        return child
+
+    def test_real_handshake_parent_default_and_chain_override_snapshot(self):
+        self.host2.known_hosts = 'parent'
+        self.trust(self.host1, self.line('host3'))
+        child = self.handshake(strategy='chain')
+        self.assertTrue(child.connected)
+        self.assertEqual(child.known_hosts, 'parent')
+        self.assertEqual(self.host2.known_hosts, 'parent')
+        self.assertIsNone(child.known_hosts_path)
+
+    def test_real_handshake_parent_default_accepts_near_match(self):
+        self.trust(self.host2, self.line('host3'))
+        self.trust(self.local, self.line('host3', self.stale))
+        self.assertTrue(self.handshake().connected)
+        self.host1._sftp.open.assert_not_called()
+
+    def test_real_handshake_near_mismatch_rejects_despite_distant_match_and_autoadd(self):
+        self.host2.known_hosts = 'chain'
+        self.trust(self.host2, self.line('host3', self.stale))
+        self.trust(self.host1, self.line('host3'))
+        self.trust(self.local, self.line('host3'))
+        with self.assertRaises(paramiko.BadHostKeyException):
+            self.handshake(policy=paramiko.AutoAddPolicy())
+        self.host1._sftp.open.assert_not_called()
+        self.assertEqual(self.host2.subsessions, [])
+
+    def test_real_handshake_parent_does_not_consult_local_match(self):
+        self.trust(self.local, self.line('host3'))
+        with self.assertRaisesRegex(paramiko.SSHException, 'not found in known_hosts'):
+            self.handshake()
+
+    def test_near_record_for_another_algorithm_still_blocks_fallback(self):
+        self.host2.known_hosts = 'chain'
+        self.trust(self.host2, self.line('host3', paramiko.ECDSAKey.generate()))
+        self.trust(self.host1, self.line('host3'))
+        with self.assertRaises(paramiko.BadHostKeyException):
+            self.handshake(policy=paramiko.AutoAddPolicy())
+        self.host1._sftp.open.assert_not_called()
+
+    def test_chain_unknown_rejects_after_all_sources_are_read(self):
+        self.host2.known_hosts = 'chain'
+        with self.assertRaisesRegex(paramiko.SSHException, 'not found in known_hosts'):
+            self.handshake()
+        self.host1._sftp.open.assert_called_once()
+
+    def test_missing_local_path_is_an_error_for_parent_and_chain(self):
+        self.local.known_hosts_path = Path(self.folder) / 'missing'
+        for strategy in ('parent', 'chain', 'local'):
+            with self.assertRaisesRegex(SSHScriptException, 'localhost.*FileNotFoundError'):
+                self.local._load_connection_host_keys(paramiko.SSHClient(), 'host3', 22, strategy)
+
+    def test_missing_default_local_file_is_an_error_in_every_strategy(self):
+        self.local.known_hosts_path = None
+        with patch.dict(os.environ, {'HOME': self.folder}):
+            for strategy in ('parent', 'chain', 'local'):
+                with self.assertRaisesRegex(SSHScriptException, 'localhost.*FileNotFoundError'):
+                    self.local.connect('host3', known_hosts=strategy,
+                        policy=paramiko.AutoAddPolicy(), ssh_config=False)
+
+    def test_unknown_policy_autoadd_is_in_memory_and_pkey_stays_on_caller(self):
+        self.host2.known_hosts = 'chain'
+        sentinel_path = '/host2/key'
+        with patch.object(self.host2, 'pkey', return_value=self.good) as read_key:
+            child = self.handshake(policy=paramiko.AutoAddPolicy(), pkey_path=sentinel_path)
+        read_key.assert_called_once_with(sentinel_path)
+        self.assertEqual(child._client.get_host_keys()['host3']['ssh-rsa'], self.good)
+        self.assertEqual(self.path.read_text(), '')
+        for source in (self.host1, self.host2):
+            self.assertTrue(all(call.args[1] == 'rb' for call in source._sftp.open.call_args_list))
+
+    def test_invalid_strategy_fails_before_opening_tunnel(self):
+        with self.assertRaises(ValueError):
+            self.host2.connect('host3', known_hosts='invalid')
+        self.host2._client.get_transport.return_value.open_channel.assert_not_called()
 
 
 class RemoteEnvironmentTests(unittest.TestCase):

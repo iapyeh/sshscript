@@ -204,6 +204,10 @@ class OpenSSHIntegrationTests(unittest.TestCase):
 
     def test_real_nested_ssh_closes_child_and_preserves_parent(self):
         parent = self._connect()
+        trust_path = f'/tmp/sshscript-trust-{uuid.uuid4().hex}'
+        self.addCleanup(self._remove_remote_tree, parent, trust_path)
+        parent.upload(str(self.trusted_hosts), trust_path)
+        parent.known_hosts_path = trust_path
         with parent.connect(self.host, username=self.username, port=self.port,
                             ssh_config=False, key_filename=str(self.key_path),
                             look_for_keys=False, allow_agent=False, timeout=5,
@@ -216,6 +220,32 @@ class OpenSSHIntegrationTests(unittest.TestCase):
         self.assertFalse(transport.is_alive())
         self.assertTrue(nested.closed)
         self.assertEqual(parent.exec_command(['printf', 'parent'], command_timeout=5).stdout, 'parent')
+
+    def test_real_three_hop_trust_chain_and_nearest_mismatch(self):
+        host1 = self._connect()
+        host1.known_hosts = 'chain'
+        trust1 = f'/tmp/sshscript-trust-{uuid.uuid4().hex}'
+        trust2 = f'/tmp/sshscript-trust-{uuid.uuid4().hex}'
+        self.addCleanup(self._remove_remote_tree, host1, trust1)
+        self.addCleanup(self._remove_remote_tree, host1, trust2)
+        host1.upload(str(self.trusted_hosts), trust1)
+        host1.known_hosts_path = trust1
+        options = dict(username=self.username, port=self.port, ssh_config=False,
+                       key_filename=str(self.key_path), look_for_keys=False,
+                       allow_agent=False, timeout=5, banner_timeout=5, auth_timeout=5)
+        with host1.connect(self.host, **options) as host2:
+            host2.known_hosts_path = trust2
+            host1.upload(str(self.mismatch_hosts), trust2)
+            with self.assertRaises(paramiko.BadHostKeyException):
+                host2.connect(self.host, policy=paramiko.AutoAddPolicy(), **options)
+            # A readable empty nearest file permits fallback to host1.
+            with host2.sftp.open(trust2, 'wb') as stream:
+                stream.write(b'')
+            with host2.connect(self.host, **options) as host3:
+                self.assertEqual(host3.exec_command(['printf', 'chain'],
+                    command_timeout=5, check=True).stdout, 'chain')
+            self.assertEqual(host2.exec_command(['printf', 'parent'],
+                command_timeout=5, check=True).stdout, 'parent')
 
     def test_real_proxyjump_authentication_host_keys_and_cleanup(self):
         with tempfile.TemporaryDirectory(prefix='sshscript-jump-config-') as folder:

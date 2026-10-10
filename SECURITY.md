@@ -65,11 +65,20 @@ termination. Verify application outcomes and reconcile unknown termination.
 
 ### SSH identity and host keys
 
-SSH connections load system host keys and reject unknown or changed keys by
-default. The application is responsible for provisioning `known_hosts` and
+SSH connections reject unknown or changed keys by default. Published 4.0.2
+loads localhost system host keys. The unreleased development API defaults to
+`known_hosts="parent"`, reading the calling Session host's trust file. Remote
+trust files are read over SFTP using the original SSH login account; verification
+still runs locally. `"chain"` trusts the nearest source with a target record;
+it never falls back after a mismatch or file error. Trusting a parent's records
+also trusts that host/account to maintain them. Use `"local"` to retain the
+previous source selection. See the [host-key source contract](API_GUIDE.md#host-key-sources-unreleased).
+
+The application is responsible for provisioning `known_hosts` and
 verifying a new fingerprint through an independent channel. Supplying an
 automatic-acceptance Paramiko policy is an explicit opt-out from this default
 and is not recommended for production enrollment.
+AutoAddPolicy does not persist keys into these local or remote trust files.
 
 SSH authentication ultimately follows Paramiko and server policy. Prefer an
 SSH agent, managed key, or secret manager. Never store passwords or private

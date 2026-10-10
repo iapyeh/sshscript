@@ -17,6 +17,21 @@ execution contract. Native-system validation limits remain documented.
 Use the normal Python Session API as the canonical entry point; optional .spy
 syntax follows the same versioned execution contract.
 
+## Unreleased host-key source migration
+
+The development checkout defaults `known_hosts` to `"parent"`: nested
+connections read the calling Session host's known_hosts through SFTP. Published
+4.0.2 reads localhost's known_hosts for every connection. Existing nested
+workflows relying on localhost trust records must opt into
+`session.set(known_hosts="local")`, or provision the parent's trust file.
+The new default requires a readable, valid trust file, even for a local
+Session; an empty file allows the configured missing-key policy to decide.
+`"chain"` searches the nearest host first and falls back only when no target
+record exists, never after a mismatch or file error. `pkey_path` ownership is
+unchanged. See [host-key sources](API_GUIDE.md#host-key-sources-unreleased).
+This behavior is not yet a published contract; release version selection must
+account for this compatibility change before distributing artifacts.
+
 ## Numbering and compatibility
 
 Versions follow PEP 440 with major.minor.patch compatibility semantics:

@@ -386,6 +386,24 @@ verified the key. See the
 nested connections, timeouts, file transfer, `sudo`, `su`, and interactive
 programs.
 
+## Host-key sources in development (unreleased)
+
+The development checkout adds `known_hosts="parent"` as the default: a local
+Session reads localhost's trust file; `host1.connect("host2")` reads host1's
+trust file over SFTP. This matches the host ownership of `pkey_path`.
+Published 4.0.2 continues to use localhost for all host-key checks.
+
+Set `session.set(known_hosts="chain")` to search from the calling Session
+through its ancestors to localhost. The nearest layer with a target record
+wins; a mismatch or read/parse error stops the connection. Set
+`session.set(known_hosts="local")` to preserve previous behavior.
+Each Session can set its own `known_hosts_path`; this path is not inherited.
+`connect(known_hosts=...)` overrides only one connection. `pkey_path` remains
+on the calling host for every strategy. `policy` handles only unknown keys;
+`AutoAddPolicy` does not write these trust files. See the
+[host-key source contract](API_GUIDE.md#host-key-sources-unreleased) for supported
+file formats, strict error handling and migration.
+
 ## Reusing SSH configuration
 
 Connections from a local session read `~/.ssh/config` if it exists. Supported

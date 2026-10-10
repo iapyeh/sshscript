@@ -110,6 +110,69 @@ formats. For an encrypted RSA key, use
 reading rule. Supplying both `pkey_path` and `pkey` raises `ValueError`.
 See the [agent guide's complete nested example](https://iapyeh.github.io/sshscript/v3a/ai-agents/guide/#ssh-connections-and-private-key-paths).
 
+### Host-key sources (unreleased)
+
+This section describes the development checkout, not published SSHScript 4.0.2.
+`known_hosts` selects the host-key trust source independently of `policy`:
+
+| Value | Sources, in order |
+| --- | --- |
+| `"parent"` (new default) | Only the calling Session's host |
+| `"local"` | Only the root localhost Session |
+| `"chain"` | Calling Session, then each ancestor through localhost |
+
+For localhost → host1 → host2 → host3, `host2.connect("host3",
+known_hosts="chain")` consults host2, host1, then localhost. The nearest source
+with a record for the resolved target hostname and port is authoritative.
+A matching key is accepted; a changed key is rejected even if a more distant
+source matches. Only absence of a target record permits continuing the chain.
+Different key algorithms do not permit falling back to another source.
+
+Each source reads its own `known_hosts_path`, or `~/.ssh/known_hosts` if unset.
+Remote files are read over SFTP as that Session's original SSH login account;
+SSH handshakes, user authentication and host-key verification still run in the
+local Python process. Neither sudo/su nor a nested connection changes the SFTP
+account. Remote `~/` paths refer to the login account's SFTP home; `~user` paths
+are unsupported. Relative remote paths use the SFTP working directory.
+
+```py
+local.set(known_hosts="chain")
+# After connecting to host1 and host2:
+host1.set(known_hosts_path="/home/ops/.ssh/known_hosts")
+host2.set(known_hosts_path="/etc/ssh/ssh_known_hosts")
+with host2.connect("deploy@host3", pkey_path="/home/ops/.ssh/host3_rsa") as host3:
+    result = host3.exec_command(["hostname"], check=True, command_timeout=10)
+```
+
+The strategy is inherited by future child Sessions; the path is host-specific
+and is **not inherited**. `known_hosts_path=None` restores the standard path.
+A `connect(known_hosts=...)` override affects only that connection; it does not
+change the parent setting or the child's inherited strategy. `set()`, `get()`
+and matching properties expose both settings. `known_hosts_path` accepts text
+paths and `PathLike[str]`; it is a Session setting, not a `connect()` keyword.
+
+`pkey_path` always reads only from the calling Session's host, including with
+`known_hosts="chain"`; private keys are never searched through ancestors.
+
+An absent trust file, permission failure, read failure, invalid UTF-8 or invalid
+entry raises an error; no distant source or permissive policy bypasses it.
+Empty files, comments, plain host-key entries (including comma-separated names)
+and hashed hostnames are supported. OpenSSH markers such as `@cert-authority`
+and `@revoked`, wildcard/negated host patterns and unsupported key types raise
+an error rather than being silently ignored. A source file is fully parsed
+before its records are used. Nonstandard ports use `[hostname]:port` records.
+
+When every selected source lacks the target, `policy` handles the unknown key.
+`AutoAddPolicy` accepts it into the new client's memory only; these trust files
+are read-only and are not automatically updated locally or remotely.
+
+**Migration:** published 4.0.2 always loads localhost host keys. The new default
+`"parent"` makes nested host-key sources consistent with `pkey_path`. To retain
+the previous behavior, set `local.set(known_hosts="local")` before connecting.
+All strategies require a readable, valid file, including the default localhost
+path. Unlike published 4.0.2, a missing local file is an error; create an empty
+file if the configured missing-key policy should handle unknown hosts.
+
 ### Private keys readable only in a privileged console
 
 Remote `pkey()` and `pkey_path` use SFTP with the original SSH login account.

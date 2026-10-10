@@ -3,6 +3,17 @@
 This project records user-visible changes here. Release artifacts and their
 provenance are available from the linked GitHub Release and PyPI pages.
 
+## Unreleased
+
+- Add `known_hosts="parent"` (new default), `"local"` and `"chain"` strategies.
+  Nested connections now use the calling host's trust file by default, matching
+  `pkey_path` ownership. Set `known_hosts="local"` for previous behavior.
+- Add per-Session `known_hosts_path` without path inheritance. Chain lookup uses
+  the nearest target record; changed keys and read/parse errors never fall back.
+  Authentication and verification still run locally; trust files are read-only.
+- Document host-key source selection, strict file errors and migration in the
+  API, website and portable AI agent skill.
+
 ## 4.0.2 — 2026-10-09
 
 - Align the README, current installation commands, website title, navigation,

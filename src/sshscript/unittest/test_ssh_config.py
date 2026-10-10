@@ -8,10 +8,15 @@ from unittest.mock import Mock, patch
 import paramiko
 
 from session import Session
+from sessionsettings import execution_defaults
 
 
 class SSHConfigTests(unittest.TestCase):
     def setUp(self):
+        # These tests isolate config/policy forwarding from host-file I/O.
+        self.enterContext(execution_defaults(known_hosts='local'))
+        self.read_keys = self.enterContext(patch.object(
+            Session, '_read_known_hosts', return_value=paramiko.HostKeys()))
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.path = Path(self.folder.name) / 'config'
@@ -110,7 +115,8 @@ Host *
         client.connect.assert_called_once_with('10.0.1.20', username='deploy', password=None, port=22,
                                               key_filename=[os.path.expanduser('~/.ssh/key-deploy-22')])
         self.assertEqual(remote.host, '10.0.1.20')
-        client.load_system_host_keys.assert_called_once()
+        self.read_keys.assert_called_once()
+        client.load_system_host_keys.assert_not_called()
         client.set_missing_host_key_policy.assert_not_called()
 
     def test_nested_connection_does_not_read_local_config(self):

@@ -23,6 +23,7 @@ else:
     import patching
 
 import ast
+import base64
 import contextvars
 import threading
 import paramiko
@@ -402,6 +403,9 @@ class Session(object):
         # A child shares its tree lock; independent roots do not block each other.
         self._lifecycle_lock = parent._lifecycle_lock if parent is not None else threading.RLock()
         self._settings = parent.get() if parent is not None else root_defaults()
+        if parent is not None:
+            # A path belongs to this host, not to the host of the parent.
+            self._settings['known_hosts_path'] = None
         self.logger = SessionLogger(self._settings)
         ## when exec_command() or withdollar() was called,
         ## this value was stored, so user can access its stdout, stderr and exitcode
@@ -458,6 +462,8 @@ class Session(object):
     verbose_stderr = property(lambda self: self.get('verbose_stderr'), lambda self, v: self.set(verbose_stderr=v))
     log_level = property(lambda self: self.get('log_level'), lambda self, v: self.set(log_level=v))
     policy = property(lambda self: self.get('policy'), lambda self, v: self.set(policy=v))
+    known_hosts = property(lambda self: self.get('known_hosts'), lambda self, v: self.set(known_hosts=v))
+    known_hosts_path = property(lambda self: self.get('known_hosts_path'), lambda self, v: self.set(known_hosts_path=v))
 
     ## added in v2.0.3
     ## always return the session which is not connected to execute commands by subprocess at localhost
@@ -677,8 +683,88 @@ class Session(object):
         self.logger.debug('Script requested exit (exit_code=%s)', code)
         raise SSHScriptExit(message,code)
 
+    def _read_known_hosts(self):
+        """Read a host-owned trust file strictly; never execute a remote shell."""
+        self._ensure_open()
+        path = self.known_hosts_path or '~/.ssh/known_hosts'
+        source = self.host if self._client is not None else 'localhost'
+        try:
+            if self._client is not None:
+                sftp = self.sftp
+                if path == '~' or path.startswith('~/'):
+                    path = posixpath.join(sftp.normalize('.'), path[2:] if path != '~' else '')
+                elif path.startswith('~'):
+                    raise ValueError('remote ~user paths are not supported')
+                with sftp.open(path, 'rb') as stream:
+                    data = stream.read()
+            else:
+                path = os.path.expanduser(path)
+                with open(path, 'rb') as stream:
+                    data = stream.read()
+            text = data.decode('utf-8') if isinstance(data, bytes) else data
+        except Exception as exc:
+            raise SSHScriptException(
+                f'Unable to read known_hosts on {source}: {path} ({type(exc).__name__})'
+            ) from exc
+
+        keys = paramiko.HostKeys()
+        for lineno, line in enumerate(text.splitlines(), 1):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            try:
+                fields = line.split()
+                if len(fields) < 3 or fields[0].startswith('@'):
+                    raise ValueError('expected a plain host-key entry')
+                # Paramiko matches literal names and hashed names, not patterns.
+                if any(c in fields[0] for c in '*?!'):
+                    raise ValueError('host patterns are not supported')
+                base64.b64decode(fields[2], validate=True)
+                entry = paramiko.hostkeys.HostKeyEntry.from_line(' '.join(fields[:3]), lineno)
+                if entry is None or entry.key is None or entry.key.get_name() != fields[1]:
+                    raise ValueError('unsupported host-key entry')
+                for name in entry.hostnames:
+                    if not name:
+                        raise ValueError('empty hostname')
+                    if name.startswith('|'):
+                        # Validate without relying on Paramiko's assertions (-O).
+                        parts = name.split('|')
+                        if (len(parts) != 4 or parts[:2] != ['', '1'] or
+                                any(len(base64.b64decode(part, validate=True)) != 20
+                                    for part in parts[2:])):
+                            raise ValueError('invalid hashed hostname')
+                    keys.add(name, entry.key.get_name(), entry.key)
+            except Exception:
+                # Do not include raw key lines in error reports.
+                raise SSHScriptException(
+                    f'Invalid known_hosts on {source}: {path}, line {lineno}'
+                ) from None
+        return keys
+
+    def _load_connection_host_keys(self, client, host, port, strategy):
+        if strategy == 'local':
+            sources = [self.local_session]
+        elif strategy == 'parent':
+            sources = [self]
+        else:
+            sources = []
+            source = self
+            while source is not None:
+                sources.append(source)
+                source = source.parent
+        identity = host if port == 22 else f'[{host}]:{port}'
+        for source in sources:
+            keys = source._read_known_hosts()
+            found = keys.lookup(identity)
+            if found is not None:
+                # Only this layer is installed. Paramiko negotiates its key types
+                # and rejects a mismatch without consulting more distant layers.
+                for key_type, key in found.items():
+                    client.get_host_keys().add(identity, key_type, key)
+                return
+
     @export2Dollar
-    def connect(self,host,username=None,password=None,port=None,policy=UNSET,*,ssh_config=None,**kw):
+    def connect(self,host,username=None,password=None,port=None,policy=UNSET,*,ssh_config=None,known_hosts=UNSET,**kw):
         """Return a connected child session, optionally through this session's SSH link.
 
         Use with session.connect("user@host") as remote to scope the connection.
@@ -701,6 +787,15 @@ class Session(object):
         parent; its connect/banner/auth timeouts default to 30 seconds and may be
         overridden. KEEPALIVE_INTERVAL sets keepalive seconds (default 60; 0 disables).
         Connection failures propagate.
+
+        known_hosts selects local, parent (default: this Session's host), or
+        chain (this host, then ancestors through localhost). Children inherit
+        the setting; a connect override affects only that connection. Each
+        source uses its own known_hosts_path or ~/.ssh/known_hosts. Paths are
+        not inherited. The nearest source containing the target is authoritative:
+        a mismatch never falls back. Read/parse failures propagate in all modes.
+        Unknown keys use policy only after all selected sources lack the target.
+        These sources are read-only, including with AutoAddPolicy.
         """
         
         if self.closed:
@@ -708,6 +803,9 @@ class Session(object):
 
         if policy is UNSET:
             policy = self.policy
+        if known_hosts is UNSET:
+            known_hosts = self.known_hosts
+        validate({'known_hosts': known_hosts})
         
         ## host might be in format of "username@hostname"
         if isinstance(host, str) and '@' in host:
@@ -742,7 +840,7 @@ class Session(object):
         def connect_client(host,username,password,port,policy,**kw):
             client = paramiko.SSHClient()
             try:
-                client.load_system_host_keys()
+                self._load_connection_host_keys(client, host, port, known_hosts)
                 if policy is not None:
                     client.set_missing_host_key_policy(policy)
                 client.connect(host,username=username,password=password,port=port,**kw)
