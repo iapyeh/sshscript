@@ -1,6 +1,6 @@
 # SSHScript Agent Guide
 
-**Documentation contract: SSHScript 4.0.2; Python 3.11+.**
+**Documentation contract: SSHScript 5.0.0; Python 3.11+.**
 
 SSHScript runs commands locally and over SSH with a Python `Session` API.
 Optional `.spy` dollar syntax exposes the same execution model. Use it when
@@ -45,7 +45,7 @@ For a new environment, when installation is authorized:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install 'sshscript==4.0.2'
+python3 -m pip install 'sshscript==5.0.0'
 ```
 
 Pin transitive dependencies in the application's lock file for repeatable
@@ -155,9 +155,11 @@ key formats beyond RSA. To use an encrypted RSA key with `pkey_path` semantics,
 load it explicitly with `parent.pkey(path, password=key_passphrase)` and pass
 the returned object as `pkey=`; do not supply both `pkey` and `pkey_path`.
 
-### Host-key sources (unreleased)
+<a id="host-key-sources-unreleased"></a>
 
-This section describes the development checkout, not published SSHScript 4.0.2.
+### Host-key sources (5.0)
+
+This section requires SSHScript 5.0.0 or newer.
 `known_hosts` selects the host-key trust source independently of `policy`:
 
 | Value | Sources, in order |
@@ -211,11 +213,11 @@ When every selected source lacks the target, `policy` handles the unknown key.
 `AutoAddPolicy` accepts it into the new client's memory only; these trust files
 are read-only and are not automatically updated locally or remotely.
 
-**Migration:** published 4.0.2 always loads localhost host keys. The new default
+**Migration from 4.0.2:** earlier releases always load localhost host keys. The new default
 `"parent"` makes nested host-key sources consistent with `pkey_path`. To retain
 the previous behavior, set `local.set(known_hosts="local")` before connecting.
 All strategies require a readable, valid file, including the default localhost
-path. Unlike published 4.0.2, a missing local file is an error; create an empty
+path. Unlike 4.0.2, a missing local file is an error; create an empty
 file if the configured missing-key policy should handle unknown hosts.
 
 ### Keys readable only after sudo/su

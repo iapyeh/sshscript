@@ -9,7 +9,8 @@ claim that a command or deployment is safe or successful.
 | Version | Contract and status |
 | --- | --- |
 | 3.1.5 | Published baseline described in API_GUIDE.md; one-shot Session commands return CommandResult, but persistent console calls return two live buffers. |
-| 4.0.2 | Production contract: completed console results, settings, managed jobs and authenticated-console handshakes; incompatible with parts of 3.1.5. |
+| 4.0.2 | Previous production contract: completed console results, settings, managed jobs and authenticated-console handshakes; incompatible with parts of 3.1.5. |
+| 5.0.0 | Current production contract: calling-host trust by default, explicit local/chain strategies and strict known_hosts file errors; preserves the 4.0 command execution contract. |
 
 Version 4.0.1 introduced the published 4.0 contract after release validation.
 Version 4.0.2 is a documentation and link maintenance patch with the same public
@@ -17,10 +18,10 @@ execution contract. Native-system validation limits remain documented.
 Use the normal Python Session API as the canonical entry point; optional .spy
 syntax follows the same versioned execution contract.
 
-## Unreleased host-key source migration
+## 5.0 host-key source migration
 
-The development checkout defaults `known_hosts` to `"parent"`: nested
-connections read the calling Session host's known_hosts through SFTP. Published
+SSHScript 5.0.0 defaults `known_hosts` to `"parent"`: nested
+connections read the calling Session host's known_hosts through SFTP.
 4.0.2 reads localhost's known_hosts for every connection. Existing nested
 workflows relying on localhost trust records must opt into
 `session.set(known_hosts="local")`, or provision the parent's trust file.
@@ -29,8 +30,9 @@ Session; an empty file allows the configured missing-key policy to decide.
 `"chain"` searches the nearest host first and falls back only when no target
 record exists, never after a mismatch or file error. `pkey_path` ownership is
 unchanged. See [host-key sources](API_GUIDE.md#host-key-sources-unreleased).
-This behavior is not yet a published contract; release version selection must
-account for this compatibility change before distributing artifacts.
+This default and the strict file-error behavior are incompatible with 4.0.2,
+so they are introduced in a new major version. Explicit `known_hosts="local"`
+preserves the previous source location, while still requiring a readable file.
 
 ## Numbering and compatibility
 

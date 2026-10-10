@@ -19,7 +19,7 @@ output and status, distinguish failure from timeout, and make cleanup and
 unknown termination explicit. A successful command exit is evidence about
 that command; verify the deployment or other application outcome separately.
 
-**Current release:** [4.0.2](https://github.com/iapyeh/sshscript/releases/tag/v4.0.2)
+**Current release:** [5.0.0](https://github.com/iapyeh/sshscript/releases/tag/v5.0.0)
 (Production/Stable) · **Python:** 3.11 or newer · **Tested:** Python
 3.11–3.14 on Linux and macOS
 
@@ -29,8 +29,9 @@ that command; verify the deployment or other application outcome separately.
 [Security](https://github.com/iapyeh/sshscript/security/policy) ·
 [Support](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 
-**Version 4.0.2** maintains the 4.0 execution contract introduced in 4.0.1.
-This patch aligns the published documentation and installation links.
+**Version 5.0.0** preserves the 4.0 command execution contract and changes the
+default host-key source to the calling host. Provision its known_hosts file or
+select `known_hosts="local"` when migrating existing nested connections.
 Upgrade 3.1.5 automation using the migration guide and application regressions.
 See [version policy and migration](VERSIONING.md) before upgrading automation.
 
@@ -121,7 +122,7 @@ pin SSHScript and all transitive dependencies in your application's lock file.
 To install this release explicitly:
 
 ```sh
-python3 -m pip install "sshscript==4.0.2"
+python3 -m pip install "sshscript==5.0.0"
 ```
 
 Use `python3 -m pip install --upgrade sshscript` to upgrade. The optional
@@ -130,7 +131,7 @@ it never installs an update by itself.
 
 ## 60-second local quickstart
 
-This example runs on 4.0.2 and retains compatibility with the 3.1.5 command API.
+This example runs on 5.0.0 and retains compatibility with the 3.1.5 command API.
 The metadata below records that older compatibility baseline.
 
 <!-- example: {"id":"readme-quickstart", "profile":"3.1.5", "stdout":"sshscript is ready\nexit code: 0\n"} -->
@@ -386,12 +387,12 @@ verified the key. See the
 nested connections, timeouts, file transfer, `sudo`, `su`, and interactive
 programs.
 
-## Host-key sources in development (unreleased)
+## Host-key sources in 5.0
 
-The development checkout adds `known_hosts="parent"` as the default: a local
+SSHScript 5.0.0 uses `known_hosts="parent"` as the default: a local
 Session reads localhost's trust file; `host1.connect("host2")` reads host1's
 trust file over SFTP. This matches the host ownership of `pkey_path`.
-Published 4.0.2 continues to use localhost for all host-key checks.
+SSHScript 4.0.2 and earlier use localhost for all host-key checks.
 
 Set `session.set(known_hosts="chain")` to search from the calling Session
 through its ancestors to localhost. The nearest layer with a target record

@@ -65,8 +65,8 @@ termination. Verify application outcomes and reconcile unknown termination.
 
 ### SSH identity and host keys
 
-SSH connections reject unknown or changed keys by default. Published 4.0.2
-loads localhost system host keys. The unreleased development API defaults to
+SSH connections reject unknown or changed keys by default. SSHScript 4.0.2 and earlier
+load localhost system host keys. SSHScript 5.0.0 defaults to
 `known_hosts="parent"`, reading the calling Session host's trust file. Remote
 trust files are read over SFTP using the original SSH login account; verification
 still runs locally. `"chain"` trusts the nearest source with a target record;

@@ -5,7 +5,7 @@ description: Write, adapt, and verify Python or .spy automation using SSHScript 
 
 # Use SSHScript
 
-This skill describes the **SSHScript 4.0.2 contract, Python 3.11+**. Read
+This skill describes the **SSHScript 5.0.0 contract, Python 3.11+**. Read
 [the agent guide](references/agent-guide.md) before generating automation.
 Select only the API sections needed for the user's task.
 
@@ -35,12 +35,12 @@ from the local Python process's filesystem even for nested connections.
 Read [SSH connections and private-key paths](references/agent-guide.md#ssh-connections-and-private-key-paths)
 for the localhost → host1 → host2 example before generating nested connections.
 
-### Host-key sources in development (unreleased)
+### Host-key sources in 5.0
 
-Published 4.0.2 loads localhost known_hosts for every connection. The development
-API adds `known_hosts="parent"` as its default, reading the calling Session's
+SSHScript 4.0.2 and earlier load localhost known_hosts for every connection.
+SSHScript 5.0.0 adds `known_hosts="parent"` as its default, reading the calling Session's
 trust file over SFTP for nested connections, consistent with `pkey_path`.
-Use these settings only after confirming the installed build supports them.
+Use these settings only with SSHScript 5.0.0 or newer.
 
 - `"parent"`: only the calling Session's host; `"local"`: only localhost;
   `"chain"`: calling host, then ancestors through localhost.
