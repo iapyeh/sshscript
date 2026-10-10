@@ -2,6 +2,7 @@
 
 from io import StringIO
 import logging
+import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -59,8 +60,7 @@ class LoggerIntegrationTests(unittest.TestCase):
 
     def test_connection_timeout_is_not_swallowed(self):
         class FailingSSHClient:
-            def load_system_host_keys(self):
-                pass
+            closed = False
 
             def set_missing_host_key_policy(self, policy):
                 pass
@@ -68,12 +68,24 @@ class LoggerIntegrationTests(unittest.TestCase):
             def connect(self, *args, **kwargs):
                 raise TimeoutError('simulated timeout')
 
+            def close(self):
+                self.closed = True
+
         session = Session()
         self.addCleanup(session.close)
+        # Isolate trust-file I/O from the runner's real HOME. The production
+        # contract requires a readable file before attempting the connection.
+        folder = self.enterContext(tempfile.TemporaryDirectory(prefix='sshscript-timeout-'))
+        trust_file = Path(folder) / 'trust'
+        trust_file.write_text('', encoding='utf-8')
+        session.known_hosts_path = trust_file
+        self.enterContext(patch.dict(os.environ, {'HOME': folder}))
+        self.assertFalse((Path(folder) / '.ssh/known_hosts').exists())
+        client = FailingSSHClient()
         with patch.object(
             session_module.paramiko,
             'SSHClient',
-            return_value=FailingSSHClient(),
+            return_value=client,
         ):
             with self.assertRaisesRegex(TimeoutError, 'simulated timeout'):
                 session.connect(
@@ -82,6 +94,7 @@ class LoggerIntegrationTests(unittest.TestCase):
                     username='test-user',
                     password='test-password',
                 )
+        self.assertTrue(client.closed)
 
     def test_cli_error_log_does_not_include_exception_secret(self):
         secret = 'SSHSCRIPT_EXCEPTION_SECRET_DO_NOT_LOG_1742'
