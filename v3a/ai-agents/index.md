@@ -15,10 +15,20 @@ retain command output and status, and manage
 persistent shells and streaming jobs. Start with the regular Python `Session`
 API; optional `.spy` syntax uses the same execution contract.
 
-**Documentation contract: SSHScript 5.0.0; Python 3.11+.** Check the installed
+**Documentation contract: SSHScript 6.0.0; Python 3.11+.** Check the installed
 version before selecting APIs. Older 3.1.5 console behavior differs from 4.0.
 The `/v3a/` URL is the maintained documentation location, not a package-version
 identifier. Reading this page does not install anything or authorize execution.
+
+## SSHScript 6.0 source contract
+
+The guide and skill bundle target 6.0.0 source and verified local wheels.
+The latest published package remains 5.0.0; a source push does not upload 6.0.0.
+Read [6.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/)
+before upgrading. The new [interactive console]({{ site.baseurl }}/v3a/reference/interactive-console/)
+retains Python variables and shell state: `exit`/`exit()` leave one layer,
+`quit`/`quit()` close all layers, and `$.stop()` completes a script.
+`$.exit()` and the old break API are removed.
 
 ## Prompt to set up for future tasks
 
@@ -130,4 +140,6 @@ collection logic, schemas and vault updates belong to their recipe project.
 Follow the [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 for feedback; public submission requires the user's authorization.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-22 23:26:49*
+
+Last Updated: 2026-10-22 23:26:49

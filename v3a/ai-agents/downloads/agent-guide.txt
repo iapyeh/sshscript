@@ -1,6 +1,6 @@
 # SSHScript Agent Guide
 
-**Documentation contract: SSHScript 5.0.0; Python 3.11+.**
+**Documentation contract: SSHScript 6.0.0; Python 3.11+.**
 
 SSHScript runs commands locally and over SSH with a Python `Session` API.
 Optional `.spy` dollar syntax exposes the same execution model. Use it when
@@ -45,8 +45,11 @@ For a new environment, when installation is authorized:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install 'sshscript==5.0.0'
+python3 -m pip install /path/to/sshscript-6.0.0-py3-none-any.whl
 ```
+
+Use a verified 6.0.0 wheel until publication; after publication, pin
+`sshscript==6.0.0`. A source push does not publish a package.
 
 Pin transitive dependencies in the application's lock file for repeatable
 deployment. Python 3.11+ is required. Consult the project's test reports for
@@ -108,6 +111,69 @@ An argv list is **one command**, not a batch. Local argv executes directly;
 remote argv is quoted for a POSIX login shell. Shell operators inside argv
 are literal data. Console commands accept strings; quote dynamic arguments
 with `shlex.join()`. Do not interpolate untrusted values into shell syntax.
+
+## Interactive console (6.0)
+
+This section requires SSHScript 6.0.0. Published 5.0.0 lacks this console and
+retains older script-control APIs. Record the source commit or verified wheel
+identity before using the 6.0 contract.
+
+Start `python3 -B sshscript.py console` from the development checkout, or
+`sshscript console` from an installed 6.0.0 wheel. Keep the same terminal/process
+alive between inputs; restarting it loses variables, connections and shells.
+A UI agent needs a tool that can send more input to that retained process.
+No temporary script file or Python/shell mode switch is required.
+
+Input is Python with dollar syntax. `hostname` reads a Python variable;
+`$hostname` executes a shell command. For an authorized local check:
+
+```text
+local [user]> value = 40
+local [user]> $printf ready
+ready
+local [user]> print($.stdout)
+ready
+local [user]> print(value + 2)
+42
+```
+
+Python variables, literal strings and keyword expansion work in connections:
+`host = "my-ssh-alias"`, `options = {"username": "ops", "port": 2222}`, then
+`$.connect(host, **options)`. Supply passwords with `getpass()` when needed.
+Each connection automatically enters a persistent Bash shell; commands such as
+`$cd /tmp` retain state. Host-key and private-key ownership rules still apply.
+
+- `$.sudo(password=...)`, `$.su("user", password=...)`, `$.shell("bash")` and
+  `$.enter(...)` enter managed layers without requiring `with`. At a local or
+  SSH connection layer, `$.connect(...)` may enter another connection. Leave
+  an explicit identity, shell or program layer before connecting again;
+  elevated console identity does not change the SFTP/SSH account.
+- `exit` and `exit()` leave exactly one managed layer. At the local root they
+  close the console. `quit` and `quit()` close every managed layer.
+- Inside an entered text program, these exit/quit forms remain console controls.
+  Use `$.input(...)` or `$.send(...)` to send reserved text to the program.
+  Configure `enter()` with the program's real prompt and exit sequence.
+- `help`/`help()` show console help, `help(object)` shows Python documentation,
+  and `:status` shows layers. Ctrl-C cancels Python input or interrupts work;
+  Ctrl-D at the Python prompt closes the console. Inside `enter()`, Ctrl-C/D
+  go to the program; a detected return to its parent shell closes that layer.
+- `$.stdout`, `$.stderr` and `$.exitcode` hold the current layer's latest command
+  snapshot; `result` holds the latest dollar-command JobResult across layers.
+  Nonzero command status is displayed;
+  inspect completion and errors rather than treating a prompt as success.
+- `$.run(source)` runs a script on the current connection Session, without
+  inheriting console elevation. `$.run_file(path)` starts with a fresh local
+  Session. `$.stop(code=0, message="")` normally completes the nearest script;
+  inspect the ScriptResult returned by `$.run()` (`exitcode`, `stopped`,
+  `message`) and any cleanup failures. `$.run_file()` returns an integer status.
+  `$.stop()` is not a prompt-level exit. `$.exit()`, `Session.exit()` and
+  wrapper `.exit()` are removed in both modes; migrate script completion to `$.stop()` or Python
+  `sys.exit()` as appropriate. Lexical `with` blocks retain Python cleanup.
+
+The terminal enables optional Python `readline` editing for Backspace and
+writes no history file. Piped input is supported; full-screen terminal programs
+are outside this text console. Consult the matching checkout's `CONSOLE.md`
+for limits and migration details.
 
 ## SSH connections and private-key paths
 
@@ -362,3 +428,5 @@ for operational examples and the [support policy](https://github.com/iapyeh/sshs
 for reporting issues. Recipe-specific schemas and vault updates belong to that
 recipe's own documentation. Reading this guide does not authorize executing
 examples or submitting a public report.
+
+*Last modified: 2026-10-22 23:24:55*

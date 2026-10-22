@@ -1,5 +1,5 @@
 ---
-title: "Version policy and 5.0 migration"
+title: "Version policy and 6.0 migration"
 parent: "Migration and Releases"
 grand_parent: "SSHScript Documentation"
 nav_order: 3
@@ -8,7 +8,7 @@ permalink: /v3a/migration-and-releases/version-policy/
 
 <!-- Generated from working_branch/VERSIONING.md. -->
 
-# Version policy and 5.0 migration
+# Version policy and 6.0 migration
 
 SSHScript aims to let engineers and AI reliably execute, understand, and take
 over automation. A version identifies a public execution contract, not a
@@ -18,15 +18,44 @@ claim that a command or deployment is safe or successful.
 
 | Version | Contract and status |
 | --- | --- |
-| 3.1.5 | Published baseline described in the canonical API guide; one-shot Session commands return CommandResult, but persistent console calls return two live buffers. |
+| 3.1.5 | Published baseline described in API_GUIDE.md; one-shot Session commands return CommandResult, but persistent console calls return two live buffers. |
 | 4.0.2 | Previous production contract: completed console results, settings, managed jobs and authenticated-console handshakes; incompatible with parts of 3.1.5. |
-| 5.0.0 | Current production contract: calling-host trust by default, explicit local/chain strategies and strict known_hosts file errors; preserves the 4.0 command execution contract. |
+| 5.0.0 | Latest published contract: calling-host trust by default, explicit local/chain strategies and strict known_hosts file errors; preserves the 4.0 command execution contract. |
+| 6.0.0 | Current source contract: interactive Python/dollar console, normal script completion with stop(), ScriptResult metadata, and removal of old exit/break APIs and control exceptions. Package publication is separate from source promotion. |
 
 Version 4.0.1 introduced the published 4.0 contract after release validation.
 Version 4.0.2 is a documentation and link maintenance patch with the same public
 execution contract. Native-system validation limits remain documented.
 Use the normal Python Session API as the canonical entry point; optional .spy
 syntax follows the same versioned execution contract.
+
+## 6.0 console and script completion migration
+
+6.0.0 is an incompatible major version, approved for the new execution contract.
+A source push and successful CI do not create a GitHub Release, tag or PyPI upload.
+The latest published 5.0.0 package remains a separate artifact.
+
+| Previous use | 6.0 replacement |
+| --- | --- |
+| `$.break(code)` or a script-ending `$.exit(...)` | `$.stop(code=0, message="")` for normal early completion; use Python `sys.exit()` when SystemExit is required. |
+| `Session.exit()` or wrapper `.exit()` | Removed. Let lexical `with` scopes clean up in scripts; use console helpers for managed console layers. |
+| `SSHScriptBreak` / `SSHScriptExit` exception handling | Removed. Inspect ScriptResult for normal completion; Python SystemExit remains separate. |
+| Console preview `$.exit()` | Use bare `exit` or `exit()` to leave one layer. |
+| Console preview bare-exit reminder or whole-console `exit()` | Both `exit` and `exit()` now leave one layer; `quit` and `quit()` close all layers. |
+
+`Session.run()` and `run_script()` return dictionary-like ScriptResult objects
+with `exitcode`, `stopped` and `message` attributes; names initialized before
+`$.stop()` are preserved. `run_file()` returns an integer completion status.
+Stop affects the nearest script/import boundary and performs normal `finally`
+and context cleanup; cleanup failures remain errors.
+
+The new `sshscript console` accepts Python and dollar syntax in the same retained
+process. `$hostname` executes a shell command; `hostname` reads a Python name.
+Connections automatically enter persistent Bash shells; console exit helpers
+manage layers without changing dollar API meanings. Read [the console guide]({{ site.baseurl }}/v3a/reference/interactive-console/)
+for connection, identity, text-program and control-key behavior. Existing users
+must update removed API calls and exception handling before upgrading. The 5.0
+host-key contract below remains unchanged.
 
 ## 5.0 host-key source migration
 
@@ -137,4 +166,6 @@ Consult that artifact's version-labelled API guide before generating examples.
 Production gates reject prerelease/local versions before uploading; they never
 silently relabel development builds as stable.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-22 23:26:49*
+
+Last Updated: 2026-10-22 23:26:49

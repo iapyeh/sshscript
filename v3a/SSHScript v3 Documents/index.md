@@ -17,6 +17,12 @@ success; closing an SSH channel does not prove its remote process stopped.
 The published example baseline is **3.1.5**. The current production
 contract is **5.0.0**, with host-key source changes from 4.0.2 and execution changes from 3.1.5; see
 [version policy and migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+The new **6.0.0 source contract** adds an
+[interactive Python/dollar console]({{ site.baseurl }}/v3a/reference/interactive-console/)
+and incompatible script-control API changes. The published package remains
+5.0.0 until a separate package publication. The canonical API and agent skill
+now document 6.0; check installed versions before copying those examples.
+
 Start with the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/)
 for version-labelled examples and lifetime rules.
 
@@ -45,4 +51,6 @@ project for reusable recipes and operations management workflows. It is
 currently an initial documentation scaffold, without executable recipes or an
 implemented management system.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-22 23:26:49*
+
+Last Updated: 2026-10-22 23:26:49
