@@ -1,6 +1,7 @@
 """Public regressions for retained console state and script completion boundaries."""
 import io
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -16,7 +17,18 @@ from scriptcontrol import ScriptResult
 from session import Session
 
 
-class ScriptControlTests(unittest.TestCase):
+class _CLITestCase(unittest.TestCase):
+    def assert_no_unexpected_stderr(self, stderr):
+        # Match the existing module CLI tests: only Paramiko's known TripleDES
+        # dependency deprecations are allowed; other diagnostics remain errors.
+        diagnostic = re.sub(
+            r'(?m)^.*[/\\]paramiko[/\\](?:pkey|transport)\.py:\d+: '
+            r'CryptographyDeprecationWarning: TripleDES[^\n]*\n[ \t]+[^\n]*\n',
+            '', stderr)
+        self.assertEqual(diagnostic, '')
+
+
+class ScriptControlTests(_CLITestCase):
     def test_stop_returns_namespace_and_runs_finally_without_exception_catch(self):
         result = sshscript.run_script('''before = 1
 try:
@@ -73,7 +85,7 @@ continued = True
             cli = subprocess.run([sys.executable, str(Path(sshscript.__file__)), str(path)],
                                  capture_output=True, text=True, timeout=20)
             self.assertEqual(cli.returncode, 23)
-            self.assertEqual(cli.stderr, '')
+            self.assert_no_unexpected_stderr(cli.stderr)
 
     def test_stop_in_imported_spy_finishes_only_module(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -104,7 +116,7 @@ continued = True
             sshscript.run_script('$.break()')
 
 
-class InteractiveTests(unittest.TestCase):
+class InteractiveTests(_CLITestCase):
     def setUp(self):
         self.enterContext(warnings.catch_warnings())
         warnings.filterwarnings('ignore', message="'get_child_watcher' is deprecated.*",
@@ -612,7 +624,7 @@ class InteractiveTests(unittest.TestCase):
         self.assertEqual(cli.returncode, 0, cli.stderr)
         self.assertIn('ready', cli.stdout)
         self.assertIn('42', cli.stdout)
-        self.assertEqual(cli.stderr, '')
+        self.assert_no_unexpected_stderr(cli.stderr)
 
 
 if __name__ == '__main__':
