@@ -32,13 +32,6 @@ class SSHScriptException(Exception):
     def __str__(self):
         return f'{self.message}(#{self.errno})'
 
-class SSHScriptBreak(SSHScriptException):
-    """Control-flow signal for $.break(status), handled by the script runner."""
-    pass
-
-class SSHScriptExit(SSHScriptException):
-    """Control-flow signal for $.exit(status), propagated to the command-line runner."""
-    pass
 
 def dumpScript(source,tb_lineno=None,linerange=10):
     """Print source with line numbers and optional error-line context."""

@@ -59,6 +59,7 @@ run_file = sshscript.run_file
 check_file = sshscript.check_file
 run_script = sshscript.run_script
 Session = session.Session
+ScriptResult = session.ScriptResult
 CommandResult = session.CommandResult
 CommandJob = session.CommandJob
 CommandTimeoutError = session.CommandTimeoutError
@@ -89,6 +90,7 @@ __all__ = [
     'run_script',
     'Session',
     'CommandResult',
+    'ScriptResult',
     'CommandJob',
     'CommandTimeoutError',
     'JobResult',

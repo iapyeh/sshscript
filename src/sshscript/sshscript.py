@@ -40,8 +40,8 @@ def warning_on_one_line(message, category, filename, lineno, file=None, line=Non
 if __package__:
     from ._version import __version__
     from .sessionsettings import execution_defaults
-    from .session import Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
-    from .errorutils import SSHScriptExit, SSHScriptBreak, get_logger, set_logger, SSHScriptException,command_summary
+    from .session import ScriptResult, Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
+    from .errorutils import get_logger, set_logger, SSHScriptException,command_summary
     ## 2025/3/3 v2.0.3 feature: import *.spy file directly
     from . import spyimporter
     from . import dollarparser
@@ -51,8 +51,8 @@ else:
     if not mydir in sys.path: sys.path.insert(0,mydir)
     from _version import __version__
     from sessionsettings import execution_defaults
-    from session import Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
-    from errorutils import SSHScriptExit, SSHScriptBreak, get_logger, set_logger, SSHScriptException,command_summary
+    from session import ScriptResult, Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
+    from errorutils import get_logger, set_logger, SSHScriptException,command_summary
     import spyimporter
     import dollarparser
     ## 2024/8/16, should remove mydir out of sys.path for python 3.11
@@ -96,8 +96,8 @@ def run_file(
     execution already failed, that exception remains primary and receives a
     cleanup-failure note.
 
-    Return 0 on normal completion, or the status passed to $.break(status).
-    $.exit(status) raises SSHScriptExit; other execution errors propagate.
+    Return 0 on normal completion, or the status passed to $.stop(status).
+    Execution errors and Python SystemExit propagate.
     Use run_script() for source text and a returned namespace.
     """
     if not isinstance(script_path, (str, os.PathLike)):
@@ -132,19 +132,11 @@ def run_file(
         script_vars['__name__'] = '__main__'
         script_vars['__file__'] = absfile
         with spyimporter.spy_imports():
-            session.run(
+            result = session.run(
                 script,
                 script_vars,
                 showScript=showScript,
             )
-    except SSHScriptBreak as exc:
-        exitcode = exc.errno
-        script_exitcode = exc.errno
-        outcome = 'break'
-    except SSHScriptExit as exc:
-        script_exitcode = exc.errno
-        outcome = 'exit'
-        raise
     except SSHScriptException as exc:
         primary_exception = exc
         script_exitcode = exc.errno
@@ -157,8 +149,8 @@ def run_file(
         exception_type = type(exc).__name__
         raise
     else:
-        outcome = 'completed'
-        script_exitcode = 0
+        outcome = 'stopped' if result.stopped else 'completed'
+        script_exitcode = exitcode = result.exitcode
     finally:
         if inserted_path:
             sys.path.remove(script_folder)
@@ -199,8 +191,6 @@ def run_script(script,varGlobals=None,showScript=False):
         result = the_session.run(script,vars=varGlobals,showScript=showScript)
         outcome = 'completed'
         return result
-    except (SSHScriptBreak, SSHScriptExit):
-        raise
     except BaseException as exc:
         primary_exception = exc
         exception_type = type(exc).__name__
@@ -278,9 +268,24 @@ def main():
     set_logger()
     warnings.formatwarning = warning_on_one_line
 
+    if len(sys.argv) > 1 and sys.argv[1] == 'console':
+        if __package__:
+            from .interactive import main as console_main
+        else:
+            # Flat development CLI removes its bootstrap path after imports.
+            # Keep it available while the REPL imports local product modules.
+            sys.path.insert(0, mydir)
+            try:
+                from interactive import main as console_main
+                return console_main(sys.argv[2:])
+            finally:
+                sys.path.remove(mydir)
+        return console_main(sys.argv[2:])
+
     import argparse
 
-    parser = argparse.ArgumentParser(description='SSHScript: automation tools for Subprocess and SSH')
+    parser = argparse.ArgumentParser(description='SSHScript: automation tools for Subprocess and SSH',
+                                     epilog='Interactive preview: sshscript console [host] (console --help for options)')
 
 
     parser.add_argument('--script','-s', dest='showScript', action='store_true',
@@ -385,8 +390,6 @@ def main():
                         args.path,
                         showScript=args.showScript,
                     )
-        except SSHScriptExit as e:
-            sys.exit(e.errno)
         except SSHScriptException as e:
             if args.show_traceback:
                 logger.exception(

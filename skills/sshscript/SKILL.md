@@ -5,9 +5,17 @@ description: Write, adapt, and verify Python or .spy automation using SSHScript 
 
 # Use SSHScript
 
-This skill describes the **SSHScript 5.0.0 contract, Python 3.11+**. Read
+This skill describes the **SSHScript 6.0.0 contract, Python 3.11+**. Read
 [the agent guide](references/agent-guide.md) before generating automation.
 Select only the API sections needed for the user's task.
+
+For retained, step-by-step interaction, read
+[Interactive console (6.0)](references/agent-guide.md#interactive-console-60).
+Use a matching 6.0.0 checkout or verified wheel; source publication alone does
+not upload a package. Published 5.0.0 lacks the console and retains older APIs.
+In the console, `exit`/`exit()` leave one layer and `quit`/`quit()`
+close all layers. `$.stop()` completes a script; `$.exit()` is removed in
+both modes. Use the matching checkout's `CONSOLE.md` for the full contract.
 
 1. Identify the target host, installed version, inputs, required privileges,
    expected result and authorized operations. Use version-matched documentation;
@@ -61,8 +69,8 @@ Read [host-key sources](references/agent-guide.md#host-key-sources-unreleased)
 for path rules, supported formats and migration. Set
 `local.set(known_hosts="local")` to retain previous nested trust behavior.
 
-Console objects from `shell()`/`sudo()`/`su()`/`enter()` do not provide
-`connect()`; `$.connect()` is unavailable while such a console is current.
+In script mode, console objects from `shell()`/`sudo()`/`su()`/`enter()`
+do not provide `connect()`; `$.connect()` is unavailable while such a console is current.
 Their `pkey()` delegates to the owning Session: SFTP still uses the original
 SSH login account, including after sudo/su. For a key readable only by the
 console's privileged account, read it with an authorized console command,
@@ -77,3 +85,5 @@ checkout use root `API_GUIDE.md` and `VERSIONING.md`. Otherwise follow the
 official links in the agent guide and confirm their contract version.
 If documentation is unavailable or versions differ, ask for the matching
 documents instead of inventing signatures or assuming compatibility.
+
+*Last modified: 2026-10-22 23:24:55*

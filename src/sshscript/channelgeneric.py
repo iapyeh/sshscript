@@ -1492,6 +1492,11 @@ class GenericChannel(object):
         Existing newlines are retained. Use send() to write exact text instead.
         A readiness/silence status does not establish command success.
         """
+        return self._input_text(text, timeout=timeout, append_newline=True)
+
+    def _input_text(self, text, timeout=60, *, append_newline=True):
+        """Shared interactive protocol for lines and raw terminal control bytes."""
+        payload = text + ('\n' if append_newline else '') if isinstance(text, str) else text
         if not isinstance(text, str):
             raise TypeError('input text must be str')
 
@@ -1504,7 +1509,7 @@ class GenericChannel(object):
             )
 
         if not self.hijacked:
-            return self.send(text + '\n', timeout=timeout)
+            return self.send(payload, timeout=timeout)
 
         deadline = time.monotonic() + timeout
         executing_lock = self.executing_lock
@@ -1555,7 +1560,7 @@ class GenericChannel(object):
                 stderr.set_callback(prompt_found, current_prompt)
 
             self.send(
-                text + '\n',
+                payload,
                 timeout=self._remaining(deadline),
             )
 

@@ -445,13 +445,13 @@ class ScriptRunnerModuleTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "missing[.]spy not found"):
                 sshscript.run_file(str(missing))
 
-    def test_cli_preserves_break_exit_status(self):
+    def test_cli_preserves_stop_exit_status(self):
         source_root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory(
-            prefix="sshscript-module-break-"
+            prefix="sshscript-module-stop-"
         ) as folder:
-            script = Path(folder) / "break.spy"
-            script.write_text("$.break(37)\n", encoding="utf-8")
+            script = Path(folder) / "stop.spy"
+            script.write_text("$.stop(37)\n", encoding="utf-8")
             completed = subprocess.run(
                 [sys.executable, str(source_root / "sshscript.py"), str(script)],
                 cwd=source_root,

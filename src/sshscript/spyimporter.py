@@ -29,10 +29,12 @@ if __package__:
     from . import dollarparser
     from . import patching
     from .dollar import Dollar
+    from .scriptcontrol import ScriptStopped, script_active
 else:
     import dollarparser
     import patching
     from dollar import Dollar
+    from scriptcontrol import ScriptStopped, script_active
 
 class SpyLoader(importlib.abc.Loader):
     """Compile and execute .spy modules while preserving their original source locations."""
@@ -68,7 +70,14 @@ class SpyLoader(importlib.abc.Loader):
             g["_sshscript_session_"] = stack[-1]
         module.__dict__.update(g)
         code = dollarparser.compile_spy(self.path, original_code)
-        exec(code, module.__dict__)  # Run the modified code inside the module's namespace
+        active_token = script_active.set(True)
+        try:
+            exec(code, module.__dict__)
+        except ScriptStopped:
+            # A stopped imported module is initialized with its partial namespace.
+            pass
+        finally:
+            script_active.reset(active_token)
 
 
 class SpyFileFinder(importlib.abc.MetaPathFinder):

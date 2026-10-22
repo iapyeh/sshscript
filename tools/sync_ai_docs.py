@@ -28,8 +28,11 @@ def outputs():
     guide = (ROOT / 'skills/sshscript/references/agent-guide.md').read_bytes()
     api = (ROOT / 'API_GUIDE.md').read_bytes()
     versioning = (ROOT / 'VERSIONING.md').read_bytes()
+    console = (ROOT / 'CONSOLE.md').read_bytes()
     # The snapshots travel together; repair their mutual documentation link.
     api = api.replace(b'(VERSIONING.md)', b'(versioning.md)')
+    api = api.replace(b'(CONSOLE.md)', b'(console.md)')
+    versioning = versioning.replace(b'(CONSOLE.md)', b'(console.md)')
     versioning = versioning.replace(b'(API_GUIDE.md#', b'(api-guide.md#')
     stream = BytesIO()
     with zipfile.ZipFile(stream, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
@@ -38,6 +41,7 @@ def outputs():
             ('sshscript/references/agent-guide.md', guide),
             ('sshscript/references/api-guide.md', api),
             ('sshscript/references/versioning.md', versioning),
+            ('sshscript/references/console.md', console),
         ):
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED

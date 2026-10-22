@@ -1,8 +1,10 @@
 # SSHScript for AI agents
 
-**Documentation contract: SSHScript 5.0.0; Python 3.11+.**
+**Documentation contract: SSHScript 6.0.0; Python 3.11+.**
 
-[SSHScript 5.0.0 is published on PyPI](https://pypi.org/project/sshscript/5.0.0/).
+This guide targets the 6.0.0 source contract and verified local wheels.
+[5.0.0 remains the latest published package](https://pypi.org/project/sshscript/5.0.0/);
+source publication and CI do not upload 6.0.0 to PyPI.
 For nested SSH, provision known_hosts on each calling host: `"parent"` is the
 default. Read the 4.0.2-to-5.0 migration before reusing older automation.
 
@@ -16,6 +18,21 @@ workflow. Its folder contains the supporting guide; copy the entire
 `skills/sshscript/` folder when installing it in an agent's skill directory.
 It teaches SSHScript usage, not development of SSHScript itself or a particular
 recipe library. Agents without skill support can read these Markdown files.
+
+## Interactive console (6.0)
+
+For step-by-step use from a human or UI agent's retained terminal, see the
+[console guide](CONSOLE.md) and the agent guide's
+[console instructions](skills/sshscript/references/agent-guide.md#interactive-console-60).
+Run `python3 -B sshscript.py console` from the matching development checkout;
+an installed 6.0.0 wheel provides `sshscript console`. Published 5.0.0 does not
+include this console.
+
+Input remains Python with dollar commands: `$hostname` executes a command,
+`print($.stdout)` reads its result, and variables persist between inputs.
+`exit`/`exit()` leave one layer; `quit`/`quit()` close all layers. Script
+completion uses `$.stop()`; `$.exit()`, `Session.exit()` and wrapper `.exit()`
+are removed. These incompatible 6.0 rules do not describe stable 5.0.0.
 
 ## Share one URL
 
@@ -91,3 +108,5 @@ contract labels and the landing page, then regenerate the website assets.
 Validate links, skill structure, example behavior, source/ZIP equality and
 the rendered website. Source and website publishing are separate operations;
 copying files does not publish either of them.
+
+*Last modified: 2026-10-22 23:24:55*
