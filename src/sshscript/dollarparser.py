@@ -138,7 +138,7 @@ def _token_syntax_error(error, script_path, spyscript):
     return _source_syntax_error(synthetic, script_path, spyscript)
 
 
-def parse(script_path, spyscript):
+def parse(script_path, spyscript, *, preprocess=None):
     """Return a transformed AST whose locations still refer to *spyscript*."""
     _cache_source(script_path, spyscript)
     try:
@@ -156,6 +156,8 @@ def parse(script_path, spyscript):
         raise _source_syntax_error(error, script_path, spyscript) from None
 
     try:
+        if preprocess is not None:
+            tree = preprocess.visit(tree)
         py_tree = DollarChanger().visit(tree)
         return ast.fix_missing_locations(py_tree)
     except Exception as error:

@@ -57,3 +57,6 @@ include API_GUIDE.md VERSIONING.md
 include src/sshscript/unittest/test_version_policy.py
 include src/sshscript/py.typed
 recursive-include src/sshscript *.pyi
+
+include src/sshscript/unittest/test_interactive_console.py
+include CONSOLE.md

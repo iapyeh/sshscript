@@ -221,12 +221,12 @@ class SessionCloseReportingTests(unittest.TestCase):
             ' '.join(caught.exception.__notes__),
         )
 
-    def test_run_script_cleanup_failure_overrides_exit_signal(self):
+    def test_run_script_cleanup_failure_overrides_normal_stop(self):
         session = self.make_failing_session()
         with mock.patch.object(
             session,
             'run',
-            side_effect=sshscript.SSHScriptExit('requested exit', 0),
+            return_value=sshscript.ScriptResult({}, stopped=True),
         ), mock.patch.object(sshscript, 'Session', return_value=session):
             with self.assertRaisesRegex(
                 RuntimeError,
@@ -274,18 +274,18 @@ class SessionCloseReportingTests(unittest.TestCase):
             ' '.join(caught.exception.__notes__),
         )
 
-    def test_run_file_cleanup_failure_overrides_break_status(self):
+    def test_run_file_cleanup_failure_overrides_stop_status(self):
         session = self.make_failing_session()
         with tempfile.TemporaryDirectory(
-            prefix='sshscript-cleanup-break-'
+            prefix='sshscript-cleanup-stop-'
         ) as folder:
-            script = Path(folder) / 'break.spy'
+            script = Path(folder) / 'stop.spy'
             script.write_text('ignored source\n', encoding='utf-8')
 
             with mock.patch.object(
                 session,
                 'run',
-                side_effect=sshscript.SSHScriptBreak('requested break', 37),
+                return_value=sshscript.ScriptResult({}, stopped=True, exitcode=37),
             ), mock.patch.object(sshscript, 'Session', return_value=session):
                 with self.assertRaisesRegex(
                     RuntimeError,

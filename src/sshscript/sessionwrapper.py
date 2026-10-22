@@ -406,8 +406,9 @@ class SessionWrapper(object):
     def __repr__(self):
         return f'SessionWrapper(id:{id(self)}, hijacked:{self.channel.hijacked})'
 
-    def _break(self,code=0,message=''):
-        self.channel.owner.session._break(code,message) 
+    def stop(self, code=0, message=''):
+        """Normally finish the nearest script, including inside a console scope."""
+        return self.channel.owner.session.stop(code, message)
     
     def _enter_thread(self,thread):    
         self.channel.owner.session._enter_thread(thread) 
@@ -426,5 +427,3 @@ class SessionWrapper(object):
     def __exit__(self,*args):
         patching.get_thread_stack().pop(self)
         return False
-    def exit(self):
-        return self.__exit__(None,None,None)

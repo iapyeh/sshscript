@@ -119,3 +119,5 @@ htmlcov/
 !/unittest/test_stdin_contract.py
 !/unittest/test_syntax_error.spy
 !/unittest/test_update_check.py
+
+!/unittest/test_interactive_console.py

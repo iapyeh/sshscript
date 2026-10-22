@@ -51,7 +51,7 @@ if __package__:
     from .dollar import Dollar
     from .sessionwrapper import SessionWrapper,SudoConsole,SuConsole
     from .channelutils import _validate_enter_timeout
-    from .errorutils import get_logger, SSHScriptExit, SSHScriptBreak, SSHScriptException, dumpScript, listRightIndex
+    from .errorutils import get_logger, SSHScriptException, dumpScript, listRightIndex
     ## v2.0.3 changes from sshscriptparserng to dollarparser
     from . import dollarparser
 
@@ -65,8 +65,13 @@ else:
     from dollar import Dollar
     from sessionwrapper import SessionWrapper,SudoConsole,SuConsole
     from channelutils import _validate_enter_timeout
-    from errorutils import get_logger, SSHScriptException, SSHScriptExit, SSHScriptBreak, dumpScript, listRightIndex
+    from errorutils import get_logger, SSHScriptException, dumpScript, listRightIndex
     import dollarparser
+
+if __package__:
+    from .scriptcontrol import ScriptResult, ScriptStopped, script_active, stop_script
+else:
+    from scriptcontrol import ScriptResult, ScriptStopped, script_active, stop_script
 
 ## setup logger
 _COMMAND_TIMEOUT_UNSET = object()
@@ -303,9 +308,6 @@ class ConsoleWrapper:
                     raise
                 self.channel.logger.debug('Unable to finish console cleanup after an exception')
 
-    def exit(self):
-        return self.__exit__(None,None,None)
-    
     def __repr__(self):
         return f'ConsoleWrapper({self.funcname})'
     ##
@@ -362,7 +364,7 @@ class Session(object):
         self._host = None
         self._port = None
         self._username = None
-        self.runLocker = threading.Lock()
+        self.runLocker = threading.RLock()
 
         self.ownerstack = None
         ## homony i/o of this thread
@@ -673,15 +675,10 @@ class Session(object):
         while p.parent is not None:
             p = p.parent
         return p
-    @export2Dollar('break')
-    def _break(self,code=0,message=''):
-        self.logger.debug('Script requested break (exit_code=%s)', code)
-        raise SSHScriptBreak(message,code)
-
     @export2Dollar
-    def exit(self,code=0,message=''):
-        self.logger.debug('Script requested exit (exit_code=%s)', code)
-        raise SSHScriptExit(message,code)
+    def stop(self, code=0, message=''):
+        """Normally finish the nearest script execution, preserving its namespace."""
+        return stop_script(code, message)
 
     def _read_known_hosts(self):
         """Read a host-owned trust file strictly; never execute a remote shell."""
@@ -1122,7 +1119,9 @@ class Session(object):
         """Execute Python or .spy source in this session and return its namespace.
 
         vars supplies initial names (default: the caller's locals); execution uses
-        a copy. This session is active for the duration of the run. showScript=True
+        a copy. Return ScriptResult, including names defined before stop(), with
+        exitcode/stopped/message completion attributes. Nested stop() ends only
+        its nearest run. This session is active for the run. showScript=True
         displays translated source and returns an empty dict without executing it.
         """
         if vars is None:
@@ -1156,7 +1155,7 @@ class Session(object):
                     if is_dollar_script else script
                 )
                 dumpScript(scriptChunk)
-                return {}
+                return ScriptResult({})
 
 
             source_path = filepath or '<str>'
@@ -1185,15 +1184,17 @@ class Session(object):
             else:
                 dollarparser._cache_source(source_path, script)
                 code = compile(script, source_path, 'exec')
+            active_token = script_active.set(True)
             try:
                 exec(code, exec_vars)  # Run the modified code inside the module's namespace
-            except (SSHScriptBreak, SSHScriptExit):
-                # Preserve the control-flow exception until run_file()/the CLI
-                # can translate it into the documented process exit status.
-                raise
+            except ScriptStopped as stopped:
+                return ScriptResult(exec_vars, exitcode=stopped.code,
+                                    stopped=True, message=stopped.message)
             else:
-                return exec_vars
-            
+                return ScriptResult(exec_vars)
+            finally:
+                script_active.reset(active_token)
+
         ## v.1.18
         if not self.runLocker.acquire(timeout=60):
             raise TimeoutError('Timed out waiting for the script execution lock')
@@ -1238,9 +1239,7 @@ class Session(object):
         try:
             ret = runner(script,vars,showScript)
         finally:
-            ## self.runLocker might be already released by caller because of timeout
-            if self.runLocker.locked():
-                self.runLocker.release()
+            self.runLocker.release()
         
         if ret.get('exception'):
             raise ret['exception']

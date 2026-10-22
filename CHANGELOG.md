@@ -1,5 +1,32 @@
 # Changelog
 
+## 6.0.0 — 2026-10-22 (incompatible source contract)
+
+- Add console helpers: help/help(), help(object), exit/exit() to leave one
+  managed layer, and quit/quit() for complete cleanup and termination.
+- Ctrl-C discards input or interrupts execution while preserving console state;
+  Ctrl-D at the Python prompt quits. Inside enter(), both keys are sent as raw
+  program control characters, with parent-shell return detected before unwinding.
+
+- Add `sshscript console`: a Python REPL with dollar syntax, persistent Bash
+  shells, retained variables and command-result snapshots,
+  automatic shell entry after connect, sudo/su layers, explicit text-program
+  entry, streaming command output and managed Ctrl-C recovery.
+- Replace `$.break()` with `$.stop()`. Normal completion is handled by the
+  nearest script/import boundary and preserves cleanup and partial names.
+- Remove `$.exit()`, Session.exit() and wrapper .exit() in both console and
+  script mode. Existing script-ending calls must become stop() or Python
+  sys.exit(). Remove the old SSHScriptBreak/SSHScriptExit control exceptions
+  and partial wrapper exit.
+- Return dictionary-like ScriptResult completion metadata from source runners;
+  preserve integer completion status from run_file().
+- Enable terminal line editing, including both Backspace control codes, when
+  Python readline support is available.
+- See [console usage](CONSOLE.md) and [6.0 migration](VERSIONING.md#60-console-and-script-completion-migration).
+  Source and local artifacts use 6.0.0. PyPI publication and release tags are
+  separate operations.
+
+
 This project records user-visible changes here. Release artifacts and their
 provenance are available from the linked GitHub Release and PyPI pages.
 
@@ -286,3 +313,5 @@ verified artifacts in the
 
 [Unreleased]: https://github.com/iapyeh/sshscript/compare/v3.1.4...release
 [3.1.4]: https://github.com/iapyeh/sshscript/releases/tag/v3.1.4
+
+*Last modified: 2026-10-22 23:24:55*

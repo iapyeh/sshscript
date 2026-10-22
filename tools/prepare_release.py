@@ -3,9 +3,9 @@ import argparse
 import shutil
 from pathlib import Path
 
-MODULES = '__init__ _runtime _version sshscript session sessionsettings commandresult commandjob consolejob sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
+MODULES = 'interactive scriptcontrol __init__ _runtime _version sshscript session sessionsettings commandresult commandjob consolejob sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
 ROOT_FILES = [
-    'AI_GUIDE.md', 'skills/sshscript/SKILL.md',
+    'CONSOLE.md', 'AI_GUIDE.md', 'skills/sshscript/SKILL.md',
     'skills/sshscript/references/agent-guide.md',
     'API_GUIDE.md', 'VERSIONING.md', 'pyproject.toml', 'README.md', 'LICENSE.txt', 'RELEASING.md',
     'MANIFEST.in', 'CHANGELOG.md', 'CONTRIBUTING.md', 'EXCEPTIONS.md',
@@ -40,6 +40,7 @@ TESTS = [
     'test_native_console_authentication.py',
     'test_native_auth_runner.py',
     'test_console_results.py',
+    'test_interactive_console.py',
     'test_console_job.py',
     'test_dollar_command_escapes.py',
     'test_file_transfer.py',
