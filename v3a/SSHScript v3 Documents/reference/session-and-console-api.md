@@ -12,7 +12,7 @@ permalink: /v3a/reference/session-and-console-api/
 > Session settings, managed deadlines, and jobs below are features available in 5.0.0.
 
 This page defines the supported core Session and Console API for the SSHScript
-v3.1 line, including the explicitly marked 4.0 managed-command API. Examples that teach a
+6.0 contract, including base 3.1.5 and explicitly marked 4.0 compatibility APIs. Examples that teach a
 workflow belong in the tutorials and how-to guides; this page focuses on
 signatures, results, errors, and lifetime rules.
 
@@ -81,7 +81,7 @@ for bounded output, cleanup guarantees, and a remote tcpdump/Ctrl-C example.
 
 ```python
 sshscript.run_file(path, vars=None, showScript=False) -> int
-sshscript.run_script(source, varGlobals=None, showScript=False) -> dict
+sshscript.run_script(source, varGlobals=None, showScript=False) -> ScriptResult
 sshscript.spy_imports()  # context manager
 sshscript.get_logger()
 sshscript.set_logger(userlogger=None, logname=None)
@@ -590,24 +590,29 @@ is sent while leaving the context. When `exit=None`, no exit text is sent.
 ## Execute source in a Session
 
 ```python
-session.run(script, vars=None, showScript=False) -> dict
+session.run(script, vars=None, showScript=False) -> ScriptResult
 ```
 
 Runs Python or `.spy` source with this Session active and returns the resulting
-namespace. The supplied namespace is copied. `showScript=True` prints the
-translated source, returns an empty dictionary, and does not execute it.
+namespace in a dictionary-like ScriptResult. The supplied namespace is copied.
+Its `exitcode`, `stopped` and `message` attributes describe normal completion.
+`showScript=True` prints translated source, returns an empty ScriptResult and
+does not execute it.
 Execution errors propagate.
 
 At package level:
 
 ```python
-sshscript.run_script(source, varGlobals=None, showScript=False) -> dict
+sshscript.run_script(source, varGlobals=None, showScript=False) -> ScriptResult
 sshscript.run_file(path, vars=None, showScript=False) -> int
 ```
 
 Both create and close a fresh local Session. `run_file()` accepts exactly one
 regular file path and returns zero on normal completion or the value passed to
-`$.break(code)`. `$.exit(code)` and execution failures propagate.
+`$.stop(code, message="")`. Stop completes the nearest script/import boundary
+normally and preserves initialized names and Python cleanup. `$.break()`,
+`$.exit()`, Session.exit() and wrapper .exit() are removed in 6.0; execution
+failures and Python SystemExit remain separate. See [6.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
 
 ## Session waiting and cleanup
 
@@ -769,9 +774,9 @@ code:
 Do not rely on dollar-named aliases exposed by console wrappers; their
 compatibility behavior is not the Session contract above.
 
-`Session.exit(code=0, message="")` is `.spy` runner control flow: it raises a
-control-flow exception for the script runner and is not a general application
-shutdown method. `Session.session` is a self-reference and `Session.dollar`
+`Session.stop(code=0, message="")` normally completes the nearest active script
+runner in 6.0. It does not close the Session or the whole Python process, and
+requires a running script. `Session.exit()` has been removed. `Session.session` is a self-reference and `Session.dollar`
 exposes the latest internal execution object; neither is needed for ordinary
 Module API code.
 
@@ -802,4 +807,6 @@ Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
 Paramiko failures retain their original exception and traceback. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-23 01:05:21*
+
+Last Updated: 2026-10-23 01:05:21

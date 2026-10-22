@@ -12,8 +12,10 @@ nav_order: 2
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
-The current release is **5.0.0**. The sections below distinguish the current
-5.0 trust-source contract, the 4.0 execution contract and historical 3.1 releases.
+The latest published package is **5.0.0**; the current source contract is
+**6.0.0**. See [6.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/) for removed exit/break APIs and the new console.
+The sections below retain the 5.0, 4.0 and historical 3.1 release contracts;
+old break/exit descriptions in those sections are historical.
 
 SSHScript 3.1.4 was published on 2026-09-24 as the first Production/Stable
 release in the supported v3.1 line. Install it from
@@ -210,4 +212,6 @@ These changes are absent from the published 3.1.5 package. See the
 [authenticated console API]({{ site.baseurl }}/v3a/reference/session-and-console-api/#authenticated-susudo-entry-unreleased)
 and [migration notes]({{ site.baseurl }}/v3a/migration-and-releases/migrating-to-v3-1/).
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-23 01:03:33*
+
+Last Updated: 2026-10-23 01:03:33

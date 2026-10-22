@@ -248,13 +248,15 @@ namespace = sshscript.run_script(
 
 `run_file()` accepts one `str` or path-like object naming an existing regular
 file. It does not accept a directory, glob, list, or group of files. It returns
-zero on normal completion or the status supplied to `$.break(status)`.
+zero on normal completion or the status supplied to `$.stop(status)`.
 
-`run_script()` executes source held in memory and returns its namespace. Both
+`run_script()` executes source held in memory and returns a dictionary-like
+ScriptResult containing the namespace and `exitcode`, `stopped`, `message`
+completion metadata. These completion rules describe SSHScript 6.0. Both
 create and close a fresh local Session. If an ordinary execution exception is
 already active, cleanup failure is attached to it; after success, cleanup
 failure raises `RuntimeError`. A cleanup failure overrides a requested
-`$.exit()` or `$.break()` control status so resource failure cannot be
+`$.stop()` completion status so resource failure cannot be
 reported as the requested status.
 
 ## Define process exit behavior
@@ -264,11 +266,15 @@ the entry-point boundary:
 
 ```python
 if $.exitcode != 0:
-    $.exit(2, "service verification failed")
+    $.stop(2, "service verification failed")
 ```
 
-`$.exit(code)` becomes the CLI process status. `$.break(code)` becomes the
-return value of `run_file()` and the CLI status. An unhandled ordinary exception
+`$.stop(code, message="")` normally completes the nearest script and supplies
+the return value of `run_file()` and the CLI status. It does not raise a
+failure exception; inspect ScriptResult when calling `run_script()` or
+`Session.run()`. Python `sys.exit()` retains SystemExit semantics.
+The old exit/break methods and control exceptions are removed in 6.0; see
+[6.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/). An unhandled ordinary exception
 or syntax error normally produces CLI status 1.
 
 A command returning nonzero does not automatically terminate the script.
@@ -291,4 +297,6 @@ for the option reference and
 [How `.spy` Transformation Works](../../concepts/how-spy-transformation-works/)
 for importer and transformation details.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-23 01:03:33*
+
+Last Updated: 2026-10-23 01:03:33

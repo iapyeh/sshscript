@@ -220,7 +220,7 @@ block, cleanup failure raises. If the block is already propagating an
 exception, SSHScript keeps that exception primary and adds a cleanup note.
 `run_file()` and `run_script()` do the same for ordinary execution
 exceptions on the fresh local root they create. A cleanup failure deliberately
-overrides a requested `$.exit()` or `$.break()` control status rather than
+overrides a requested `$.stop()` completion status rather than
 reporting that requested status with incomplete cleanup.
 
 Do not rely on garbage collection to report cleanup failure. See the
@@ -229,4 +229,6 @@ for the normative contract and
 [Timeouts, Retries, and Cleanup](../../security-and-operations/timeouts-retries-and-cleanup/)
 for production patterns.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-23 01:03:33*
+
+Last Updated: 2026-10-23 01:03:33

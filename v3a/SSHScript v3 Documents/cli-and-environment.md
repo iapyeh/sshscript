@@ -12,7 +12,7 @@ nav_order: 3
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
-SSHScript v3.1 can run a regular Python file or a `.spy` file from the
+SSHScript 6.0 can run a regular Python file or a `.spy` file from the
 command line. The CLI deliberately accepts one script file at a time.
 
 ## Run one script
@@ -60,8 +60,14 @@ Python can print the filename, line, source text, and caret. Use `--traceback`
 only when its diagnostic value outweighs the risk; keep secrets out of source
 and review every diagnostic before sharing it.
 
-Normal completion returns status 0. `$.break(code)` becomes the CLI process
-status, while `$.exit(code)` exits with the requested status.
+In 6.0, normal completion returns status 0; `$.stop(code, message="")`
+completes the script normally with the requested CLI status. `$.break()` and
+`$.exit()` are removed; Python `sys.exit()` retains SystemExit behavior.
+See [6.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
+The 6.0 `sshscript console` command starts a retained Python/dollar REPL.
+`exit`/`exit()` leave one layer; `quit`/`quit()` close all layers. See the
+[interactive console guide]({{ site.baseurl }}/v3a/reference/interactive-console/).
 
 ## Validate syntax without execution
 
@@ -91,12 +97,13 @@ status = sshscript.run_file("automation.spy")
 
 The function accepts a `str` or `os.PathLike` path to one existing regular
 file and returns 0 after normal completion or the status supplied to
-`$.break(status)`. It creates and closes a local Session, sets `__name__` to
+`$.stop(status)`. It creates and closes a local Session, sets `__name__` to
 `"__main__"`, supplies `__file__`, and temporarily adds the script directory
 to `sys.path`.
 
 Use `sshscript.run_script(source)` when the program already has source text
-in memory.
+in memory. It returns a dictionary-like ScriptResult with `exitcode`,
+`stopped` and `message` attributes.
 
 ## Import `.spy` modules explicitly
 
@@ -151,4 +158,6 @@ only by the CLI.
 See [Contributing and Testing](../development-and-testing/) for the
 credential-free release gate and isolated integration-test guidance.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-23 01:03:33*
+
+Last Updated: 2026-10-23 01:03:33

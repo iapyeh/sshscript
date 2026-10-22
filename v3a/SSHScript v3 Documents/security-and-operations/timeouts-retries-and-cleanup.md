@@ -277,7 +277,7 @@ they do not erase an earlier cleanup failure.
 `run_file()` and `run_script()` apply the same preservation rule to ordinary
 execution exceptions. Cleanup failure raises after successful execution and is
 attached as a note when ordinary script execution already failed. A cleanup
-failure overrides `$.exit()` or `$.break()` control status so incomplete
+failure overrides `$.stop()` completion status so incomplete
 cleanup cannot be reported as the requested status.
 
 ## Verification cases
@@ -333,4 +333,6 @@ is accepted while the job is active. PTY output may merge streams. Native
 su/sudo validation remains environment-specific; protocol fixtures are not proof
 of all PAM/sudoers compatibility. See [console foreground jobs]({{ site.baseurl }}/v3a/recommended-api/#unreleased-foreground-jobs-inside-shell-sudo-and-su).
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-23 01:03:33*
+
+Last Updated: 2026-10-23 01:03:33

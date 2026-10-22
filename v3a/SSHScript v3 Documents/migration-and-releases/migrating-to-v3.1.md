@@ -8,9 +8,9 @@ permalink: /v3a/migration-and-releases/migrating-to-v3-1/
 
 # Migrating to v3.1
 
-For the 3.1.5-to-5.0.0 upgrade, use
-[Version policy and 5.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
-This page retains the v3.1 migration baseline.
+This page retains the historical v3.1 migration baseline, including its old
+script-control APIs. It does not describe the 6.0 exit/stop contract.
+For upgrades to current source, use [6.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
 > Session settings and managed jobs/deadlines are features available in 5.0.0.
@@ -366,4 +366,6 @@ that API does not provide the authenticated su/sudo handshake.
 
 See [the API contract and platform notes]({{ site.baseurl }}/v3a/reference/session-and-console-api/#authenticated-susudo-entry-unreleased).
 
-Last Updated: 2026-10-10 19:44:40
+*Last modified: 2026-10-23 01:03:33*
+
+Last Updated: 2026-10-23 01:03:33
