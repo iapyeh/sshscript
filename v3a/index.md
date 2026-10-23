@@ -5,13 +5,6 @@ nav_exclude: true
 
 # SSHScript 6.1.0
 
-<!-- release-610-staging -->
-> **6.1.0 release status: publication in progress.** This site documents the approved
-> 6.1.0 contract. Confirm that the 6.1.0 distribution files are available on
-> [PyPI](https://pypi.org/project/sshscript/6.1.0/) before using the installation
-> commands. Release validation is tracked in [PR #27](https://github.com/iapyeh/sshscript/pull/27).
-<!-- /release-610-staging -->
-
 SSHScript aims to help engineers and AI agents execute, understand, and hand
 off automation reliably. Use the regular Python Session API first; optional
 Dollar syntax shares the same execution semantics. Retain the command's host,
@@ -97,6 +90,6 @@ SSHScript is released under the MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-*Last modified: 2026-10-23 19:53:33*
+*Last modified: 2026-10-23 23:31:42*
 
-Last Updated: 2026-10-23 19:53:33
+Last Updated: 2026-10-23 23:31:42

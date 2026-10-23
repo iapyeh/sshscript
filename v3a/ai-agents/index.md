@@ -9,13 +9,6 @@ permalink: /v3a/ai-agents/
 
 # SSHScript for AI Agents
 
-<!-- release-610-staging -->
-> **6.1.0 release status: publication in progress.** This site documents the approved
-> 6.1.0 contract. Confirm that the 6.1.0 distribution files are available on
-> [PyPI](https://pypi.org/project/sshscript/6.1.0/) before using the installation
-> commands. Release validation is tracked in [PR #27](https://github.com/iapyeh/sshscript/pull/27).
-<!-- /release-610-staging -->
-
 Give your agent this page to prepare for future tasks or to complete a current
 task. SSHScript lets it write Python automation for local and SSH commands,
 retain command output and status, and manage
@@ -149,6 +142,6 @@ collection logic, schemas and vault updates belong to their recipe project.
 Follow the [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 for feedback; public submission requires the user's authorization.
 
-*Last modified: 2026-10-23 19:53:33*
+*Last modified: 2026-10-23 23:31:42*
 
-Last Updated: 2026-10-23 19:53:33
+Last Updated: 2026-10-23 23:31:42
