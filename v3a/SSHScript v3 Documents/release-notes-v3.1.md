@@ -12,10 +12,34 @@ nav_order: 2
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
-The latest published package is **5.0.0**; the current source contract is
-**6.0.0**. See [6.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/) for removed exit/break APIs and the new console.
-The sections below retain the 5.0, 4.0 and historical 3.1 release contracts;
-old break/exit descriptions in those sections are historical.
+The current release contract is **6.1.0**. See the
+[public Console API]({{ site.baseurl }}/v3a/reference/embedded-console/) and
+[major differences]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+The older release sections below are historical.
+
+## 6.1.0 — 2026-10-23
+
+- Add public `Console(existing_session)` for terminal and host/AI-agent interaction
+  over an existing Session, including target Sessions reached through jumps,
+  without reconnecting or changing authentication/host-key sources.
+- Retain Python variables, shell cwd/environment and interactive program state.
+  Expose structured submit/poll/input/interrupt/EOF and completion results.
+- Add account credential/policy and switch-result hooks, separate connection login
+  identity from effective shell identity, and expose the environment stack.
+- Borrow Sessions by default. Unwind console-owned layers and confirm Session
+  reuse; initialization/restoration/cleanup failures report unknown explicitly.
+- Fix lost prompt readiness after program Ctrl-C. Keep waiting_input after a
+  protocol match, running for ignored/unfinished interrupts, and real exit status
+  for exiting programs; support delayed prompt recovery through poll.
+- Use one Console implementation for CLI and embedding. Remove old internal
+  InteractiveConsole/open()/execute() entry points and :help/:quit aliases; use
+  Console(session), submit(), help/quit and structured status instead.
+- Add complete terminal/agent examples and the matching AI skill. OpsFeast reports
+  local/simulated and browser UI revalidation passed. This is distinct from real
+  SSH/jump/PAM/su/sudo validation; release CI records its own disposable native tests.
+- Development-stage releases do not guarantee backward compatibility unless
+  explicitly requested. Minor releases may include the differences listed above.
+
 
 SSHScript 3.1.4 was published on 2026-09-24 as the first Production/Stable
 release in the supported v3.1 line. Install it from
@@ -212,6 +236,6 @@ These changes are absent from the published 3.1.5 package. See the
 [authenticated console API]({{ site.baseurl }}/v3a/reference/session-and-console-api/#authenticated-susudo-entry-unreleased)
 and [migration notes]({{ site.baseurl }}/v3a/migration-and-releases/migrating-to-v3-1/).
 
-*Last modified: 2026-10-23 01:03:33*
+*Last modified: 2026-10-23 18:41:27*
 
-Last Updated: 2026-10-23 01:03:33
+Last Updated: 2026-10-23 18:41:27

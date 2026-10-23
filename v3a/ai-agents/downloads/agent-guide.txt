@@ -1,6 +1,11 @@
 # SSHScript Agent Guide
 
-**Documentation contract: SSHScript 6.0.0; Python 3.11+.**
+**Documentation contract: SSHScript 6.1.0; Python 3.11+.**
+
+**Development policy:** SSHScript is still in development and does not maintain
+backward compatibility unless the user explicitly requests it. Follow the current
+design and give brief notes on major differences; do not add compatibility layers
+or migration paths solely for older versions by default.
 
 SSHScript runs commands locally and over SSH with a Python `Session` API.
 Optional `.spy` dollar syntax exposes the same execution model. Use it when
@@ -45,11 +50,11 @@ For a new environment, when installation is authorized:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install /path/to/sshscript-6.0.0-py3-none-any.whl
+python3 -m pip install "sshscript==6.1.0"
 ```
 
-Use a verified 6.0.0 wheel until publication; after publication, pin
-`sshscript==6.0.0`. A source push does not publish a package.
+Pin `sshscript==6.1.0` for this contract and verify the imported version.
+A source checkout or a same-version development wheel requires its exact commit/hash.
 
 Pin transitive dependencies in the application's lock file for repeatable
 deployment. Python 3.11+ is required. Consult the project's test reports for
@@ -112,14 +117,33 @@ remote argv is quoted for a POSIX login shell. Shell operators inside argv
 are literal data. Console commands accept strings; quote dynamic arguments
 with `shlex.join()`. Do not interpolate untrusted values into shell syntax.
 
-## Interactive console (6.0)
+## Existing Session integration (unified Console)
 
-This section requires SSHScript 6.0.0. Published 5.0.0 lacks this console and
-retains older script-control APIs. Record the source commit or verified wheel
-identity before using the 6.0 contract.
+The new `from sshscript import Console` surface borrows an existing connected
+Session and never reconnects. Use its context manager and structured submit/poll
+updates; require `session_reuse == "confirmed"` after close before reuse.
+`start_command` is asynchronous shell execution; submit executes Python/dollar
+cells synchronously. Generic jobs cannot identify stdin readiness. Use explicit
+enter() protocols for text programs; silence is not completion. Program Ctrl-C
+returns waiting_input only after its configured prompt matches; otherwise it stays
+running and poll may observe a later prompt. Readiness persists across polls.
+KeyboardInterrupt records the attempt and does not establish program failure. The host Python
+process needs no terminal, but the shell uses PTY by default for interruption and
+authentication. Missing non-terminal credentials fail; return SwitchCredentials
+from the host resolver and never embed password literals in input source.
+Hooks cover managed switches, not arbitrary trusted Python/lexical scripts.
+Read the checkout EMBEDDED_CONSOLE.md or bundled references/embedded-console.md
+for ownership, failure and secret-handling limits. CLI and host calls share this
+contract; older CLI entry points/aliases are removed. Use a matching verified
+6.1.0 implementation; earlier 6.0 console internals are unsupported.
+
+## Interactive console (6.1)
+
+This section describes SSHScript 6.1.0. Record the installed version, source
+commit or verified wheel identity before using the Console integration contract.
 
 Start `python3 -B sshscript.py console` from the development checkout, or
-`sshscript console` from an installed 6.0.0 wheel. Keep the same terminal/process
+`sshscript console` from an installed 6.1.0 wheel. Keep the same terminal/process
 alive between inputs; restarting it loses variables, connections and shells.
 A UI agent needs a tool that can send more input to that retained process.
 No temporary script file or Python/shell mode switch is required.
@@ -429,4 +453,4 @@ for reporting issues. Recipe-specific schemas and vault updates belong to that
 recipe's own documentation. Reading this guide does not authorize executing
 examples or submitting a public report.
 
-*Last modified: 2026-10-22 23:24:55*
+*Last modified: 2026-10-23 18:39:31*

@@ -1,9 +1,9 @@
 ---
-title: "SSHScript 5.0.0"
+title: "SSHScript 6.1.0"
 nav_exclude: true
 ---
 
-# SSHScript 5.0.0
+# SSHScript 6.1.0
 
 SSHScript aims to help engineers and AI agents execute, understand, and hand
 off automation reliably. Use the regular Python Session API first; optional
@@ -12,14 +12,17 @@ output, status and installed version, distinguish failure from timeout, and
 reconcile unknown termination. A zero exit status does not prove deployment
 success; closing an SSH channel does not prove its remote process stopped.
 
-The published example baseline is **3.1.5**. The current production
-contract is **5.0.0**, with host-key source changes from 4.0.2 and execution changes from 3.1.5; see
-[version policy and migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
-The new **6.0.0 source contract** adds an
-[interactive Python/dollar console]({{ site.baseurl }}/v3a/reference/interactive-console/)
-and incompatible script-control API changes. The published package remains
-5.0.0 until a separate package publication. The canonical API and agent skill
-now document 6.0; check installed versions before copying those examples.
+**SSHScript is under active development. Backward compatibility is not maintained
+unless explicitly requested. APIs, CLI behavior, configuration and data formats
+may change; release notes briefly identify major differences.**
+
+The current contract is **6.1.0**. The public
+[Console integration API]({{ site.baseurl }}/v3a/reference/embedded-console/)
+borrows an existing Session for terminal, host application or AI agent interaction.
+It retains Python/shell/program state, reports structured readiness and results,
+and makes credential hooks, layer ownership and Session reuse explicit. The CLI
+uses the same implementation. Earlier 6.0 internal entry points and :help/:quit
+aliases are removed; use Console(session), submit(), help/quit and structured updates.
 
 Start with the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/)
 for version-labelled examples and lifetime rules.
@@ -32,7 +35,7 @@ cleanly through nested context managers. Python remains available for data
 processing, branching, exceptions, testing, and integration with existing
 applications.
 
-SSHScript 5.0.0 emphasizes predictable and secure automation:
+SSHScript 6.1.0 emphasizes predictable and secure automation:
 
 - one-shot commands accept nonempty strings or argv lists/tuples;
 - argument sequences preserve data boundaries without caller-side quoting;
@@ -49,7 +52,7 @@ It provides a copyable task prompt, reading order, plain-text guide and
 portable skill download.
 
 1. Read [Installation and Verification](getting-started/installation-and-verification/)
-   and confirm that both the CLI and import report `5.0.0`.
+   and confirm that both the CLI and import report `6.1.0`.
 2. Complete the credential-free [5-Minute Quickstart](getting-started/quickstart/).
 3. Continue with the
    [Module API Tutorial](SSHScript%20v3%20Documents/tutorial/).
@@ -68,12 +71,11 @@ documentation scaffold, without executable recipes or an implemented system.
 
 ## Project status
 
-The current 5.0.0 release is classified Production/Stable for Python
-3.11–3.14 on Linux and macOS. It introduces an incompatible execution contract;
-review the migration guide before upgrading 3.1.5 automation. Review the candidate's CI
-reports and validate site-specific PAM, `sudoers`, network, and host-key policy
-in an isolated environment before rollout. SSHScript is released under the
-MIT License.
+SSHScript remains a development-stage project. Python 3.11–3.14 on Linux and
+macOS are covered by the CI matrix. Local/simulated and browser UI validation by
+OpsFeast is separate from native SSH/PAM/su/sudo evidence. Consult the release CI
+and validate site-specific authentication and trust policies before rollout.
+SSHScript is released under the MIT License.
 
 ## Trust and support
 
@@ -88,6 +90,6 @@ MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-*Last modified: 2026-10-22 23:26:49*
+*Last modified: 2026-10-23 18:41:27*
 
-Last Updated: 2026-10-22 23:26:49
+Last Updated: 2026-10-23 18:41:27

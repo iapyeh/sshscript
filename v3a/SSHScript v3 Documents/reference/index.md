@@ -10,7 +10,7 @@ permalink: /v3a/reference/
 # Reference
 
 Reference pages define signatures, options, return values, exceptions, and
-compatibility behavior.
+lifecycle and ownership behavior.
 
 | Reference | Status |
 | --- | --- |
@@ -18,8 +18,9 @@ compatibility behavior.
 | [Dollar Syntax Reference]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Basic/dollar/) | Available |
 | [CLI and Environment Variables]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/cli-and-environment/) | Available |
 | [Exceptions and Return Values](exceptions-and-return-values/) | Available |
-| [Interactive console (6.0)](interactive-console/) | 6.0 source contract |
+| [Unified Console API](embedded-console/) | Existing Session, host/agent updates, credentials and cleanup |
+| [Interactive console (6.1)](interactive-console/) | Terminal CLI and retained state |
 
-*Last modified: 2026-10-22 23:26:49*
+*Last modified: 2026-10-23 18:41:27*
 
-Last Updated: 2026-10-22 23:26:49
+Last Updated: 2026-10-23 18:41:27
