@@ -23,7 +23,7 @@ authors = [
   {name = "Yeh, Hsin-Yuan", email = "iapyeh@gmail.com"},
 ]
 classifiers = [
-  "Development Status :: 5 - Production/Stable",
+  "Development Status :: 4 - Beta",
   "Operating System :: MacOS",
   "Operating System :: POSIX :: Linux",
   "Programming Language :: Python :: 3",

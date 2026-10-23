@@ -43,12 +43,14 @@ else:
 _require_python()
 
 if __package__:
+    from .interactive import Console, ConsoleUpdate, Environment, SwitchRequest, SwitchCredentials, SwitchOutcome, CredentialsRequiredError, ConsoleInitializationError, ConsoleCleanupError
     from ._version import __version__
     from . import sshscript
     from . import session
     from . import errorutils
     from .spyimporter import spy_imports
 else:
+    from interactive import Console, ConsoleUpdate, Environment, SwitchRequest, SwitchCredentials, SwitchOutcome, CredentialsRequiredError, ConsoleInitializationError, ConsoleCleanupError
     from _version import __version__
     import sshscript
     import session
@@ -85,6 +87,7 @@ SSHScriptException = errorutils.SSHScriptException
 #        return _global['____sshscript____'][0]
 
 __all__ = [
+    'Console', 'ConsoleUpdate', 'Environment', 'SwitchRequest', 'SwitchCredentials', 'SwitchOutcome', 'CredentialsRequiredError', 'ConsoleInitializationError', 'ConsoleCleanupError',
     'run_file',
     'check_file',
     'run_script',

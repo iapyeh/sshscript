@@ -1,10 +1,9 @@
 # SSHScript for AI agents
 
-**Documentation contract: SSHScript 6.0.0; Python 3.11+.**
+**Documentation contract: SSHScript 6.1.0; Python 3.11+.**
 
-This guide targets the 6.0.0 source contract and verified local wheels.
-[5.0.0 remains the latest published package](https://pypi.org/project/sshscript/5.0.0/);
-source publication and CI do not upload 6.0.0 to PyPI.
+This guide targets SSHScript 6.1.0 and its public Console integration API.
+Install `sshscript==6.1.0` and verify the imported package version.
 For nested SSH, provision known_hosts on each calling host: `"parent"` is the
 default. Read the 4.0.2-to-5.0 migration before reusing older automation.
 
@@ -19,14 +18,22 @@ workflow. Its folder contains the supporting guide; copy the entire
 It teaches SSHScript usage, not development of SSHScript itself or a particular
 recipe library. Agents without skill support can read these Markdown files.
 
-## Interactive console (6.0)
+## Borrowed Session integration (unified Console API)
+
+Use `from sshscript import Console` and `with Console(existing_session)` for an
+existing authorized connection. Read [the full host contract](EMBEDDED_CONSOLE.md)
+before driving it. Require structured completion/exit status and confirmed reuse;
+keep host account policy and credentials in the resolver. A prompt/silence is not
+a success signal. See the bundled skill for the matching agent guidance.
+
+## Interactive console (6.1)
 
 For step-by-step use from a human or UI agent's retained terminal, see the
 [console guide](CONSOLE.md) and the agent guide's
-[console instructions](skills/sshscript/references/agent-guide.md#interactive-console-60).
+[console instructions](skills/sshscript/references/agent-guide.md#interactive-console-61).
 Run `python3 -B sshscript.py console` from the matching development checkout;
-an installed 6.0.0 wheel provides `sshscript console`. Published 5.0.0 does not
-include this console.
+an installed 6.1.0 wheel provides `sshscript console`. Use public
+Console(session) for host integration; older 6.0 console internals are removed.
 
 Input remains Python with dollar commands: `$hostname` executes a command,
 `print($.stdout)` reads its result, and variables persist between inputs.
@@ -109,4 +116,4 @@ Validate links, skill structure, example behavior, source/ZIP equality and
 the rendered website. Source and website publishing are separate operations;
 copying files does not publish either of them.
 
-*Last modified: 2026-10-22 23:24:55*
+*Last modified: 2026-10-23 18:39:31*

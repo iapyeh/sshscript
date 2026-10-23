@@ -8,7 +8,7 @@ import tempfile
 VALID = '''from typing import assert_type, Literal
 from pathlib import Path
 from paramiko import MissingHostKeyPolicy, AutoAddPolicy
-from sshscript import Session, CommandResult, JobResult, CommandJob
+from sshscript import Session, CommandResult, JobResult, CommandJob, Console, ConsoleUpdate, SwitchCredentials
 s = Session()
 s.set(check=True, log_level="DEBUG")
 s.verbose = False
@@ -41,6 +41,11 @@ with s.shell() as console:
     if isinstance(shell_result, CommandResult):
         assert_type(shell_result, CommandResult[int])
         assert_type(shell_result.stdout, str)
+with Console(s, credential_resolver=lambda request: SwitchCredentials(None)) as embedded:
+    assert_type(embedded.submit('x=42'), ConsoleUpdate)
+    assert_type(embedded.poll().stdout, str)
+    assert_type(embedded.connection, Session)
+    assert_type(embedded.environments[0].effective_user, str)
 with s.connect("host", known_hosts="local") as remote:
     assert_type(remote, Session)
 '''

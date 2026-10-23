@@ -1,15 +1,23 @@
-# Interactive console (6.0)
+# Interactive console (6.1)
 
-The SSHScript 6.0 console runs from the flat development checkout:
+The SSHScript 6.1 console runs from the flat development checkout:
 
 ```sh
 python3 -B sshscript.py console
 ```
 
-Use Python 3.11 or newer with the project's dependencies. An installed 6.0.0
-wheel provides `sshscript console`. Published 5.0.0 lacks this feature; this
-source version update does not upload a package. No installation into the
+Use Python 3.11 or newer with the project's dependencies. Install
+`sshscript==6.1.0` for `sshscript console`. No installation into the flat
 development checkout is required.
+
+## Embed an existing Session (new API)
+
+Use the public `sshscript.Console` API for borrowed Sessions, host-driven updates,
+credential hooks and explicit cleanup/reuse reporting. Read
+[the embedded console contract](EMBEDDED_CONSOLE.md) and its executable examples.
+The CLI uses the same Console core and ownership contract. Earlier 6.0 CLI
+compatibility is not maintained; see the linked contract for removed entry points
+and aliases. This guide describes the 6.1.0 release contract.
 
 ## A Python console with dollar syntax
 
@@ -18,7 +26,7 @@ namespace. No Python/shell language-mode switching is required:
 
 ```text
 local [user]> hostname
-NameError: name 'hostname' is not defined
+NameError: operation failed; inspect error for details.
 local [user]> hostname = "a Python variable"
 local [user]> hostname
 'a Python variable'
@@ -165,7 +173,8 @@ Readiness or silence is not interpreted as a successful process exit.
 - In an enter() program, Ctrl-C/Ctrl-D are forwarded as raw terminal control
   characters, without an added newline. Only a detected return to the parent
   shell closes that program layer; the Python console stays available.
-- `:help` and `:quit` remain aliases; `:status` shows the environment stack.
+- Use `help`/`help()` and `quit`/`quit()`. The former `:help` and `:quit` aliases
+  are removed; `:status` shows the environment stack.
   The Python helper names can be shadowed by assignment, just like Python names;
   the colon aliases and `control.quit()` remain available.
 - Python `sys.exit()` retains SystemExit semantics. The interactive boundary
@@ -205,4 +214,4 @@ Input now follows Python/dollar syntax throughout; prefix shell commands with `$
 Type `help` for a reminder. Operation failures display their type without
 reprinting credential-bearing input; inspect `error` at the prompt for details.
 
-*Last modified: 2026-10-22 23:24:55*
+*Last modified: 2026-10-23 18:39:31*

@@ -1,5 +1,28 @@
 # Changelog
 
+## 6.1.0 — 2026-10-23
+
+- Add public `Console(existing_session)` for terminal and host/AI-agent interaction
+  over an existing Session, including target Sessions reached through jumps,
+  without reconnecting or changing authentication/host-key sources.
+- Retain Python variables, shell cwd/environment and interactive program state.
+  Expose structured submit/poll/input/interrupt/EOF and completion results.
+- Add account credential/policy and switch-result hooks, separate connection login
+  identity from effective shell identity, and expose the environment stack.
+- Borrow Sessions by default. Unwind console-owned layers and confirm Session
+  reuse; initialization/restoration/cleanup failures report unknown explicitly.
+- Fix lost prompt readiness after program Ctrl-C. Keep waiting_input after a
+  protocol match, running for ignored/unfinished interrupts, and real exit status
+  for exiting programs; support delayed prompt recovery through poll.
+- Use one Console implementation for CLI and embedding. Remove old internal
+  InteractiveConsole/open()/execute() entry points and :help/:quit aliases; use
+  Console(session), submit(), help/quit and structured status instead.
+- Add complete terminal/agent examples and the matching AI skill. OpsFeast reports
+  local/simulated and browser UI revalidation passed. This is distinct from real
+  SSH/jump/PAM/su/sudo validation; release CI records its own disposable native tests.
+- Development-stage releases do not guarantee backward compatibility unless
+  explicitly requested. Minor releases may include the differences listed above.
+
 ## 6.0.0 — 2026-10-22 (incompatible source contract)
 
 - Add console helpers: help/help(), help(object), exit/exit() to leave one
@@ -314,4 +337,4 @@ verified artifacts in the
 [Unreleased]: https://github.com/iapyeh/sshscript/compare/v3.1.4...release
 [3.1.4]: https://github.com/iapyeh/sshscript/releases/tag/v3.1.4
 
-*Last modified: 2026-10-22 23:24:55*
+*Last modified: 2026-10-23 18:39:31*

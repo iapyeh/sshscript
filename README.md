@@ -1,6 +1,11 @@
 # SSHScript
 
-SSHScript 6.0.0: [interactive console and script completion](CONSOLE.md).
+**Development status:** SSHScript is still under active development. Backward
+compatibility is not maintained at this stage. APIs, CLI behavior, configuration
+and data formats may change; we provide only brief notes on major differences.
+Compatibility work is done only when explicitly requested by the maintainer.
+
+SSHScript 6.1.0: [borrow an existing Session for interactive operation](EMBEDDED_CONSOLE.md).
 Run `python3 -B sshscript.py console` from the development checkout.
 
 
@@ -23,10 +28,9 @@ output and status, distinguish failure from timeout, and make cleanup and
 unknown termination explicit. A successful command exit is evidence about
 that command; verify the deployment or other application outcome separately.
 
-**Source contract: 6.0.0.** The release branch and local artifacts target this
-version; this source update does not publish a package or create a release tag.
-**Latest published release:** [5.0.0](https://github.com/iapyeh/sshscript/releases/tag/v5.0.0)
-(Production/Stable) · **Python:** 3.11 or newer · **Tested:** Python
+**Release contract: 6.1.0.** Install the matching distribution and verify its version.
+[Release notes](https://github.com/iapyeh/sshscript/releases/tag/v6.1.0)
+(development-stage project) · **Python:** 3.11 or newer · **Tested:** Python
 3.11–3.14 on Linux and macOS
 
 [Documentation](https://iapyeh.github.io/sshscript/v3a/) ·
@@ -35,13 +39,14 @@ version; this source update does not publish a package or create a release tag.
 [Security](https://github.com/iapyeh/sshscript/security/policy) ·
 [Support](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 
-**Version 6.0.0** adds a Python-first interactive console and normal script
-completion through `$.stop()`. It removes `$.exit()`, `$.break()` and their old
-control exceptions; review the [6.0 migration](VERSIONING.md#60-console-and-script-completion-migration).
-It retains the 5.0 calling-host default for host-key sources. Provision its known_hosts file or
-select `known_hosts="local"` when migrating existing nested connections.
-Upgrade 3.1.5 automation using the migration guide and application regressions.
-See [version policy and migration](VERSIONING.md) before upgrading automation.
+**Version 6.1.0** adds public `Console(existing_session)` integration for terminals,
+host applications and AI agents. Python variables, shell state and text programs
+persist; structured updates distinguish readiness, execution, failure and cleanup.
+Borrowed Sessions remain owned by the host. Credential/policy hooks and verified
+Session reuse keep integration explicit. Read the [integration contract](EMBEDDED_CONSOLE.md).
+Earlier 6.0 console internals, open()/execute() entry points and :help/:quit aliases
+are removed; use Console(session), submit(), help/quit and structured updates.
+The 5.0 host-key source and SSH/SFTP login identity contracts remain unchanged.
 
 ## AI agent ready
 
@@ -130,7 +135,7 @@ pin SSHScript and all transitive dependencies in your application's lock file.
 To install this release explicitly:
 
 ```sh
-python3 -m pip install /path/to/sshscript-6.0.0-py3-none-any.whl
+python3 -m pip install "sshscript==6.1.0"
 ```
 
 Use `python3 -m pip install --upgrade sshscript` to upgrade. The optional
@@ -139,11 +144,9 @@ it never installs an update by itself.
 
 ## 60-second local quickstart
 
-For 6.0.0, install a verified local wheel as shown above until package publication.
-After publication, pin `sshscript==6.0.0` instead. The latest published 5.0.0
-package does not contain the new console.
+Install `sshscript==6.1.0` for the Console integration documented here.
 
-This example runs on 6.0.0 and retains compatibility with the 3.1.5 command API.
+This example runs on 6.1.0 and retains compatibility with the 3.1.5 command API.
 The metadata below records that older compatibility baseline.
 
 <!-- example: {"id":"readme-quickstart", "profile":"3.1.5", "stdout":"sshscript is ready\nexit code: 0\n"} -->
@@ -589,4 +592,8 @@ for maintainer-only release steps.
 SSHScript is released under the
 [MIT License](https://github.com/iapyeh/sshscript/blob/release/LICENSE.txt).
 
-*Last modified: 2026-10-22 23:24:55*
+For embedding an existing connected Session, see the new public
+[Console integration API](EMBEDDED_CONSOLE.md). CLI and embedding applications
+share one implementation; earlier 6.0 CLI compatibility is not maintained.
+
+*Last modified: 2026-10-23 18:39:31*
