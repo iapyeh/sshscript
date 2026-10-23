@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   verify:
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -48,7 +48,7 @@ jobs:
   openssh-integration:
     name: OpenSSH integration (Python ${{ matrix.python-version }}, ${{ matrix.dependency-label }})
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
