@@ -38,6 +38,7 @@ import warnings
 def warning_on_one_line(message, category, filename, lineno, file=None, line=None):
     return '%s:%s: %s: %s\n' % (filename, lineno, category.__name__, message)
 if __package__:
+    from .interactive import Console, ConsoleUpdate, Environment, SwitchRequest, SwitchCredentials, SwitchOutcome, CredentialsRequiredError, ConsoleInitializationError, ConsoleCleanupError
     from ._version import __version__
     from .sessionsettings import execution_defaults
     from .session import ScriptResult, Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
@@ -49,6 +50,7 @@ else:
     ## 2024/8/16, should add mydir into sys.path for python 3.12
     mydir = os.path.abspath(os.path.dirname(__file__))
     if not mydir in sys.path: sys.path.insert(0,mydir)
+    from interactive import Console, ConsoleUpdate, Environment, SwitchRequest, SwitchCredentials, SwitchOutcome, CredentialsRequiredError, ConsoleInitializationError, ConsoleCleanupError
     from _version import __version__
     from sessionsettings import execution_defaults
     from session import ScriptResult, Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
@@ -285,7 +287,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='SSHScript: automation tools for Subprocess and SSH',
-                                     epilog='Interactive preview: sshscript console [host] (console --help for options)')
+                                     epilog='Interactive console: sshscript console [host] (console --help for options)')
 
 
     parser.add_argument('--script','-s', dest='showScript', action='store_true',

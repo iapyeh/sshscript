@@ -1,8 +1,19 @@
-# Version policy and 6.0 migration
+# Version policy and major differences
 
 SSHScript aims to let engineers and AI reliably execute, understand, and take
 over automation. A version identifies a public execution contract, not a
 claim that a command or deployment is safe or successful.
+
+## Current development policy
+
+SSHScript is still in development. Unless the maintainer explicitly requests
+backward compatibility, changes do not need to preserve older APIs, CLI behavior,
+configuration or data formats. Do not add compatibility layers, legacy aliases,
+or fallback/migration tools solely for old versions. Provide only brief notes on
+major differences and any necessary caller changes. Historical version and
+migration notes below record earlier contracts; they do not impose compatibility
+requirements on current development. Version selection and publication still
+require their existing authorization.
 
 ## Current contracts
 
@@ -10,8 +21,9 @@ claim that a command or deployment is safe or successful.
 | --- | --- |
 | 3.1.5 | Published baseline described in API_GUIDE.md; one-shot Session commands return CommandResult, but persistent console calls return two live buffers. |
 | 4.0.2 | Previous production contract: completed console results, settings, managed jobs and authenticated-console handshakes; incompatible with parts of 3.1.5. |
-| 5.0.0 | Latest published contract: calling-host trust by default, explicit local/chain strategies and strict known_hosts file errors; preserves the 4.0 command execution contract. |
-| 6.0.0 | Current source contract: interactive Python/dollar console, normal script completion with stop(), ScriptResult metadata, and removal of old exit/break APIs and control exceptions. Package publication is separate from source promotion. |
+| 5.0.0 | Previous published contract: calling-host trust by default, explicit local/chain strategies and strict known_hosts file errors; preserves the 4.0 command execution contract. |
+| 6.0.0 | Previous release contract: interactive Python/dollar console, normal script completion with stop(), ScriptResult metadata, and removal of old exit/break APIs and control exceptions. |
+| 6.1.0 | Public Console(existing_session), host/agent updates, credential hooks, explicit ownership and cleanup/reuse status; unified CLI and corrected program Ctrl-C readiness. |
 
 Version 4.0.1 introduced the published 4.0 contract after release validation.
 Version 4.0.2 is a documentation and link maintenance patch with the same public
@@ -23,7 +35,8 @@ syntax follows the same versioned execution contract.
 
 6.0.0 is an incompatible major version, approved for the new execution contract.
 A source push and successful CI do not create a GitHub Release, tag or PyPI upload.
-The latest published 5.0.0 package remains a separate artifact.
+The 6.0.0 package was published separately; this historical section records its
+script-completion changes. The current integration contract is 6.1.0.
 
 | Previous use | 6.0 replacement |
 | --- | --- |
@@ -63,29 +76,43 @@ This default and the strict file-error behavior are incompatible with 4.0.2,
 so they are introduced in a new major version. Explicit `known_hosts="local"`
 preserves the previous source location, while still requiring a readable file.
 
+## 6.1.0 public Console integration
+
+The public `Console` and CLI share one implementation. Compatibility with earlier
+6.0 CLI behavior is intentionally not maintained: the internal InteractiveConsole
+class, open()/execute() startup API, :help/:quit aliases, mode-specific error text
+and silent failed-layer removal are gone. Use Console(session), submit(line), the
+Python help/quit helpers and explicit cleanup/reuse status. Session SSH/SFTP and
+command contracts keep their existing responsibilities.
+
+The maintainer selected 6.1.0 for this feature release under the current
+development policy. It includes the above incompatible console changes, without
+compatibility aliases. Read [the integration contract](EMBEDDED_CONSOLE.md).
+
 ## Numbering and compatibility
 
-Versions follow PEP 440 with major.minor.patch compatibility semantics.
-Propose and discuss a major-version promotion with the maintainer before
-changing the version; a request to publish does not itself choose a major bump:
+Versions follow PEP 440. During active development, major/minor labels organize
+feature releases and do not promise backward compatibility. The maintainer selects
+and explicitly approves the release version; do not invent an automatic major bump
+or preserve old behavior solely because the selected release is minor.
 
-- Major: incompatible public return types/unpacking, input data, exceptions,
-  lifecycle/cleanup guarantees, authentication or accepted command templates.
-- Minor: additive public features that preserve existing execution contracts.
-- Patch: compatible fixes. A security fix may require an incompatible restriction;
-  release notes must identify that exception, its impact and migration.
+- Major: a maintainer-selected major milestone or broad contract redesign.
+- Minor: a feature release; may include incompatible changes during development.
+- Patch: focused corrections or documentation updates; identify any behavior change.
+
 - Development: NEXT.devN; increment N when distributing a changed development
   contract. Do not reuse an artifact version for different distributed inputs.
 - Candidates: NEXTaN, NEXTbN or NEXTrcN identify prerelease artifacts. This project's
   current production pipeline accepts only stable versions; prereleases use local
   artifacts/TestPyPI until a separate public prerelease channel is authorized.
 
-Old forms may remain temporarily for migration, but new examples use the
-canonical API. Deprecations require an explicit warning and replacement guidance;
-removal normally waits for a major release. If security or data correctness
-requires an earlier restriction, document it explicitly. Compatibility covers
-both Python and .spy entry points. Do not reinterpret a timeout or transport
-failure as command success, or channel closure as confirmed remote termination.
+During the current development phase, older forms may be removed without a
+compatibility layer, deprecation period or migration implementation unless the
+maintainer explicitly requests those. Briefly note major differences for both
+Python and .spy callers. The numbering rules describe release labels, not a
+requirement to maintain old behavior during development. Do not reinterpret a
+timeout or transport failure as command success, or channel closure as confirmed
+remote termination.
 
 Only _version.py owns the package version. Edit it in the designated
 working_branch directory on branch working_branch. Imports, CLI, wheel/sdist
@@ -156,4 +183,4 @@ Consult that artifact's version-labelled API guide before generating examples.
 Production gates reject prerelease/local versions before uploading; they never
 silently relabel development builds as stable.
 
-*Last modified: 2026-10-22 23:25:30*
+*Last modified: 2026-10-23 18:39:31*

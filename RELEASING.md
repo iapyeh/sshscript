@@ -4,7 +4,7 @@ Python 3.11 or newer is required. The development checkout is a flat source tree
 
 Install development tools with `python -m pip install 'paramiko>=2.11,<5' 'packaging>=21' build twine`. Run `python tools/run_checks.py` from working_branch. Run `python tools/check_release.py --output /tmp/sshscript-candidate-UNIQUE` to build a clean allowlisted source distribution, build its wheel, verify the exact public test/instruction list in the sdist, rerun the credential-free gates from that extracted sdist, check metadata and test the installed wheel. The output directory must not exist. Local preparation includes current files, including uncommitted changes; only committed inputs are available in CI.
 
-Review and commit the intended development changes before any explicitly authorized merge into src/main. Follow [VERSIONING.md](VERSIONING.md): edit only working_branch/_version.py on the working_branch branch. Never edit src/main directly. Development builds use distinct .devN versions; incompatible public execution contracts target the next major release. Promotion to a stable version is a separately authorized action after release validation, not an automatic patch bump on merge. Version imports must refer to _version.py; build and upload tools never edit versions.
+Review and commit the intended development changes before any explicitly authorized merge into src/main. Follow [VERSIONING.md](VERSIONING.md): edit only working_branch/_version.py on the working_branch branch. Never edit src/main directly. Development builds use distinct .devN versions. During active development, minor releases may include incompatible changes; explicitly select the release version with the maintainer and briefly document major differences. Promotion to a stable version is a separately authorized action after release validation, not an automatic patch bump on merge. Version imports must refer to _version.py; build and upload tools never edit versions.
 
 From git/, run `sh update_from_src.sh` to synchronize the integrated src tree. The explicit allowlist preserves unrelated files; review deletions separately when retiring modules. Review the diff, including newly created files. Run `python tools/run_checks.py` and `python tools/check_release.py --output /tmp/sshscript-release-UNIQUE` in git/. Commit reviewed release files, then verify a clean checkout of that commit before tagging or uploading. CI uses the same checks in both layouts on Linux/macOS and Python 3.11–3.14.
 
@@ -61,3 +61,5 @@ from its root.
 These credential-free gates can skip real OpenSSH tests. Such skips are not
 proof of native SSH/PAM/su/sudo compatibility; the separate OpenSSH jobs and
 native-system validation matrix still apply.
+
+*Last modified: 2026-10-23 18:39:31*

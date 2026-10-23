@@ -29,6 +29,10 @@ def outputs():
     api = (ROOT / 'API_GUIDE.md').read_bytes()
     versioning = (ROOT / 'VERSIONING.md').read_bytes()
     console = (ROOT / 'CONSOLE.md').read_bytes()
+    embedded = (ROOT / 'EMBEDDED_CONSOLE.md').read_bytes()
+    api = api.replace(b'(EMBEDDED_CONSOLE.md)', b'(embedded-console.md)')
+    versioning = versioning.replace(b'(EMBEDDED_CONSOLE.md)', b'(embedded-console.md)')
+    console = console.replace(b'(EMBEDDED_CONSOLE.md)', b'(embedded-console.md)')
     # The snapshots travel together; repair their mutual documentation link.
     api = api.replace(b'(VERSIONING.md)', b'(versioning.md)')
     api = api.replace(b'(CONSOLE.md)', b'(console.md)')
@@ -42,6 +46,9 @@ def outputs():
             ('sshscript/references/api-guide.md', api),
             ('sshscript/references/versioning.md', versioning),
             ('sshscript/references/console.md', console),
+            ('sshscript/references/embedded-console.md', embedded),
+            ('sshscript/references/examples/embedded_agent.py', (ROOT / 'examples/embedded_agent.py').read_bytes()),
+            ('sshscript/references/examples/embedded_terminal.py', (ROOT / 'examples/embedded_terminal.py').read_bytes()),
         ):
             info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED

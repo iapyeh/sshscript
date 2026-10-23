@@ -5,6 +5,7 @@ from pathlib import Path
 
 MODULES = 'interactive scriptcontrol __init__ _runtime _version sshscript session sessionsettings commandresult commandjob consolejob sshconfig patching errorutils tokenparser dollarparser dollarchanger spyimporter channelssh channelsubprocess channelutils channelgeneric sessionwrapper stdio dollar'.split()
 ROOT_FILES = [
+    'EMBEDDED_CONSOLE.md', 'examples/embedded_terminal.py', 'examples/embedded_agent.py',
     'CONSOLE.md', 'AI_GUIDE.md', 'skills/sshscript/SKILL.md',
     'skills/sshscript/references/agent-guide.md',
     'API_GUIDE.md', 'VERSIONING.md', 'pyproject.toml', 'README.md', 'LICENSE.txt', 'RELEASING.md',
@@ -40,6 +41,7 @@ TESTS = [
     'test_native_console_authentication.py',
     'test_native_auth_runner.py',
     'test_console_results.py',
+    'test_embedded_console.py',
     'test_interactive_console.py',
     'test_console_job.py',
     'test_dollar_command_escapes.py',
@@ -125,7 +127,7 @@ def prepare(source, destination):
     bootstrap = source / 'src/_sshscript_cli.py' if (source / 'src/sshscript').is_dir() else source / '_sshscript_cli.py'
     pairs.append((bootstrap, destination / 'src/_sshscript_cli.py'))
     pairs += [(package / 'unittest' / p, destination / 'src/sshscript/unittest' / p) for p in TESTS]
-    pairs += [(package / p, destination / 'src/sshscript' / p) for p in ('py.typed', '__init__.pyi', 'session.pyi', 'sessionwrapper.pyi', 'commandjob.pyi', 'commandresult.pyi')]
+    pairs += [(package / p, destination / 'src/sshscript' / p) for p in ('py.typed', 'interactive.pyi', '__init__.pyi', 'session.pyi', 'sessionwrapper.pyi', 'commandjob.pyi', 'commandresult.pyi')]
     missing = [str(src) for src, _ in pairs if not src.is_file()]
     if missing:
         raise FileNotFoundError('Missing release inputs: ' + ', '.join(missing))
