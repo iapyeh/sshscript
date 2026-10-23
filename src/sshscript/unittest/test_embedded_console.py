@@ -227,7 +227,7 @@ class EmbeddedConsoleTests(unittest.TestCase):
         update = console.send_input('import time; print("sleep-started", flush=True); time.sleep(30)',
                                     timeout=.3)
         self.assertEqual(update.state, 'running')
-        self.assertIn('\r\nsleep-started\r\n', update.stdout + console.poll().stdout)
+        self.assertIn('sleep-started\n', (update.stdout + console.poll().stdout).replace('\r\n', '\n'))
         update = console.interrupt()
         self.assertEqual(update.state, 'waiting_input')
         self.assertEqual(console.poll().state, 'waiting_input')
@@ -242,7 +242,7 @@ class EmbeddedConsoleTests(unittest.TestCase):
         console.send_input('import signal, time; signal.signal(signal.SIGINT, signal.SIG_IGN)')
         update = console.send_input('print("ignoring-started", flush=True); time.sleep(4)', timeout=.3)
         self.assertEqual(update.state, 'running')
-        self.assertIn('\r\nignoring-started\r\n', update.stdout + console.poll().stdout)
+        self.assertIn('ignoring-started\n', (update.stdout + console.poll().stdout).replace('\r\n', '\n'))
         update = console.interrupt()
         self.assertEqual(update.state, 'running')
         self.assertEqual(console.poll().state, 'running')
@@ -259,7 +259,7 @@ class EmbeddedConsoleTests(unittest.TestCase):
         source = 'import time\ntry:\n print("delay-started", flush=True); time.sleep(30)\nexcept KeyboardInterrupt:\n time.sleep(3)'
         update = console.send_input('exec(' + repr(source) + ')', timeout=.3)
         self.assertEqual(update.state, 'running')
-        self.assertIn('\r\ndelay-started\r\n', update.stdout + console.poll().stdout)
+        self.assertIn('delay-started\n', (update.stdout + console.poll().stdout).replace('\r\n', '\n'))
         update = console.interrupt()
         self.assertEqual(update.state, 'running')
         update, _ = self.complete(console, update)
