@@ -25,8 +25,8 @@ class NativeRunnerTests(unittest.TestCase):
         with patch.object(module, 'Session', side_effect=AssertionError('native session must not be created')):
             result = unittest.TestResult()
             unittest.defaultTestLoader.loadTestsFromTestCase(module.NativeAuthenticationTests).run(result)
-        self.assertEqual(result.testsRun, 9)
-        self.assertEqual(len(result.skipped), 9)
+        self.assertEqual(result.testsRun, 10)
+        self.assertEqual(len(result.skipped), 10)
         self.assertFalse(result.errors or result.failures)
 
     def run_fixture(self, local_report=None, timeout=False):

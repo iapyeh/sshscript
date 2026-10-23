@@ -121,3 +121,5 @@ htmlcov/
 !/unittest/test_update_check.py
 
 !/unittest/test_interactive_console.py
+
+!/unittest/test_embedded_console.py

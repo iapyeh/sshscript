@@ -3,6 +3,7 @@ import ast
 import inspect
 from pathlib import Path
 import unittest
+from interactive import Console
 from session import Session
 from commandjob import CommandJob
 from sessionwrapper import SessionWrapper
@@ -11,7 +12,7 @@ class PublicTypeTests(unittest.TestCase):
     def test_public_stub_methods_exist_and_keywords_match(self):
         root = Path(__file__).resolve().parents[1]
         self.assertTrue((root / 'py.typed').is_file())
-        for filename, cls in [('session.pyi', Session), ('commandjob.pyi', CommandJob),
+        for filename, cls in [('interactive.pyi', Console), ('session.pyi', Session), ('commandjob.pyi', CommandJob),
                               ('sessionwrapper.pyi', SessionWrapper)]:
             tree = ast.parse((root / filename).read_text())
             definition = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == cls.__name__)

@@ -60,3 +60,8 @@ recursive-include src/sshscript *.pyi
 
 include src/sshscript/unittest/test_interactive_console.py
 include CONSOLE.md
+
+include src/sshscript/unittest/test_embedded_console.py
+include EMBEDDED_CONSOLE.md
+include examples/embedded_terminal.py
+include examples/embedded_agent.py

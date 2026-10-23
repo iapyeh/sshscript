@@ -17,7 +17,7 @@ import uuid
 
 import paramiko
 
-from sshscript import Session, CommandTimeoutError
+from sshscript import Session, CommandTimeoutError, Console
 
 
 ENABLED = os.environ.get("SSHSCRIPT_OPENSSH_TESTS") == "1"
@@ -216,6 +216,15 @@ class OpenSSHIntegrationTests(unittest.TestCase):
             result = nested.exec_command(['printf', 'nested'], command_timeout=5, check=True)
             self.assertEqual(result.stdout, 'nested')
             self.assertEqual(result.host, self.host)
+            parent_transport = parent._client.get_transport()
+            with Console(nested) as embedded:
+                update = embedded.submit('$printf borrowed-jump')
+                self.assertEqual((update.state, update.result.stdout), ('completed', 'borrowed-jump'))
+            self.assertEqual(embedded.session_reuse, 'confirmed')
+            self.assertIs(nested._client.get_transport(), transport)
+            self.assertIs(parent._client.get_transport(), parent_transport)
+            self.assertFalse(nested.closed or parent.closed)
+            self.assertEqual(nested(['printf', 'reused'], check=True).stdout, 'reused')
         transport.join(2)
         self.assertFalse(transport.is_alive())
         self.assertTrue(nested.closed)

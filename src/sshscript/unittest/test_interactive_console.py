@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import sshscript
 import patching
-from interactive import InteractiveConsole
+from interactive import Console
 from scriptcontrol import ScriptResult
 from session import Session
 
@@ -124,7 +124,7 @@ class InteractiveTests(_CLITestCase):
 
     def open_console(self):
         output, errors = io.StringIO(), io.StringIO()
-        console = InteractiveConsole(stdout=output, stderr=errors).open()
+        console = Console(Session(), ownership='owned', terminal=True, stdout=output, stderr=errors)
         self.addCleanup(console.close)
         return console, output, errors
 
@@ -132,61 +132,61 @@ class InteractiveTests(_CLITestCase):
         console, output, errors = self.open_console()
         with tempfile.TemporaryDirectory() as folder:
             import shlex
-            console.execute('$cd ' + shlex.quote(folder))
-            console.execute('$export CONSOLE_FIXTURE=retained')
-            console.execute('$pwd; printf "%s" "$CONSOLE_FIXTURE"')
+            console.submit('$cd ' + shlex.quote(folder))
+            console.submit('$export CONSOLE_FIXTURE=retained')
+            console.submit('$pwd; printf "%s" "$CONSOLE_FIXTURE"')
             self.assertIn(folder, output.getvalue())
             self.assertIn('retained', output.getvalue())
-            console.execute('$false')
+            console.submit('$false')
             self.assertEqual(console.namespace['result'].exitcode, 1)
             self.assertIn('[exit 1]', errors.getvalue())
-            console.execute('options = {"port": 2222}')
-            console.execute('for index in range(2):')
-            console.execute('    options["count"] = index')
-            console.execute('')
-            console.execute('$printf after-failure')
+            console.submit('options = {"port": 2222}')
+            console.submit('for index in range(2):')
+            console.submit('    options["count"] = index')
+            console.submit('')
+            console.submit('$printf after-failure')
             self.assertIn('after-failure', output.getvalue())
             self.assertEqual(console.namespace['options'], {'port': 2222, 'count': 1})
-            console.execute('print(options["port"])')
+            console.submit('print(options["port"])')
             self.assertIn('2222', output.getvalue())
 
     def test_bare_name_is_python_and_never_an_implicit_shell_command(self):
         console, output, errors = self.open_console()
         with patch.object(console, 'exec_command') as execute:
-            console.execute('hostname')
+            console.submit('hostname')
             self.assertIn('NameError', errors.getvalue())
-            console.execute('hostname = "a Python variable"')
-            console.execute('hostname')
+            console.submit('hostname = "a Python variable"')
+            console.submit('hostname')
             execute.assert_not_called()
         self.assertIn('a Python variable', output.getvalue())
 
     def test_dollar_command_result_is_available_inside_python_expressions(self):
         console, output, errors = self.open_console()
-        console.execute('$printf host-fixture')
+        console.submit('$printf host-fixture')
         self.assertEqual(output.getvalue(), 'host-fixture')
-        console.execute('print($.stdout)')
-        console.execute('hostname = $.stdout.strip()')
-        console.execute('status = $.exitcode')
+        console.submit('print($.stdout)')
+        console.submit('hostname = $.stdout.strip()')
+        console.submit('status = $.exitcode')
         self.assertEqual(console.namespace['hostname'], 'host-fixture')
         self.assertEqual(console.namespace['status'], 0)
-        console.execute('message = f"host={$.stdout.strip()}"')
+        console.submit('message = f"host={$.stdout.strip()}"')
         self.assertEqual(console.namespace['message'], 'host=host-fixture')
-        console.execute('out, err, status = $printf another-host')
+        console.submit('out, err, status = $printf another-host')
         self.assertEqual((console.namespace['out'], console.namespace['err'], console.namespace['status']),
                          ('another-host', '', 0))
-        console.execute('literal = "$.stdout is text, not evaluation"')
+        console.submit('literal = "$.stdout is text, not evaluation"')
         self.assertEqual(console.namespace['literal'], '$.stdout is text, not evaluation')
         self.assertEqual(errors.getvalue(), '')
 
     def test_dollar_commands_in_python_multiline_loop_and_function(self):
         console, output, errors = self.open_console()
         for line in ['for index in range(2):', '    $f"echo item-{index}"', '']:
-            console.execute(line)
+            console.submit(line)
         self.assertIn('item-0', output.getvalue())
         self.assertIn('item-1', output.getvalue())
         for line in ['def read_host():', '    $printf function-host', '    return $.stdout', '']:
-            console.execute(line)
-        console.execute('saved = read_host()')
+            console.submit(line)
+        console.submit('saved = read_host()')
         self.assertEqual(console.namespace['saved'], 'function-host')
         self.assertFalse(console.more)
         self.assertEqual(errors.getvalue(), '')
@@ -198,25 +198,25 @@ class InteractiveTests(_CLITestCase):
         self.addCleanup(remote.close)
         console.namespace['host'] = 'fixture'
         with patch.object(parent.session, 'connect', return_value=remote) as connect:
-            console.execute('$.connect(')
+            console.submit('$.connect(')
             self.assertTrue(console.more)
             connect.assert_not_called()
-            console.execute('    host,')
+            console.submit('    host,')
             self.assertTrue(console.more)
-            console.execute('    username="ops",')
-            console.execute(')')
+            console.submit('    username="ops",')
+            console.submit(')')
         connect.assert_called_once_with('fixture', username='ops')
         self.assertFalse(console.more)
         self.assertEqual(len(console.layers), 2)
-        console.execute('exit()')
+        console.submit('exit()')
         self.assertEqual(errors.getvalue(), '')
 
     def test_syntax_error_recovers_for_next_input(self):
         console, _, errors = self.open_console()
-        console.execute('$.stdout + )')
+        console.submit('$.stdout + )')
         self.assertFalse(console.more)
         self.assertIn('SyntaxError', errors.getvalue())
-        console.execute('value = 42')
+        console.submit('value = 42')
         self.assertEqual(console.namespace['value'], 42)
 
     def test_lexical_with_uses_normal_spy_scope_and_restores_stack(self):
@@ -224,7 +224,7 @@ class InteractiveTests(_CLITestCase):
         original = console.current
         stack = patching.get_thread_stack().snapshot()
         for line in ['with $.shell("bash"):', '    $printf lexical-host', '    saved = str($.stdout)', '']:
-            console.execute(line)
+            console.submit(line)
         self.assertEqual(console.namespace['saved'], 'lexical-host')
         self.assertIs(console.current, original)
         self.assertEqual(patching.get_thread_stack().snapshot(), stack)
@@ -234,10 +234,10 @@ class InteractiveTests(_CLITestCase):
         console, output, errors = self.open_console()
         original = console.current
         import shlex
-        console.execute('$.enter(' + repr(shlex.quote(sys.executable) + ' -q -u') + ', prompt=">>>", exit="quit()")')
-        console.execute('raise SystemExit')
+        console.submit('$.enter(' + repr(shlex.quote(sys.executable) + ' -q -u') + ', prompt=">>>", exit="quit()")')
+        console.submit('raise SystemExit')
         self.assertIs(console.current, original)
-        console.execute('value = 42')
+        console.submit('value = 42')
         self.assertEqual(console.namespace['value'], 42)
         self.assertEqual(errors.getvalue(), '')
 
@@ -245,24 +245,24 @@ class InteractiveTests(_CLITestCase):
         console, output, errors = self.open_console()
         original = console.current
         original_stack = patching.get_thread_stack().snapshot()
-        console.execute('$.shell("bash")')
+        console.submit('$.shell("bash")')
         self.assertEqual(len(console.layers), 2)
-        console.execute('exit()')
+        console.submit('exit()')
         self.assertIs(console.current, original)
         self.assertEqual(patching.get_thread_stack().snapshot(), original_stack)
-        console.execute('$printf parent-restored')
+        console.submit('$printf parent-restored')
         self.assertIn('parent-restored', output.getvalue())
-        console.execute('exit()')
+        console.submit('exit()')
         self.assertTrue(console.done)
         self.assertTrue(original.session.closed)
         console.close()
 
     def test_dollar_session_and_wrapper_exit_are_removed_in_console(self):
         console, _, _ = self.open_console()
-        console.execute('$.shell("bash")')
+        console.submit('$.shell("bash")')
         current = console.current
         for source in ('$.exit()', 'session.exit()', 'console.exit()'):
-            console.execute(source)
+            console.submit(source)
             self.assertIsInstance(console.namespace['error'], AttributeError)
             self.assertIs(console.current, current)
             self.assertEqual(len(console.layers), 2)
@@ -275,10 +275,10 @@ class InteractiveTests(_CLITestCase):
         self.addCleanup(remote.close)
         console.namespace.update(host='fixture', options={'username': 'ops', 'port': 2222})
         with patch.object(parent.session, 'connect', return_value=remote) as connect:
-            console.execute('$.connect(host, password="literal", **options)')
+            console.submit('$.connect(host, password="literal", **options)')
         connect.assert_called_once_with('fixture', password='literal', username='ops', port=2222)
         self.assertEqual(len(console.layers), 2)
-        console.execute('exit()')
+        console.submit('exit()')
         self.assertIs(console.current, parent)
         self.assertTrue(remote.closed)
         self.assertFalse(parent.session.closed)
@@ -289,11 +289,11 @@ class InteractiveTests(_CLITestCase):
         remote = Session()
         with patch.object(parent.session, 'connect', return_value=remote), \
              patch.object(remote, 'shell', side_effect=RuntimeError('fixture shell failure')):
-            console.execute('$.connect("fixture")')
+            console.submit('$.connect("fixture")')
             self.assertIsInstance(console.namespace['error'], RuntimeError)
         self.assertTrue(remote.closed)
         self.assertIs(console.current, parent)
-        console.execute('$true')
+        console.submit('$true')
 
     def test_identity_layers_route_parameters_and_unwind(self):
         # Use real shell layers as credential-free stand-ins for auth; native
@@ -301,50 +301,50 @@ class InteractiveTests(_CLITestCase):
         console, _, _ = self.open_console()
         original = console.current
         with patch.object(original.console, 'sudo', side_effect=lambda **kw: original.console.shell('bash')) as sudo:
-            console.execute('$.sudo(password=None, username="fixture")')
+            console.submit('$.sudo(password=None, username="fixture")')
         sudo.assert_called_once_with(password=None, username='fixture')
         self.assertEqual(console.current.kind, 'sudo')
-        console.execute('$.connect("other")')
+        console.submit('$.connect("other")')
         self.assertIsInstance(console.namespace['error'], RuntimeError)
         self.assertIn('credentials', str(console.namespace['error']))
         with patch.object(console.current.console, 'su', side_effect=lambda *a, **kw: original.console.shell('bash')) as su:
-            console.execute('$.su("other", password="fixture")')
+            console.submit('$.su("other", password="fixture")')
         su.assert_called_once_with('other', password='fixture')
         self.assertEqual(len(console.layers), 3)
-        console.execute('exit()')
-        console.execute('exit()')
+        console.submit('exit()')
+        console.submit('exit()')
         self.assertIs(console.current, original)
 
     def test_stop_returns_to_console_but_script_exit_cannot_pop_it(self):
         console, _, _ = self.open_console()
         original = console.current
-        console.execute('script = $.run("value=42\\n$.stop()\\nmissing=True")')
+        console.submit('script = $.run("value=42\\n$.stop()\\nmissing=True")')
         self.assertTrue(console.namespace['script'].stopped)
         self.assertEqual(console.namespace['script']['value'], 42)
         self.assertIs(console.current, original)
-        console.execute('$.run("$.exit()")')
+        console.submit('$.run("$.exit()")')
         self.assertIsInstance(console.namespace['error'], AttributeError)
         self.assertIs(console.current, original)
-        console.execute('exit()')
+        console.submit('exit()')
         self.assertTrue(console.done)
 
     def test_explicit_text_program_replies_and_exit_restore_shell(self):
         console, output, _ = self.open_console()
         original = console.current
         import shlex
-        console.execute('$.enter(' + repr(shlex.quote(sys.executable) + ' -q -u') + ', prompt=">>>", exit="quit()")')
+        console.submit('$.enter(' + repr(shlex.quote(sys.executable) + ' -q -u') + ', prompt=">>>", exit="quit()")')
         self.assertEqual(console.current.kind, 'program')
-        console.execute('print(6 * 7)')
+        console.submit('print(6 * 7)')
         self.assertIn('42', output.getvalue())
-        console.execute('exit()')
+        console.submit('exit()')
         self.assertIs(console.current, original)
-        console.execute('$printf recovered')
+        console.submit('$printf recovered')
         self.assertIn('recovered', output.getvalue())
 
     def test_keyboard_interrupt_stops_job_and_keeps_shell_usable(self):
         console, output, errors = self.open_console()
         import interactive
-        console.execute('$.set(check=True)')
+        console.submit('$.set(check=True)')
         real_sleep = interactive.time.sleep
         triggered = False
         caller_thread = threading.get_ident()
@@ -356,10 +356,10 @@ class InteractiveTests(_CLITestCase):
                 raise KeyboardInterrupt
             real_sleep(seconds)
         with patch.object(interactive.time, 'sleep', side_effect=interrupt_once):
-            console.execute('$sleep 30')
+            console.submit('$sleep 30')
         self.assertIn('KeyboardInterrupt', errors.getvalue())
         self.assertIsNone(console.namespace['error'])
-        console.execute('$printf after-interrupt')
+        console.submit('$printf after-interrupt')
         self.assertIn('after-interrupt', output.getvalue())
 
     def test_eof_closes_and_errors_do_not_echo_secrets(self):
@@ -380,13 +380,13 @@ class InteractiveTests(_CLITestCase):
     def test_help_keeps_current_environment(self):
         console, output, _ = self.open_console()
         original = console.current
-        console.execute('help')
-        console.execute('help()')
+        console.submit('help')
+        console.submit('help()')
         self.assertEqual(output.getvalue().count('Input is Python'), 2)
         self.assertIs(console.current, original)
         self.assertFalse(console.done)
         with patch('interactive.builtins.help') as python_help:
-            console.execute('help(str)')
+            console.submit('help(str)')
         python_help.assert_called_once_with(str)
 
     def test_exit_helpers_leave_one_layer_and_unwind_python_finally(self):
@@ -394,18 +394,18 @@ class InteractiveTests(_CLITestCase):
             with self.subTest(statement=statement):
                 console, _, errors = self.open_console()
                 parent = console.current
-                console.execute('value=42')
-                console.execute('$.shell("bash")')
+                console.submit('value=42')
+                console.submit('$.shell("bash")')
                 if statement == 'exit':
-                    console.execute('exit # leave one environment')
+                    console.submit('exit # leave one environment')
                 else:
                     for line in ('try:', '    exit()', 'finally:', '    cleaned=True', ''):
-                        console.execute(line)
+                        console.submit(line)
                     self.assertTrue(console.namespace['cleaned'])
                 self.assertIs(console.current, parent)
                 self.assertFalse(console.done)
                 self.assertEqual(console.namespace['value'], 42)
-                console.execute(statement)
+                console.submit(statement)
                 self.assertTrue(console.done)
                 self.assertTrue(parent.session.closed)
                 self.assertEqual(errors.getvalue(), '')
@@ -416,7 +416,7 @@ class InteractiveTests(_CLITestCase):
                 console, _, errors = self.open_console()
                 parent = console.current
                 self.enter_python(console)
-                console.execute(statement)
+                console.submit(statement)
                 if statement.startswith('exit'):
                     self.assertIs(console.current, parent)
                     self.assertFalse(console.done)
@@ -430,12 +430,12 @@ class InteractiveTests(_CLITestCase):
             with self.subTest(statement=statement):
                 console, _, errors = self.open_console()
                 session = console.current.session
-                console.execute('$.shell("bash")')
+                console.submit('$.shell("bash")')
                 if statement == 'quit':
-                    console.execute('quit # finish all environments')
+                    console.submit('quit # finish all environments')
                 else:
                     for line in ('try:', '    '+statement, 'finally:', '    cleaned=True', ''):
-                        console.execute(line)
+                        console.submit(line)
                     self.assertTrue(console.namespace['cleaned'])
                 self.assertTrue(console.done)
                 self.assertTrue(session.closed)
@@ -444,10 +444,10 @@ class InteractiveTests(_CLITestCase):
 
     def test_script_exit_does_not_inherit_console_quit_helper(self):
         console, _, errors = self.open_console()
-        console.execute('value=42')
+        console.submit('value=42')
         original = console.current
         for source in ('exit()', 'quit()', 'import sys; sys.exit()'):
-            console.execute('$.run(' + repr(source) + ')')
+            console.submit('$.run(' + repr(source) + ')')
             self.assertIs(console.current, original)
             self.assertFalse(console.done)
             self.assertEqual(console.namespace['value'], 42)
@@ -455,11 +455,11 @@ class InteractiveTests(_CLITestCase):
 
     def test_helpers_can_be_shadowed_like_python_names(self):
         console, output, _ = self.open_console()
-        console.execute('quit = "a variable"')
-        console.execute('quit')
+        console.submit('quit = "a variable"')
+        console.submit('quit')
         self.assertIn('a variable', output.getvalue())
         self.assertFalse(console.done)
-        console.execute('control.quit()')
+        console.submit('control.quit()')
         self.assertTrue(console.done)
 
     def test_ctrl_c_discards_multiline_input_and_preserves_namespace(self):
@@ -480,23 +480,23 @@ class InteractiveTests(_CLITestCase):
 
     def test_python_execution_interrupt_keeps_console_and_variables(self):
         console, output, errors = self.open_console()
-        console.execute('value=42')
-        console.execute('raise KeyboardInterrupt')
+        console.submit('value=42')
+        console.submit('raise KeyboardInterrupt')
         self.assertFalse(console.done)
         self.assertFalse(console.more)
-        console.execute('print(value)')
+        console.submit('print(value)')
         self.assertIn('42', output.getvalue())
         self.assertIn('KeyboardInterrupt', errors.getvalue())
 
     def enter_python(self, console):
         import shlex
-        console.execute('$.enter(' + repr(shlex.quote(sys.executable) + ' -q -u') + ', prompt=">>>", exit="quit()")')
+        console.submit('$.enter(' + repr(shlex.quote(sys.executable) + ' -q -u') + ', prompt=">>>", exit="quit()")')
         self.assertEqual(console.current.kind, 'program')
 
     def test_ctrl_c_and_ctrl_d_go_to_program_and_restore_python_parent(self):
         console, output, errors = self.open_console()
         original = console.current
-        console.execute('value=42')
+        console.submit('value=42')
         self.enter_python(console)
         program = console.current
         events = iter([KeyboardInterrupt(), 'print(6*7)', EOFError(), 'print(value)', 'quit'])
@@ -541,11 +541,11 @@ class InteractiveTests(_CLITestCase):
                 raise KeyboardInterrupt
             return wait(*args, **kwargs)
         with patch.object(channel, '_wait_input_completion', side_effect=interrupt_once):
-            console.execute('import time; time.sleep(30)')
+            console.submit('import time; time.sleep(30)')
         self.assertEqual(console.current.kind, 'program')
-        console.execute('print(6*7)')
+        console.submit('print(6*7)')
         self.assertIn('42', output.getvalue())
-        console._eof()
+        console.eof()
         self.assertIs(console.current, original)
         self.assertFalse(console.done)
         self.assertEqual(errors.getvalue(), '')

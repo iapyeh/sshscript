@@ -5,14 +5,32 @@ description: Write, adapt, and verify Python or .spy automation using SSHScript 
 
 # Use SSHScript
 
-This skill describes the **SSHScript 6.0.0 contract, Python 3.11+**. Read
+SSHScript is currently in development. Unless the user explicitly requests
+backward compatibility, use the current design without retaining or adding legacy
+interfaces, compatibility layers, or fallback/migration paths solely for older
+versions. Briefly identify the main differences and any required caller changes;
+do not expand the task into compatibility work. This policy is specific to SSHScript.
+
+This skill describes the **SSHScript 6.1.0 contract, Python 3.11+**. Read
 [the agent guide](references/agent-guide.md) before generating automation.
 Select only the API sections needed for the user's task.
 
+For an existing host-owned Session, use the new public `Console(session)` API
+with a context manager, default borrowed ownership, structured submit/poll updates
+and explicit Session reuse reporting. Read the guide section
+[Existing Session integration](references/agent-guide.md#existing-session-integration-unified-console)
+and the matching EMBEDDED_CONSOLE.md (bundled references/embedded-console.md).
+CLI and embedding callers share one Console core. Earlier CLI compatibility is
+not maintained. Require 6.1.0 or a verified equivalent source revision for this API.
+Do not reconnect, edit reserved variables, log credentials or treat silence as success.
+After program interrupt(), follow the returned state: waiting_input means its
+configured prompt matched; running means keep polling. KeyboardInterrupt alone
+does not establish readiness or program failure.
+
 For retained, step-by-step interaction, read
-[Interactive console (6.0)](references/agent-guide.md#interactive-console-60).
-Use a matching 6.0.0 checkout or verified wheel; source publication alone does
-not upload a package. Published 5.0.0 lacks the console and retains older APIs.
+[Interactive console (6.1)](references/agent-guide.md#interactive-console-61).
+Install `sshscript==6.1.0` or use a matching verified artifact. Earlier 6.0
+console internals do not supply the supported host integration contract.
 In the console, `exit`/`exit()` leave one layer and `quit`/`quit()`
 close all layers. `$.stop()` completes a script; `$.exit()` is removed in
 both modes. Use the matching checkout's `CONSOLE.md` for the full contract.
@@ -86,4 +104,4 @@ official links in the agent guide and confirm their contract version.
 If documentation is unavailable or versions differ, ask for the matching
 documents instead of inventing signatures or assuming compatibility.
 
-*Last modified: 2026-10-22 23:24:55*
+*Last modified: 2026-10-23 18:39:31*

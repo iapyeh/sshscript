@@ -12,7 +12,7 @@ import sys
 import time
 import unittest
 
-from sshscript import Session
+from sshscript import Session, Console, SwitchCredentials
 
 CONFIG = None
 
@@ -56,6 +56,33 @@ class NativeAuthenticationTests(unittest.TestCase):
         else:
             self.assertEqual(after, before, 'parent UID and shell PID must both survive')
             CONFIG['outcomes'].append({'case': self._testMethodName, 'recovery': 'confirmed'})
+
+    def test_embedded_borrowed_session_native_switches_and_reuse(self):
+        outcomes = []
+        def resolve(request):
+            password = CONFIG['target_password'] if request.kind == 'su' else CONFIG['password']
+            return SwitchCredentials(password)
+        with Console(self.session, credential_resolver=resolve,
+                     switch_observer=outcomes.append) as embedded:
+            before = embedded.environments[-1]
+            self.assertEqual(embedded.submit('saved = 42').state, 'completed')
+            for kind in ('su', 'sudo'):
+                if kind == 'su':
+                    embedded.su(CONFIG['target_user'], enter_timeout=15)
+                else:
+                    embedded.sudo(enter_timeout=15)
+                update = embedded.submit('$id -u')
+                self.assertEqual(update.state, 'completed')
+                self.assertEqual(update.result.stdout.strip(), self.target_uid if kind == 'su' else '0')
+                self.assertEqual(embedded.environments[-1].connection_user, self.session.username)
+                embedded.leave()
+                self.assertEqual(embedded.environments[-1], before)
+            self.assertEqual(embedded.submit('assert saved == 42').state, 'completed')
+        self.assertEqual(embedded.session_reuse, 'confirmed')
+        self.assertFalse(self.session.closed)
+        self.assertEqual(self.session(['id', '-u'], check=True).stdout.strip(), self.original_uid)
+        self.assertEqual([outcome.success for outcome in outcomes], [True, True])
+        CONFIG['outcomes'].append({'case': self._testMethodName, 'recovery': 'confirmed'})
 
     def test_foreground_job_in_real_su_and_sudo(self):
         for kind in ('su', 'sudo'):

@@ -6,7 +6,8 @@ import code
 from io import StringIO
 import tokenize
 from contextlib import ExitStack, redirect_stdout, redirect_stderr
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import threading
 from getpass import getpass
 import sys
 import time
@@ -15,9 +16,13 @@ import subprocess
 if __package__:
     from . import dollarparser, tokenparser, patching
     from .session import Session
+    from .commandresult import CommandResult
+    from .commandjob import JobResult
 else:
     import dollarparser, tokenparser, patching
     from session import Session
+    from commandresult import CommandResult
+    from commandjob import JobResult
 
 
 class _LeaveLayer(BaseException):
@@ -75,6 +80,7 @@ class _PythonConsole(code.InteractiveConsole):
     def __init__(self, namespace):
         super().__init__(namespace)
         self.cell = 1
+        self.last_error = None
 
     def runsource(self, source, filename='<input>', symbol='single'):
         filename = f'<sshscript-console-{self.cell}>'
@@ -130,11 +136,15 @@ class _PythonConsole(code.InteractiveConsole):
                 return True
         except (SyntaxError, OverflowError, ValueError):
             self.cell += 1
+            self.last_error = type(sys.exc_info()[1]).__name__
             self.showsyntaxerror(filename)
             return False
         self.cell += 1
         self.runcode(compiled)
         return False
+
+    def showsyntaxerror(self, filename=None):
+        self.write("SyntaxError: input compilation failed.\n")
 
     def runcode(self, code_object):
         try:
@@ -142,12 +152,11 @@ class _PythonConsole(code.InteractiveConsole):
         except (_LeaveLayer, _QuitConsole, SystemExit, KeyboardInterrupt):
             raise
         except BaseException as error:
+            self.last_error = type(error).__name__
             self.locals['error'] = error
-            if isinstance(error, NameError):
-                self.write(f'{type(error).__name__}: {error}\n')
-            else:
-                # Do not echo credential-bearing source or arbitrary server text.
-                self.write(f'{type(error).__name__}: operation failed; inspect error for details.\n')
+            # Source and exception text may contain credentials.
+            self.write(f'{type(error).__name__}: operation failed; inspect error for details.\n')
+
 
 
 @dataclass
@@ -163,20 +172,96 @@ class _Layer:
     program_positions: tuple = (0, 0)
 
 
-class InteractiveConsole:
-    """Own a stack of connection/console contexts and a persistent Python namespace.
 
-    All context entry and exit occurs on the calling thread. No input history is
-    persisted. Connections under sudo/su are rejected rather than implying that
-    the SSH Session has adopted the console's effective identity or key files.
+class CredentialsRequiredError(ValueError):
+    """A managed identity switch needs an explicit credential decision."""
+
+
+class ConsoleInitializationError(RuntimeError):
+    """Initialization failed; the supplied Session needs reconciliation."""
+    session_reuse = 'unknown'
+
+
+class ConsoleCleanupError(RuntimeError):
+    """Cleanup or the post-cleanup Session probe failed; reuse is unknown."""
+    session_reuse = 'unknown'
+
+
+@dataclass(frozen=True)
+class Environment:
+    kind: str
+    host: str
+    connection_user: str | None
+    effective_user: str
+    identity_verified: bool
+
+
+@dataclass(frozen=True)
+class SwitchRequest:
+    kind: str
+    username: str | None
+    environment: Environment
+    credential_supplied: bool
+
+
+@dataclass(frozen=True)
+class SwitchCredentials:
+    password: str | None = field(repr=False)
+
+
+@dataclass(frozen=True)
+class SwitchOutcome:
+    request: SwitchRequest
+    success: bool
+    environment: Environment
+    error_type: str | None = None
+
+
+@dataclass(frozen=True)
+class ConsoleUpdate:
+    state: str
+    stdout: str = ''
+    stderr: str = ''
+    result: CommandResult[int | None] | None = None
+    error_type: str | None = None
+    session_reuse: str = 'in_use'
+
+
+
+class Console:
+    """Persistent Python/dollar console shared by terminal and embedded callers.
+
+    Borrow a supplied Session by default; explicitly transfer ownership with
+    ownership="owned". Use a context manager or always call close().
     """
-    def __init__(self, *, stdout=None, stderr=None, input_func=None,
-                 password_func=None, session_factory=Session):
-        self._stdout = stdout or sys.stdout
-        self._stderr = stderr or sys.stderr
+
+    def __init__(self, session, *, ownership='borrowed', terminal=False,
+                 get_pty=True, credential_resolver=None, switch_observer=None,
+                 stdout=None, stderr=None, input_func=None, password_func=None):
+        if ownership not in ('borrowed', 'owned'):
+            raise ValueError('ownership must be borrowed or owned')
+        if session.closed:
+            raise RuntimeError('Session is closed')
+        self._creator = threading.get_ident()
+        self._session = session
+        self._ownership = ownership
+        self._terminal = terminal
+        self._resolver = credential_resolver
+        self._observer = switch_observer
+        self._capture = (StringIO(), StringIO())
+        self._job = None
+        self._job_positions = [0, 0]
+        self._state = 'ready'
+        self._error_type = None
+        self._reuse = 'in_use'
+        self._cleanup_error = None
+        self._uncertain = False
+        self._last_result = None
+        self._submitting = False
+        self._stdout = stdout if stdout is not None else (sys.stdout if terminal else self._capture[0])
+        self._stderr = stderr if stderr is not None else (sys.stderr if terminal else self._capture[1])
         self.input_func = input_func or input
-        self.password_func = password_func or getpass
-        self.session_factory = session_factory
+        self.password_func = password_func or (self._terminal_password if terminal else self._missing_password)
         self.layers = []
         self.namespace = {'__name__': '__console__', 'getpass': self.password_func,
                           'control': self, '_console_control_': self,
@@ -186,6 +271,22 @@ class InteractiveConsole:
         self.python = _PythonConsole(self.namespace)
         self.more = False
         self.done = False
+        # Do not enter/exit the external Session or mutate its execution settings.
+        try:
+            with ExitStack() as resources:
+                wrapper = session.shell('bash', get_pty=get_pty)
+                wrapper.channel.dump2sys = (0, 0)
+                shell = resources.enter_context(wrapper)
+                self._push(resources, session, shell, 'ssh' if session.host else 'local',
+                           session.host or 'local')
+        except BaseException:
+            self._reuse = 'unknown'
+            if ownership == 'owned':
+                try:
+                    session.close(strict=True)
+                except BaseException:
+                    pass
+            raise ConsoleInitializationError('console initialization failed; Session reuse is unknown') from None
 
     @property
     def current(self):
@@ -203,60 +304,8 @@ class InteractiveConsole:
         self.layers.append(_Layer(resources.pop_all(), session, console, kind, host, user))
         self._refresh()
 
-    def open(self, host=None, **options):
-        if self.layers or self.done:
-            raise RuntimeError('console has already been opened')
-        with ExitStack() as resources:
-            local = self.session_factory()
-            resources.callback(local.close, strict=True)
-            resources.enter_context(local)
-            local.set(verbose=False, verbose_stderr=False, check=False)
-            shell = resources.enter_context(local.shell('bash'))
-            self._push(resources, local, shell, 'local', 'local')
-        try:
-            if host is not None:
-                self.connect(host, **options)
-        except BaseException:
-            self.close()
-            raise
-        return self
-
-    def connect(self, *args, **kwargs):
-        layer = self.current
-        if layer.kind not in ('local', 'ssh'):
-            raise RuntimeError('leave the current sudo/su/shell/program layer before connect(); SSH credentials belong to the connection Session')
-        with ExitStack() as resources:
-            remote = layer.session.connect(*args, **kwargs)
-            resources.callback(remote.close, strict=True)
-            resources.enter_context(remote)
-            remote.set(verbose=False, verbose_stderr=False, check=False)
-            shell = resources.enter_context(remote.shell('bash'))
-            self._push(resources, remote, shell, 'ssh', remote.host or '?')
-
-    def _console_layer(self, kind, *args, **kwargs):
-        layer = self.current
-        if layer.kind == 'program':
-            raise RuntimeError('leave the interactive program before entering another layer')
-        with ExitStack() as resources:
-            console = resources.enter_context(getattr(layer.console, kind)(*args, **kwargs))
-            self._push(resources, layer.session, console,
-                       'program' if kind == 'enter' else kind, layer.host,
-                       program=kind == 'enter')
-        if kind == 'enter':
-            self._drain_program()
-
     def shell(self, *args, **kwargs):
         self._console_layer('shell', *args, **kwargs)
-
-    def _identity_layer(self, kind, *args, **kwargs):
-        if 'password' not in kwargs:
-            # su's first positional argument is username; sudo's is password.
-            supplied_positionally = len(args) >= (2 if kind == 'su' else 1)
-            if not supplied_positionally:
-                if self.password_func is getpass and not sys.stdin.isatty():
-                    raise ValueError('provide password explicitly (password=None for passwordless authentication) when stdin is not a terminal')
-                kwargs['password'] = self.password_func(kind + ' password: ')
-        self._console_layer(kind, *args, **kwargs)
 
     def sudo(self, *args, **kwargs):
         self._identity_layer('sudo', *args, **kwargs)
@@ -322,7 +371,7 @@ class InteractiveConsole:
         # Non-environment operations keep the regular API's session/console owner.
         if name in ('upload', 'download', 'pkey', 'set', 'get'):
             return getattr(self.current.session, name)
-        if name in ('send', 'input', 'expect', 'start'):
+        if name in ('send', 'input', 'expect'):
             return getattr(self.current.console, name)
         if name in ('stdout', 'stderr', 'exitcode'):
             if self.current.kind == 'program':
@@ -330,28 +379,6 @@ class InteractiveConsole:
             result = self.current.result
             return getattr(result, name) if result is not None else (None if name == 'exitcode' else '')
         raise AttributeError(name)
-
-    def leave(self):
-        layer = self.layers.pop()
-        try:
-            layer.resources.close()
-        finally:
-            if self.layers:
-                self._refresh()
-            else:
-                self.done = True
-                self.namespace.update(session=None, console=None)
-
-    def close(self):
-        failures = []
-        while self.layers:
-            try:
-                self.leave()
-            except BaseException as error:
-                failures.append(error)
-        self.done = True
-        if failures:
-            raise BaseExceptionGroup('console cleanup failed', failures)
 
     def _write(self, text, stream):
         if text:
@@ -366,47 +393,12 @@ class InteractiveConsole:
             raise TypeError('check must be bool')
         result = self._command(command, timeout=timeout, capture_limit=capture_limit,
                                stop_timeout=stop_timeout)
-        if (enabled and result is not None and result.stop_reason == 'completed'
+        if (enabled and result is not None and (not isinstance(result, JobResult) or result.stop_reason == 'completed')
                 and result.exitcode != 0):
             error = subprocess.CalledProcessError(result.exitcode, command,
                                                  output=result.stdout, stderr=result.stderr)
             error.result = result
             raise error
-        return result
-
-    def _command(self, line, *, timeout=None, capture_limit=8 * 1024 * 1024,
-                 stop_timeout=3):
-        if self.current.kind == 'program':
-            outcome = self.current.console.input(line)
-            self._drain_program()
-            if outcome == 'exited':
-                self.leave()
-            return
-        # Managed foreground jobs retain shell state, stream output and recover
-        # the parent shell after Ctrl-C. Completion is never inferred from silence.
-        job = self.current.console.start(line, timeout=timeout, capture_limit=capture_limit,
-                                         stop_timeout=stop_timeout, check=False)
-        positions = [0, 0]
-        def drain():
-            for index, (text, stream) in enumerate(((job.stdout, self._stdout),
-                                                   (job.stderr, self._stderr))):
-                self._write(text[positions[index]:], stream)
-                positions[index] = len(text)
-        try:
-            while not job.done:
-                drain()
-                time.sleep(0.03)
-            result = job.wait()
-        except KeyboardInterrupt:
-            result = job.stop()
-            self._write('\nKeyboardInterrupt\n', self._stderr)
-        finally:
-            drain()
-        self.namespace['result'] = self.current.result = result
-        if result.exitcode not in (0, None):
-            self._write(f'[exit {result.exitcode}]\n', self._stderr)
-        if result.stdout_truncated or result.stderr_truncated:
-            self._write('[output capture limit reached]\n', self._stderr)
         return result
 
     def _drain_program(self):
@@ -442,14 +434,10 @@ class InteractiveConsole:
         self._drain_program()
         if outcome == 'exited':
             self.leave()
-
-    def _interrupt(self):
-        self.python.resetbuffer()
-        self.more = False
-        if self.layers and self.current.kind == 'program':
-            self._program_control('\x03')
         else:
-            self._write('\nKeyboardInterrupt\n', self._stderr)
+            # _input_text consumes a matched prompt from its output buffers.
+            # Preserve the protocol result: poll cannot rediscover that prompt.
+            self._state = 'waiting_input' if outcome == 'prompt' else 'running'
 
     def _eof(self):
         if self.layers and self.current.kind == 'program':
@@ -458,60 +446,6 @@ class InteractiveConsole:
             self.python.resetbuffer()
             self.more = False
             self.close()
-
-    def _discard_failed_layers(self):
-        while self.layers:
-            channel = self.current.console.channel
-            if not channel.closed and getattr(channel, '_state', None) not in ('failed', 'closed'):
-                break
-            self._write('Current shell is unavailable; leaving its environment.\n', self._stderr)
-            try:
-                self.leave()
-            except Exception as error:
-                self._write('Cleanup failed: ' + type(error).__name__ + '\n', self._stderr)
-
-    def execute(self, line):
-        """Process one input line; variables and contexts survive later calls."""
-        if self.done:
-            return
-        try:
-            helper = self._bare_helper(line) if not self.more else None
-            if helper == 'quit':
-                self.quit()
-            elif helper == 'help':
-                self.help()
-            elif helper == 'exit':
-                self._exit_layer()
-            elif not self.more and line.strip() == ':quit':
-                self.close()
-            elif not self.more and line.strip() == ':help':
-                self._write(HELP + '\n', self._stdout)
-            elif not self.more and line.strip() == ':status':
-                for layer in self.layers:
-                    self._write(f'{layer.kind}: {layer.host} [{layer.user}]\n', self._stdout)
-                self._write('Transfers and SSH credentials use the connection account.\n', self._stdout)
-            elif (not self.more and self.current.kind == 'program'
-                  and not line.lstrip().startswith('$.')):
-                self._command(line)
-            else:
-                with redirect_stdout(self._stdout), redirect_stderr(self._stderr):
-                    self.more = self.python.push(line)
-        except _QuitConsole:
-            self.python.resetbuffer()
-            self.more = False
-            self.close()
-        except KeyboardInterrupt:
-            self._interrupt()
-        except _LeaveLayer:
-            self.python.resetbuffer()
-            self.more = False
-            self.leave()
-        except SystemExit as error:
-            self.python.resetbuffer()
-            self.more = False
-            self._write(f'Python/script exited ({error.code}); console remains open.\n', self._stderr)
-        finally:
-            self._discard_failed_layers()
 
     @property
     def prompt(self):
@@ -535,15 +469,24 @@ class InteractiveConsole:
                 try:
                     line = self.input_func(self.prompt)
                 except EOFError:
-                    self._eof()
+                    self.eof()
                     continue
                 except KeyboardInterrupt:
-                    self._interrupt()
+                    self.interrupt()
                     continue
                 try:
-                    self.execute(line)
+                    self.submit(line)
+                    while self._job is not None:
+                        update = self.poll()
+                        if update.state == 'failed':
+                            diagnostic = (f'exit {update.result.exitcode}' if update.result is not None
+                                          and update.result.exitcode is not None
+                                          else update.error_type or 'operation failed')
+                            self._write(f'[{diagnostic}]\n', self._stderr)
+                        if self._job is not None:
+                            time.sleep(0.03)
                 except KeyboardInterrupt:
-                    self._interrupt()
+                    self.interrupt()
                 except Exception as error:
                     # Avoid echoing credential-bearing expressions or arbitrary
                     # server error text; the original exception is available as error.
@@ -551,6 +494,435 @@ class InteractiveConsole:
                     self._write('Operation failed (' + type(error).__name__ + '). Use :status or inspect error.\n', self._stderr)
         finally:
             self.close()
+
+    def _release_layer(self):
+        layer = self.layers.pop()
+        try:
+            layer.resources.close()
+        finally:
+            if self.layers:
+                self._refresh()
+            else:
+                self.done = True
+                self.namespace.update(session=None, console=None)
+
+    def _submit_line(self, line):
+        """Process one input line; variables and contexts survive later calls."""
+        if self.done:
+            return
+        try:
+            helper = self._bare_helper(line) if not self.more else None
+            if helper == 'quit':
+                self.quit()
+            elif helper == 'help':
+                self.help()
+            elif helper == 'exit':
+                self._exit_layer()
+            elif not self.more and line.strip() == ':status':
+                for layer in self.layers:
+                    self._write(f'{layer.kind}: {layer.host} [{layer.user}]\n', self._stdout)
+                self._write('Transfers and SSH credentials use the connection account.\n', self._stdout)
+            else:
+                with redirect_stdout(self._stdout), redirect_stderr(self._stderr):
+                    self.more = self.python.push(line)
+        except _QuitConsole:
+            self.python.resetbuffer()
+            self.more = False
+            self.close()
+        except KeyboardInterrupt:
+            self._interrupt()
+        except _LeaveLayer:
+            self.python.resetbuffer()
+            self.more = False
+            self.leave()
+        except SystemExit as error:
+            self.python.last_error = type(error).__name__
+            self.python.resetbuffer()
+            self.more = False
+            self._write('Python/script exited; console remains open.\n', self._stderr)
+        finally:
+            self._discard_failed_layers()
+
+    @staticmethod
+    def _terminal_password(prompt='Password: '):
+        if not sys.stdin.isatty():
+            raise CredentialsRequiredError('terminal password input requires a terminal or host-provided credentials')
+        return getpass(prompt)
+
+    @staticmethod
+    def _missing_password(*args, **kwargs):
+        raise CredentialsRequiredError('non-terminal console requires host-provided credentials')
+
+    def _check(self, *, idle=False):
+        if threading.get_ident() != self._creator:
+            raise RuntimeError('Console operations require the constructing thread')
+        if idle and self._job is not None:
+            raise RuntimeError('poll or interrupt the foreground job before another operation')
+
+    @property
+    def connection(self):
+        """The current connection Session; its login identity is unchanged by su/sudo."""
+        self._check()
+        return self.current.session
+
+    @property
+    def environments(self):
+        self._check()
+        return tuple(Environment(layer.kind, layer.host, layer.session.username,
+                                 (self.layers[index - 1].user if layer.kind == 'program'
+                                  and index else layer.user), layer.kind != 'program')
+                     for index, layer in enumerate(self.layers))
+
+    @property
+    def session_reuse(self):
+        return self._reuse
+
+    def _identity_layer(self, kind, *args, **kwargs):
+        self._check(idle=True)
+        username = (args[0] if kind == 'su' and args else kwargs.get('username'))
+        if kind == 'sudo' and len(args) > 1:
+            username = args[1]
+        supplied = 'password' in kwargs or len(args) >= (2 if kind == 'su' else 1)
+        request = SwitchRequest(kind, username, self.environments[-1], supplied)
+        try:
+            credential = self._resolver(request) if self._resolver else None
+            if credential is not None:
+                if not isinstance(credential, SwitchCredentials):
+                    raise TypeError('credential_resolver must return SwitchCredentials or None')
+                # Normalize positional password arguments before overriding them.
+                if len(args) >= (2 if kind == 'su' else 1):
+                    args = list(args)
+                    args[1 if kind == 'su' else 0] = credential.password
+                    kwargs.pop('password', None)
+                else:
+                    kwargs['password'] = credential.password
+                supplied = True
+            if not supplied and not self._terminal:
+                raise CredentialsRequiredError('provide credentials or explicit password=None')
+            if not supplied:
+                kwargs['password'] = self.password_func(kind + ' password: ')
+            self._console_layer(kind, *args, **kwargs)
+        except BaseException as error:
+            if self._observer:
+                self._observer(SwitchOutcome(request, False, self.environments[-1],
+                                             type(error).__name__))
+            raise
+        if self._observer:
+            self._observer(SwitchOutcome(request, True, self.environments[-1]))
+
+    def _console_layer(self, kind, *args, **kwargs):
+        self._check(idle=True)
+        layer = self.current
+        if layer.kind == 'program':
+            raise RuntimeError('leave the interactive program before entering another layer')
+        with ExitStack() as resources:
+            console = resources.enter_context(getattr(layer.console, kind)(*args, **kwargs))
+            self._push(resources, layer.session, console,
+                       'program' if kind == 'enter' else kind, layer.host,
+                       program=kind == 'enter')
+        if kind == 'enter':
+            self._drain_program()
+
+        self._state = 'running' if kind == 'enter' else 'completed'
+        self._last_result, self._error_type = None, None
+        if kind == 'enter':
+            self._program_started = time.monotonic()
+
+    def connect(self, *args, **kwargs):
+        self._check(idle=True)
+        layer = self.current
+        if layer.kind not in ('local', 'ssh'):
+            raise RuntimeError('leave the current sudo/su/shell/program layer before connect(); SSH credentials belong to the connection Session')
+        with ExitStack() as resources:
+            remote = layer.session.connect(*args, **kwargs)
+            resources.callback(remote.close, strict=True)
+            resources.enter_context(remote)
+            wrapper = remote.shell('bash')
+            wrapper.channel.dump2sys = (0, 0)
+            shell = resources.enter_context(wrapper)
+            self._push(resources, remote, shell, 'ssh', remote.host or '?')
+
+    def _discard_failed_layers(self):
+        if any(layer.console.channel.closed or
+               getattr(layer.console.channel, '_state', None) in ('failed', 'closed')
+               for layer in self.layers):
+            self._uncertain = True
+            self._state = 'failed'
+            self._reuse = 'unknown'
+
+    def _command(self, line, *, timeout=None, capture_limit=8 * 1024 * 1024,
+                 stop_timeout=3):
+        try:
+            if self.current.kind == 'program':
+                return self.send_input(line).result
+            # Managed foreground jobs retain shell state, stream output and recover
+            # the parent shell after Ctrl-C. Completion is never inferred from silence.
+            job = self.current.console.start(line, timeout=timeout, capture_limit=capture_limit,
+                                             stop_timeout=stop_timeout, check=False)
+            positions = [0, 0]
+            def drain():
+                for index, (text, stream) in enumerate(((job.stdout, self._stdout),
+                                                       (job.stderr, self._stderr))):
+                    self._write(text[positions[index]:], stream)
+                    positions[index] = len(text)
+            try:
+                while not job.done:
+                    drain()
+                    time.sleep(0.03)
+                result = job.wait()
+            except KeyboardInterrupt:
+                result = job.stop()
+                self._write('\nKeyboardInterrupt\n', self._stderr)
+            finally:
+                drain()
+            self.namespace['result'] = self.current.result = result
+            if result.exitcode not in (0, None):
+                self._write(f'[exit {result.exitcode}]\n', self._stderr)
+            if result.stdout_truncated or result.stderr_truncated:
+                self._write('[output capture limit reached]\n', self._stderr)
+        except Exception as error:
+            self._last_result = getattr(error, 'result', None)
+            if self._last_result is not None and self._last_result.termination_status != 'confirmed':
+                self._uncertain, self._reuse = True, 'unknown'
+            raise
+        self._last_result = result
+        if result is not None and result.termination_status != 'confirmed':
+            self._uncertain, self._reuse = True, 'unknown'
+        if result is not None:
+            self._state = ('completed' if result.stop_reason == 'completed'
+                           and result.exitcode == 0 else 'failed')
+        return result
+
+    def _update(self, *, consume=True):
+        output = []
+        for buffer in self._capture:
+            output.append(buffer.getvalue())
+            if consume:
+                buffer.seek(0)
+                buffer.truncate(0)
+        return ConsoleUpdate(self._state, *output, self._last_result,
+                             self._error_type, self._reuse)
+
+    def submit(self, line):
+        """Evaluate one Python/dollar line, returning a structured update.
+
+        Shell dollar commands block until completion; use start_command for polling.
+        Operation errors are reported by safe type, without source/error text.
+        """
+        self._check(idle=True)
+        if self.done:
+            return self._update()
+        if self.current.kind == 'program' and not line.lstrip().startswith('$.'):
+            if self._bare_helper(line) is None:
+                try:
+                    return self.send_input(line)
+                except KeyboardInterrupt:
+                    return self.interrupt()
+        self._state, self._error_type, self._last_result = 'completed', None, None
+        self.python.last_error = None
+        self._submitting = True
+        try:
+            self._submit_line(line)
+        except ConsoleCleanupError:
+            raise
+        except (Exception, KeyboardInterrupt, SystemExit) as error:
+            self._state, self._error_type = 'failed', type(error).__name__
+        finally:
+            self._submitting = False
+        if self.python.last_error is not None:
+            self._state, self._error_type = 'failed', self.python.last_error
+        elif self.more:
+            self._state = 'incomplete'
+        if self.done:
+            self._state = 'closed' if self._reuse != 'unknown' else 'failed'
+        return self._update()
+
+    def start(self, command, *, timeout=60, stop_timeout=3,
+              capture_limit=1024 * 1024, check=False):
+        """Start and track a foreground job, including prompt-level $.start()."""
+        self._check(idle=True)
+        if self.more:
+            raise RuntimeError('finish or interrupt incomplete Python input first')
+        self._job = self.current.console.start(command, timeout=timeout,
+                                              stop_timeout=stop_timeout,
+                                              capture_limit=capture_limit, check=check)
+        self._job_positions = [0, 0]
+        self._state, self._error_type, self._last_result = 'running', None, None
+        return self._job
+
+    def start_command(self, command, *, timeout=60, stop_timeout=3,
+                      capture_limit=1024 * 1024):
+        """Start a foreground shell command and return its first update."""
+        self.start(command, timeout=timeout, stop_timeout=stop_timeout,
+                   capture_limit=capture_limit, check=False)
+        return self.poll()
+
+    def _drain_job(self):
+        for index, (text, stream) in enumerate(((self._job.stdout, self._stdout),
+                                               (self._job.stderr, self._stderr))):
+            self._write(text[self._job_positions[index]:], stream)
+            self._job_positions[index] = len(text)
+
+    def _finish_job(self, *, stop=False):
+        job = self._job
+        try:
+            self._last_result = job.stop() if stop else job.wait()
+            self._state = ('completed' if self._last_result.stop_reason == 'completed'
+                           and self._last_result.exitcode == 0 else 'failed')
+        except Exception as error:
+            self._last_result = getattr(error, 'result', None)
+            self._state, self._error_type = 'failed', type(error).__name__
+            if self._last_result is None or self._last_result.termination_status != 'confirmed':
+                self._uncertain = True
+                self._reuse = 'unknown'
+        finally:
+            self._drain_job()
+            self._job = None
+        if self._last_result is not None:
+            self.namespace['result'] = self.current.result = self._last_result
+            if self._last_result.termination_status != 'confirmed':
+                self._uncertain, self._reuse = True, 'unknown'
+
+    def poll(self):
+        """Return available output; never wait for a running command."""
+        self._check()
+        if self._job is not None:
+            self._drain_job()
+            if self._job.done:
+                self._finish_job()
+        elif self.layers and self.current.kind == 'program':
+            channel = self.current.console.channel
+            texts = (str(channel._stdout), str(channel._stderr))
+            parent = channel.prompts[-2] if len(channel.prompts) > 1 else None
+            prompt = channel.prompt
+            if isinstance(parent, str) and parent != prompt and any(parent in text for text in texts):
+                channel._mark_interactive_layer_exited(channel.executing_lock)
+                self._drain_program()
+                self.leave()
+            else:
+                if isinstance(prompt, str) and any(prompt in text for text in texts):
+                    self._state = 'waiting_input'
+                self._drain_program()
+        self._discard_failed_layers()
+        return self._update()
+
+    def send_input(self, text, *, newline=True, timeout=1):
+        """Send a raw write or one line to an enter() program."""
+        self._check()
+        if self._job is not None:
+            raise RuntimeError('shell jobs do not accept input; use enter() for an interactive program')
+        if self.current.kind != 'program':
+            raise RuntimeError('input requires a running job or enter() program')
+        self._last_result, self._error_type = None, None
+        try:
+            if newline:
+                outcome = self.current.console.input(text, timeout=timeout)
+            else:
+                self.current.console.send(text)
+                outcome = None
+            self._drain_program()
+            if outcome == 'exited':
+                self.leave()
+            else:
+                self._state = 'waiting_input' if outcome == 'prompt' else 'running'
+        except TimeoutError:
+            self._state, self._error_type = 'running', 'TimeoutError'
+        self._discard_failed_layers()
+        return self._update()
+
+    def _interrupt(self):
+        self.python.resetbuffer()
+        self.more = False
+        if self.layers and self.current.kind == 'program':
+            self._program_control('\x03')
+        else:
+            self._write('\nKeyboardInterrupt\n', self._stderr)
+            self._state = 'ready'
+        self._error_type = 'KeyboardInterrupt'
+
+    def interrupt(self):
+        self._check()
+        if self._job is not None:
+            self._finish_job(stop=True)
+        else:
+            self._interrupt()
+        return self._update()
+
+    def eof(self):
+        self._check(idle=True)
+        self._eof()
+        return self._update()
+
+    def leave(self):
+        self._check(idle=True)
+        if len(self.layers) == 1:
+            return self.close()
+        layer = self.current
+        program = layer.kind == 'program'
+        output = (str(layer.console.channel._stdout), str(layer.console.channel._stderr)) if program else None
+        try:
+            self._release_layer()
+            if layer.console.channel._failure is not None:
+                raise RuntimeError('environment recovery failed')
+            if program:
+                status = self.current.console.exitcode
+                self._last_result = CommandResult(*output, status, layer.session.host, time.monotonic() - self._program_started, '<interactive>')
+                self.namespace['result'] = self.current.result = self._last_result
+                self._state = 'completed' if status == 0 else 'failed'
+        except BaseException:
+            self._uncertain, self._reuse = True, 'unknown'
+            raise ConsoleCleanupError('layer cleanup failed; Session reuse is unknown') from None
+
+    def close(self):
+        self._check()
+        if self.done:
+            if self._cleanup_error:
+                raise self._cleanup_error
+            return self._update()
+        failures = []
+        if self._job is not None:
+            self._finish_job(stop=True)
+        while self.layers:
+            layer = self.current
+            if layer.console.channel._failure is not None:
+                self._uncertain = True
+            try:
+                self._release_layer()
+                if layer.console.channel._failure is not None:
+                    self._uncertain = True
+            except BaseException as error:
+                failures.append(type(error).__name__)
+        self.done = True
+        try:
+            if self._ownership == 'owned':
+                self._session.close(strict=True)
+                self._reuse = 'closed'
+            elif not failures and not self._uncertain:
+                self._session.exec_command('true', check=True, command_timeout=3)
+                self._reuse = 'confirmed'
+        except BaseException as error:
+            failures.append(type(error).__name__)
+        if failures or self._uncertain:
+            self._state, self._reuse = 'failed', 'unknown'
+            self._cleanup_error = ConsoleCleanupError('console cleanup or Session recovery unconfirmed')
+            raise self._cleanup_error from None
+        self._state = 'closed'
+        return self._update(consume=not self._submitting)
+
+    def __enter__(self):
+        self._check()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            self.close()
+        except BaseException as cleanup:
+            if exc_value is not None:
+                raise BaseExceptionGroup('host operation and console cleanup failed',
+                                         [exc_value, cleanup]) from None
+            raise
+        return False
+
 
 
 HELP = '''Input is Python with SSHScript dollar syntax; variables persist between inputs.
@@ -568,9 +940,8 @@ help / help() show this guide; help(object) shows Python object documentation.
 quit / quit() close all layers. $.exit() is not available.
 :status shows the environment stack. Ctrl-C cancels current input or execution.
 Ctrl-D at the Python prompt closes the console. In enter(), Ctrl-C/D go to the program.
-:help and :quit remain aliases.
 Inside enter(), plain input goes to that program; $. expressions remain controls.
-No input history is persisted. Full-screen programs are not supported in this preview.'''
+No input history is persisted. Full-screen programs are not supported.'''
 
 
 
@@ -591,16 +962,16 @@ def main(argv=None):
                if name not in ('host', 'ask_pass', 'known_hosts_path') and value is not None}
     if args.host is None and (options or args.ask_pass):
         parser.error('connection options require a host')
-    console = InteractiveConsole()
+    session = Session()
     try:
-        console.open()
         if args.known_hosts_path is not None:
-            console.current.session.set(known_hosts_path=args.known_hosts_path)
-        if args.ask_pass:
-            options['password'] = getpass('SSH password: ')
-        if args.host is not None:
-            console.connect(args.host, **options)
-        console.interact()
+            session.set(known_hosts_path=args.known_hosts_path)
+        with Console(session, ownership='owned', terminal=True) as console:
+            if args.ask_pass:
+                options['password'] = getpass('SSH password: ')
+            if args.host is not None:
+                console.connect(args.host, **options)
+            console.interact()
     finally:
-        console.close()
+        session.close(strict=True)
     return 0

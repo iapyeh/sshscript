@@ -1,7 +1,7 @@
 # Recommended SSHScript API
 
 This is the canonical entry point for new code and AI-generated examples.
-**Current source contract: 6.0.0**, Python 3.11+. Sections marked **4.0** require
+**Current release contract: 6.1.0**, Python 3.11+. Sections marked **4.0** require
 SSHScript 4.0.2 or newer; installing `sshscript==3.1.5` does not provide them.
 Examples labelled 3.1.5 remain verified compatibility examples for that baseline.
 Pin the exact artifact version and record it with execution diagnostics when
@@ -31,8 +31,8 @@ identifiers and handoff reports are future work, not a current API guarantee.
 
 ## One command, one retained result (4.0; compatible with 3.1.5)
 
-For this source contract, install a verified 6.0.0 wheel. Once published, pin
-`sshscript==6.0.0`; the source push does not itself upload a PyPI package.
+Install `sshscript==6.1.0` for this contract. Verify the installed version and
+artifact before operational use; source publication alone does not install it.
 For reproducing only the historical compatibility baseline, explicitly install
 `sshscript==3.1.5`; the 4.0 sections require the current release.
 An argv list is one command, not a batch. Shell-looking argument text stays data.
@@ -235,7 +235,7 @@ print(result.stdout)
 
 ## 4.0: settings and managed jobs
 
-Use SSHScript 6.0.0 for the following examples. CLI `-v`, `--stderr`, and
+Use SSHScript 6.1.0 for the following examples. CLI `-v`, `--stderr`, and
 `--debug` override root defaults only for that execution. Child Sessions copy
 their parent's settings. `set()` validates before changing anything; `get()`
 returns a copy. Explicit command options override Session policy.
@@ -254,7 +254,7 @@ the settings dictionary at creation; the policy object itself is shared, so
 custom policies with mutable state must account for reuse. Changing the setting
 does not reconfigure existing connections.
 
-<!-- example: {"id":"settings", "profile":"6.0.0", "stdout":"True\n1\n"} -->
+<!-- example: {"id":"settings", "profile":"6.1.0", "stdout":"True\n1\n"} -->
 ```python
 from contextlib import closing
 import paramiko
@@ -276,7 +276,7 @@ semantics; do not combine it with `command_timeout`.
 For an indefinite command such as tcpdump, use `start(timeout=None)`. This safe
 local example uses a small Python process instead of capturing network traffic:
 
-<!-- example: {"id":"stop", "profile":"6.0.0", "stdout":"cancelled confirmed\n"} -->
+<!-- example: {"id":"stop", "profile":"6.1.0", "stdout":"cancelled confirmed\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -315,7 +315,7 @@ legacy SSH behavior which appended a newline to strings: if a consumer
 needs a line, migrate `input=password` to `input=password + "\n"` explicitly.
 Published 3.1.5 still has the legacy SSH behavior.
 
-<!-- example: {"id":"exact-stdin", "profile":"6.0.0", "stdout":"'abc'\n'abc\\n'\n"} -->
+<!-- example: {"id":"exact-stdin", "profile":"6.1.0", "stdout":"'abc'\n'abc\\n'\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -384,7 +384,7 @@ or unpack exactly `stdout, stderr, exitcode`. This changes the released 3.1.5
 console contract: old `stdout, stderr = shell(command)` must be migrated.
 Shell calls accept command strings; argv execution belongs to Session.
 
-<!-- example: {"id":"shell-result", "profile":"6.0.0", "stdout":"first 0\n"} -->
+<!-- example: {"id":"shell-result", "profile":"6.1.0", "stdout":"first 0\n"} -->
 ```python
 from contextlib import closing
 from sshscript import Session
@@ -440,7 +440,7 @@ matching: `iter_stdout()` yields chunks, not packets or lines. Put `stop()` in
 `finally`, so condition matches, exceptions, and KeyboardInterrupt all trigger
 cleanup. This credential-free example uses a continuous Python process:
 
-<!-- example: {"id":"stream-condition", "profile":"6.0.0", "stdout":"cancelled confirmed\n"} -->
+<!-- example: {"id":"stream-condition", "profile":"6.1.0", "stdout":"cancelled confirmed\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -505,7 +505,7 @@ the current Bash console's channel, cwd, environment and identity. It does not
 launch through the underlying Session. Ordinary `console(command)` / `$command`
 still waits and returns `CommandResult`; no migration is needed for finite commands.
 
-<!-- example: {"id":"console-stream", "profile":"6.0.0", "stdout":"cancelled confirmed\nconsole-alive\n"} -->
+<!-- example: {"id":"console-stream", "profile":"6.1.0", "stdout":"cancelled confirmed\nconsole-alive\n"} -->
 ```python
 from contextlib import closing
 import shlex
@@ -765,6 +765,14 @@ The same source is mirrored into the website; edit this file, then use
 production details remain in the full documentation.
 
 
+## Embed an existing Session (unified Console API)
+
+`from sshscript import Console` provides a supported integration surface without
+editing reserved variables. `Console(session)` borrows the connection, while
+`ownership="owned"` explicitly transfers ownership. Read the complete
+[API and lifecycle contract](EMBEDDED_CONSOLE.md) for structured updates,
+credentials, identity, PTY limits, exceptions and runnable examples.
+
 ## Interactive console and script completion (6.0)
 
 See [the console guide](CONSOLE.md) for the 6.0 Python-first dollar REPL, retained
@@ -782,4 +790,4 @@ ScriptResult with exitcode, stopped and message attributes; run_file() returns
 the integer status. Cleanup failures still propagate. Python SystemExit remains
 separate from normal script completion.
 
-*Last modified: 2026-10-22 23:24:55*
+*Last modified: 2026-10-23 18:39:31*
