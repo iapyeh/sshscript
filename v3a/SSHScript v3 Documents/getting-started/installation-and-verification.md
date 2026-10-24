@@ -8,175 +8,79 @@ permalink: /v3a/getting-started/installation-and-verification/
 
 # Installation and Verification
 
-> **Version scope:** The argv/CommandResult/check/config API is available in 6.1.0.
-> Session settings and managed jobs/deadlines are features available in 6.1.0.
-> Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
-> examples for your installed version.
-
-This page installs the supported SSHScript release and verifies the command-line
-program, Python import, and dependency set before any SSH connection is made.
-
-## Version status
-
-> **SSHScript 6.1.0 is the baseline for these examples.** It is available
-> from [PyPI](https://pypi.org/project/sshscript/6.1.0/) and the corresponding
-> [GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v6.1.0).
-> Settings and managed-job APIs are available in 6.1.0. See the canonical
-> guide and migration notes before upgrading 3.1.5 automation.
+> **7.0.0 source contract.** This page installs the current source branch.
+> A source push does not create a GitHub Release, tag or PyPI package.
+> The previously published 6.1.0 package has different connection parameter names.
 
 ## Requirements
 
-SSHScript 6.1.0 declares:
+SSHScript 7.0.0 requires Python 3.11+, a POSIX Linux or macOS runner,
+Paramiko >=2.11,<5 and Packaging >=21. Native Windows is not supported;
+use a supported POSIX environment. Remote shell and privilege operations also
+require the corresponding tools and authentication policy on the target host.
 
-- Python 3.11 or newer;
-- macOS or a POSIX Linux environment;
-- Paramiko 2.11 or newer, but earlier than 5; and
-- Packaging 21 or newer.
+If explicitly pinning Paramiko 2.11, also pin `cryptography<48`; that backend
+imports TripleDES from a namespace removed in cryptography 48. The minimum CI
+checks this compatible pair. Normal installations select the newer supported
+Paramiko backend; do not impose this cryptography cap on those installations.
 
-Windows is not currently listed as a supported platform. The local runner must
-use a supported POSIX environment. Remote one-shot commands require a
-POSIX-compatible SSH command environment; `shell()`, `su()`, and `sudo()` also
-require the corresponding Unix tools. Other remote operating systems are not
-part of the documented 4.0 contract.
+## Install the matching source
 
-## Create an isolated environment
-
-Use the same Python executable to create the virtual environment and invoke
-`pip`:
+Create an isolated environment and install from the release source branch:
 
 ```sh
 python3 --version
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install --upgrade pip
-```
-
-Confirm that the selected interpreter is Python 3.11 or newer before
-continuing.
-
-## Install from PyPI
-
-For an ordinary installation, install the current release:
-
-```sh
-python3 -m pip install sshscript
-```
-
-For a deployment that must remain reproducible, pin the exact release in the
-environment's requirements or lock file:
-
-```sh
-python3 -m pip install "sshscript==6.1.0"
-```
-
-To accept future compatible maintenance releases within the supported line,
-use `sshscript>=6.1.0,<6` and preserve the resolver output in a lock file.
-Do not rely on an unbounded dependency in a production deployment.
-
-## Install the tagged source
-
-Ordinary users should prefer the PyPI wheel. Contributors who need to inspect
-or test the released source can use the immutable release tag:
-
-```sh
-git clone --branch v6.1.0 --depth 1 https://github.com/iapyeh/sshscript.git
+git clone --branch release --depth 1 https://github.com/iapyeh/sshscript.git
 cd sshscript
+git rev-parse HEAD
 python3 -m pip install .
 ```
 
-The mutable `release` branch is useful for development but is not a
-reproducible version selector. Use a tag or full commit SHA when a source
-installation must be auditable.
+Record the full commit SHA. The release branch can move; use the recorded full
+SHA when reproducing the installation. A verified local 7.0.0 wheel can also be
+installed with `python3 -m pip install /path/to/sshscript-7.0.0-py3-none-any.whl`.
+Do not assume `pip install sshscript` from PyPI provides the current source API.
+Pin transitive dependencies in your application's lock file as well.
 
-## Verify the command-line program
+## Verify CLI and import
 
 ```sh
 sshscript --version
-```
-
-Expected output:
-
-```text
-6.1.0
-```
-
-If the command is missing, make sure the virtual environment is active. If it
-prints another version, stop and identify the environment before running 5.0 examples.
-
-## Verify the Python import
-
-```sh
 python3 -c "import sshscript; print(sshscript.__version__); print(sshscript.__file__)"
-```
-
-The first line must be `6.1.0`. The second line identifies the package being
-imported and should point into the active virtual environment for a PyPI
-installation. This catches a common problem in which an older installation or
-a local `sshscript.py` file shadows the intended package.
-
-## Verify the dependency set
-
-```sh
 python3 -m pip check
 python3 -m pip show sshscript paramiko packaging
 ```
 
-`pip check` should report no broken requirements. Keep this output when
-reporting installation problems, together with the operating system and
-Python version. Remove usernames, private paths, tokens, and credentials
-before posting diagnostics publicly.
+Both version outputs must be **7.0.0**. The import path should point into the
+active environment. Resolve a different version or a shadowing local module
+before using the examples. The credential-free quickstart retains its labelled
+3.1.5 baseline; connection names in the current guide require 7.0.0.
 
-## Verify release provenance
+## Verify provenance and upgrades
 
-The 6.1.0 distributions were built and tested by the repository's public
-release workflow. The workflow:
+Review the source commit, [CI workflow](https://github.com/iapyeh/sshscript/actions/workflows/ci.yml),
+[version differences]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/)
+and artifact hash before adopting an installation. Publishing a source branch
+or passing local checks does not establish that native SSH/PAM/sudo behavior
+works in your environment. Repeat site-specific validation before rollout.
 
-1. runs the credential-free checks and package assertion gate;
-2. builds and verifies one wheel and one source distribution;
-3. exercises the installed wheel against a disposable OpenSSH server;
-4. records SHA-256 hashes and GitHub build-provenance attestations;
-5. publishes to PyPI with a short-lived OIDC credential from the configured
-   Trusted Publisher; and
-6. publishes the GitHub Release only after PyPI accepts the distributions.
+The separately published [6.1.0 release](https://github.com/iapyeh/sshscript/releases/tag/v6.1.0)
+and [PyPI metadata](https://pypi.org/project/sshscript/) describe those packages;
+they do not establish publication or provenance of 7.0.0 artifacts.
 
-Review the [v6.1.0 release](https://github.com/iapyeh/sshscript/releases/tag/v6.1.0),
-the [successful release workflow](https://github.com/iapyeh/sshscript/actions/runs/38047762078),
-and PyPI's distribution metadata before adopting an artifact. Provenance
-confirms where an artifact came from; it does not replace source review or
-site-specific validation.
-
-## About the update checker
-
-```sh
-sshscript --check-updates
-```
-
-`--check-updates` (or legacy `--check` without a file) queries stable releases on
-PyPI that are compatible with the current Python version. It does not install
-anything. Verify the installed version and import path separately as shown
-above.
-
-## Upgrade an existing installation
-
-Upgrade within the supported 5.x line with:
-
-```sh
-python3 -m pip install --upgrade "sshscript>=6.1.0,<6"
-sshscript --version
-python3 -m pip check
-```
-
-Review the release notes and repeat application-specific SSH, PAM, `sudoers`,
-network, and host-key tests before promoting an upgraded environment.
+`sshscript --check-updates` queries compatible published PyPI versions and never
+installs anything. It is independent of the source checkout's version. Upgrade
+source installations by selecting and verifying a new full commit; update the
+lock file and repeat your SSH, host-key, PAM and sudoers checks.
 
 ## Next step
 
-Continue with the [5-Minute Quickstart](../quickstart/) to execute a
-credential-free command. See
-[Installation Troubleshooting]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/troubleshooting-installation/)
-if the
-version or import path is not what you expect.
+Run the [5-Minute Quickstart]({{ site.baseurl }}/v3a/getting-started/quickstart/),
+then use the [canonical guide]({{ site.baseurl }}/v3a/recommended-api/).
 
-*Last modified: 2026-10-23 18:41:27*
+*Last modified: 2026-10-24 16:46:57*
 
-Last Updated: 2026-10-23 18:41:27
+Last Updated: 2026-10-24 16:46:57

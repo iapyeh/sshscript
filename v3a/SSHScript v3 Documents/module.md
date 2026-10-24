@@ -7,9 +7,9 @@ nav_order: 1
 
 # Running Commands and Shell Pipelines
 
-> Connection examples use the unreleased development API; published 6.1.0
-> uses the previous parameter names. Use a matching checkout or artifact and
-> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
+
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
 > Session settings and managed jobs/deadlines are features available in 5.0.0.
@@ -202,6 +202,6 @@ timeout, and transport failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-*Last modified: 2026-10-24 13:19:20*
+*Last modified: 2026-10-24 16:35:46*
 
-Last Updated: 2026-10-24 13:19:20
+Last Updated: 2026-10-24 16:35:46

@@ -7,9 +7,9 @@ nav_order: 2
 
 # Connections, Authentication, and Bastions
 
-> Connection examples use the unreleased development API; published 6.1.0
-> uses the previous parameter names. Use a matching checkout or artifact and
-> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
+
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
 > Session settings and managed jobs/deadlines are features available in 5.0.0.
@@ -319,6 +319,6 @@ with $.connect("ops@example.net"):
 Nested `$.connect()` blocks and the host-key policy follow the same Session
 API behavior.
 
-*Last modified: 2026-10-24 13:27:36*
+*Last modified: 2026-10-24 16:35:46*
 
-Last Updated: 2026-10-24 13:27:36
+Last Updated: 2026-10-24 16:35:46

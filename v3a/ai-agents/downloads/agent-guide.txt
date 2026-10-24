@@ -1,9 +1,10 @@
 # SSHScript Agent Guide
 
-> Connection API changes in this guide require the matching unreleased
-> development checkout or artifact; published 6.1.0 uses the previous names.
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
 
-**Documentation contract: SSHScript 6.1.0; Python 3.11+.**
+
+**Documentation contract: SSHScript 7.0.0; Python 3.11+.**
 
 **Development policy:** SSHScript is still in development and does not maintain
 backward compatibility unless the user explicitly requests it. Follow the current
@@ -53,10 +54,10 @@ For a new environment, when installation is authorized:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install "sshscript==6.1.0"
+python3 -m pip install "git+https://github.com/iapyeh/sshscript.git@release"
 ```
 
-Pin `sshscript==6.1.0` for this contract and verify the imported version.
+Pin the full source commit or verified 7.0.0 wheel hash and verify the imported version.
 A source checkout or a same-version development wheel requires its exact commit/hash.
 
 Pin transitive dependencies in the application's lock file for repeatable
@@ -138,15 +139,15 @@ Hooks cover managed switches, not arbitrary trusted Python/lexical scripts.
 Read the checkout EMBEDDED_CONSOLE.md or bundled references/embedded-console.md
 for ownership, failure and secret-handling limits. CLI and host calls share this
 contract; older CLI entry points/aliases are removed. Use a matching verified
-6.1.0 implementation; earlier 6.0 console internals are unsupported.
+7.0.0 implementation; earlier 6.0 console internals are unsupported.
 
-## Interactive console (6.1)
+## Interactive console (7.0)
 
-This section describes SSHScript 6.1.0. Record the installed version, source
+This section describes SSHScript 7.0.0. Record the installed version, source
 commit or verified wheel identity before using the Console integration contract.
 
 Start `python3 -B sshscript.py console` from the development checkout, or
-`sshscript console` from an installed 6.1.0 wheel. Keep the same terminal/process
+`sshscript console` from an installed 7.0.0 wheel. Keep the same terminal/process
 alive between inputs; restarting it loses variables, connections and shells.
 A UI agent needs a tool that can send more input to that retained process.
 No temporary script file or Python/shell mode switch is required.
@@ -167,7 +168,7 @@ local [user]> print(value + 2)
 Python variables, literal strings and keyword expansion work in connections:
 `host = "my-ssh-alias"`, `options = {"username": "ops", "port": 2222}`, then
 `$.connect(host, **options)`. Supply passwords with `getpass()` when needed.
-The unreleased console's `$.input(secret=True)` reads and sends one hidden
+The 7.0.0 console's `$.input(secret=True)` reads and sends one hidden
 reply directly to an entered program. In terminal `interact()`, recognized
 password prompts select this reader automatically; unfamiliar or late prompts
 need the explicit control. Use the matching development checkout. Never type a
@@ -468,4 +469,4 @@ for reporting issues. Recipe-specific schemas and vault updates belong to that
 recipe's own documentation. Reading this guide does not authorize executing
 examples or submitting a public report.
 
-*Last modified: 2026-10-24 14:06:17*
+*Last modified: 2026-10-24 16:35:46*

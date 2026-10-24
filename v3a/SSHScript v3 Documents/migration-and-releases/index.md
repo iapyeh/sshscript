@@ -9,7 +9,10 @@ permalink: /v3a/migration-and-releases/
 
 # Migration and Releases
 
-Read the 6.1.0 public Console contract and its brief major differences before
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
+
+Read the 7.0.0 public Console contract and its brief major differences before
 upgrading. During development, minor releases may contain incompatible changes;
 compatibility work is required only when explicitly requested. Historical release
 notes remain available for earlier contracts.
@@ -20,6 +23,6 @@ notes remain available for earlier contracts.
 | [Migrating to v3.1](migrating-to-v3-1/) | Complete |
 | [Release Notes]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/release-notes-v3.1/) | Available |
 
-*Last modified: 2026-10-23 18:41:27*
+*Last modified: 2026-10-24 16:35:46*
 
-Last Updated: 2026-10-23 18:41:27
+Last Updated: 2026-10-24 16:35:46

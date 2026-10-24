@@ -8,8 +8,11 @@ permalink: /v3a/getting-started/quickstart/
 
 # 5-Minute Quickstart
 
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
+
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
-> Session settings and managed jobs/deadlines are features available in 6.1.0.
+> Session settings and managed jobs/deadlines are features available in 7.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
 > examples for your installed version.
 
@@ -160,6 +163,6 @@ stderr—instead. Handle both exceptions and nonzero command results.
 - [Failure Model and Production Checklist](../../security-and-operations/failure-model-and-production-checklist/)
   explains how to turn examples into operational code.
 
-*Last modified: 2026-10-23 18:41:27*
+*Last modified: 2026-10-24 16:35:46*
 
-Last Updated: 2026-10-23 18:41:27
+Last Updated: 2026-10-24 16:35:46

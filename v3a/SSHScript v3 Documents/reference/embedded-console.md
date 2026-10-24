@@ -10,10 +10,11 @@ permalink: /v3a/reference/embedded-console/
 
 # Unified Console API
 
-> Connection API and hidden-input changes require the matching unreleased
-> development checkout or artifact; published 6.1.0 uses the previous names.
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
 
-**Contract: SSHScript 6.1.0; Python 3.11+.**
+
+**Contract: SSHScript 7.0.0; Python 3.11+.**
 
 Design and lifecycle contract, written before implementation.
 
@@ -145,21 +146,22 @@ The CLI drains foreground $.start() jobs through poll() before reading another l
 Earlier 6.0 CLI behavior is not a compatibility target. Internal open()/execute()
 entry points are removed: construct Console(session) and call submit(line).
 `:help` and `:quit` aliases are removed; use help/help() and quit/quit(). `:status`
-remains the environment-stack command. Diagnostics always omit source and arbitrary
-exception text, including NameError and SystemExit values. A failed channel remains
+remains the environment-stack command. Automatic diagnostics omit source and arbitrary exception text, including
+NameError and SystemExit values; explicit :error/:traceback diagnostics may show it. A failed channel remains
 owned until cleanup and is reported as unknown; it is not silently popped to an
 apparently healthy parent layer. SSH/SFTP authentication and Session command APIs
 keep their existing responsibilities.
 
-This public API is released in SSHScript 6.1.0. During development, minor releases
+Public Console integration first appeared in SSHScript 6.1.0; this guide
+describes its 7.0.0 connection and hidden-input contract. During development, minor releases
 may include incompatible changes; compatibility is required only when explicitly
 requested. Pin the released artifact or record the exact source revision/hash.
 
 ## Executable examples
 
 Run from the flat source checkout with `PYTHONPATH=. python3 -B` followed by
-[examples/embedded_agent.py](https://github.com/iapyeh/sshscript/blob/v6.1.0/examples/embedded_agent.py) or
-[examples/embedded_terminal.py](https://github.com/iapyeh/sshscript/blob/v6.1.0/examples/embedded_terminal.py). With the matching
+[examples/embedded_agent.py](https://github.com/iapyeh/sshscript/blob/release/examples/embedded_agent.py) or
+[examples/embedded_terminal.py](https://github.com/iapyeh/sshscript/blob/release/examples/embedded_terminal.py). With the matching
 installed wheel the PYTHONPATH setting is unnecessary. Both examples create only
 local Sessions; `handover(existing_target)` and `drive(existing_target)` also
 accept a host's already-connected target Session, including a jump target.
@@ -237,6 +239,6 @@ appeared successful. If the host body and cleanup both fail, both errors are
 preserved in a BaseExceptionGroup. Do not reuse an unknown Session on the strength
 of a prompt or a successful command from an unrelated shell.
 
-*Last modified: 2026-10-24 14:13:47*
+*Last modified: 2026-10-24 16:35:46*
 
-Last Updated: 2026-10-24 14:13:47
+Last Updated: 2026-10-24 16:35:46

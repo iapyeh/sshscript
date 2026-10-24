@@ -1,5 +1,5 @@
 ---
-title: "Interactive console (6.1)"
+title: "Interactive console (7.0)"
 parent: "Reference"
 grand_parent: "SSHScript Documentation"
 nav_order: 5
@@ -8,19 +8,20 @@ permalink: /v3a/reference/interactive-console/
 
 <!-- Generated from working_branch/CONSOLE.md. -->
 
-# Interactive console (6.1)
+# Interactive console (7.0)
 
-> Connection API and hidden-input changes require the matching unreleased
-> development checkout or artifact; published 6.1.0 uses the previous names.
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
 
-The SSHScript 6.1 console runs from the flat development checkout:
+
+The SSHScript 7.0 console runs from the flat development checkout:
 
 ```sh
 python3 -B sshscript.py console
 ```
 
 Use Python 3.11 or newer with the project's dependencies. Install
-`sshscript==6.1.0` for `sshscript console`. No installation into the flat
+a matching 7.0.0 wheel or source distribution for `sshscript console`. No installation into the flat
 development checkout is required.
 
 ## Embed an existing Session (new API)
@@ -30,7 +31,7 @@ credential hooks and explicit cleanup/reuse reporting. Read
 [the embedded console contract]({{ site.baseurl }}/v3a/reference/embedded-console/) and its executable examples.
 The CLI uses the same Console core and ownership contract. Earlier 6.0 CLI
 compatibility is not maintained; see the linked contract for removed entry points
-and aliases. This guide describes the 6.1.0 release contract.
+and aliases. This guide describes the 7.0.0 release contract.
 
 ## A Python console with dollar syntax
 
@@ -174,7 +175,7 @@ Command results retain up to 8 MiB per stream; reaching that capture limit is
 reported and the displayed stream may omit output. PTY stdout/stderr can merge.
 Readiness or silence is not interpreted as a successful process exit.
 
-## Hidden program input (unreleased)
+## Hidden program input (7.0)
 
 In the terminal console, recognized prompts such as `Enter password:`,
 `Password for user:`, `Enter passphrase for key ...:`, PIN/token prompts and
@@ -279,6 +280,6 @@ A late parent-shell return is checked before sending another program reply.
 Use `prompt="mysql>"` if you also want explicit MySQL readiness detection.
 Do not add a newline to `$.exit("quit")`; one is supplied automatically.
 
-*Last modified: 2026-10-24 14:13:47*
+*Last modified: 2026-10-24 16:36:46*
 
-Last Updated: 2026-10-24 14:13:47
+Last Updated: 2026-10-24 16:36:46

@@ -1,9 +1,12 @@
 ---
-title: "SSHScript 6.1.0"
+title: "SSHScript 7.0.0"
 nav_exclude: true
 ---
 
-# SSHScript 6.1.0
+# SSHScript 7.0.0
+
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
 
 SSHScript aims to help engineers and AI agents execute, understand, and hand
 off automation reliably. Use the regular Python Session API first; optional
@@ -17,12 +20,9 @@ success; closing an SSH channel does not prove its remote process stopped.
 > without a deprecation period. Pin the exact version or source revision,
 > review changes before upgrading, and validate your automation again.
 
-> Connection examples use the unreleased development API; published 6.1.0
-> uses the previous parameter names. Use a matching checkout or artifact and
-> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
 
 
-The current contract is **6.1.0**. The public
+The current contract is **7.0.0**. The public
 [Console integration API]({{ site.baseurl }}/v3a/reference/embedded-console/)
 borrows an existing Session for terminal, host application or AI agent interaction.
 It retains Python/shell/program state, reports structured readiness and results,
@@ -41,7 +41,7 @@ cleanly through nested context managers. Python remains available for data
 processing, branching, exceptions, testing, and integration with existing
 applications.
 
-SSHScript 6.1.0 emphasizes predictable and secure automation:
+SSHScript 7.0.0 emphasizes predictable and secure automation:
 
 - one-shot commands accept nonempty strings or argv lists/tuples;
 - argument sequences preserve data boundaries without caller-side quoting;
@@ -58,7 +58,7 @@ It provides a copyable task prompt, reading order, plain-text guide and
 portable skill download.
 
 1. Read [Installation and Verification](getting-started/installation-and-verification/)
-   and confirm that both the CLI and import report `6.1.0`.
+   and confirm that both the CLI and import report `7.0.0`.
 2. Complete the credential-free [5-Minute Quickstart](getting-started/quickstart/).
 3. Continue with the
    [Module API Tutorial](SSHScript%20v3%20Documents/tutorial/).
@@ -96,6 +96,6 @@ SSHScript is released under the MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-*Last modified: 2026-10-24 13:19:20*
+*Last modified: 2026-10-24 16:35:46*
 
-Last Updated: 2026-10-24 13:19:20
+Last Updated: 2026-10-24 16:35:46

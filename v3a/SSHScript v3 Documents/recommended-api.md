@@ -14,12 +14,12 @@ permalink: /v3a/recommended-api/
 > without a deprecation period. Pin the exact version or source revision,
 > review changes before upgrading, and validate your automation again.
 
-The connection parameter names below describe the **unreleased development
-checkout**, not the published 6.1.0 package. Use a matching checkout or
-verified development artifact. See the connection changes in [VERSIONING.md]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+These examples describe the **7.0.0 source contract**. Use the matching
+source checkout or verified wheel. A source push does not publish a GitHub
+Release or PyPI package. See [the connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
 
 This is the canonical entry point for new code and AI-generated examples.
-**Base release contract: 6.1.0; connection changes are unreleased**, Python 3.11+. Sections marked **4.0** require
+**Source contract: 7.0.0**, Python 3.11+. Sections marked **4.0** require
 SSHScript 4.0.2 or newer; installing `sshscript==3.1.5` does not provide them.
 Examples labelled 3.1.5 remain verified compatibility examples for that baseline.
 Pin the exact artifact version and record it with execution diagnostics when
@@ -49,7 +49,7 @@ identifiers and handoff reports are future work, not a current API guarantee.
 
 ## One command, one retained result (4.0; compatible with 3.1.5)
 
-Install `sshscript==6.1.0` for this contract. Verify the installed version and
+Install the matching 7.0.0 source checkout or verified wheel for this contract. Verify the installed version and
 artifact before operational use; source publication alone does not install it.
 For reproducing only the historical compatibility baseline, explicitly install
 `sshscript==3.1.5`; the 4.0 sections require the current release.
@@ -278,7 +278,7 @@ the settings dictionary at creation; the policy object itself is shared, so
 custom policies with mutable state must account for reuse. Changing the setting
 does not reconfigure existing connections.
 
-<!-- example: {"id":"settings", "profile":"6.1.0", "stdout":"True\n1\n"} -->
+<!-- example: {"id":"settings", "profile":"7.0.0", "stdout":"True\n1\n"} -->
 ```python
 from contextlib import closing
 import paramiko
@@ -300,7 +300,7 @@ semantics; do not combine it with `command_timeout`.
 For an indefinite command such as tcpdump, use `start(timeout=None)`. This safe
 local example uses a small Python process instead of capturing network traffic:
 
-<!-- example: {"id":"stop", "profile":"6.1.0", "stdout":"cancelled confirmed\n"} -->
+<!-- example: {"id":"stop", "profile":"7.0.0", "stdout":"cancelled confirmed\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -339,7 +339,7 @@ legacy SSH behavior which appended a newline to strings: if a consumer
 needs a line, migrate `input=password` to `input=password + "\n"` explicitly.
 Published 3.1.5 still has the legacy SSH behavior.
 
-<!-- example: {"id":"exact-stdin", "profile":"6.1.0", "stdout":"'abc'\n'abc\\n'\n"} -->
+<!-- example: {"id":"exact-stdin", "profile":"7.0.0", "stdout":"'abc'\n'abc\\n'\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -408,7 +408,7 @@ or unpack exactly `stdout, stderr, exitcode`. This changes the released 3.1.5
 console contract: old `stdout, stderr = shell(command)` must be migrated.
 Shell calls accept command strings; argv execution belongs to Session.
 
-<!-- example: {"id":"shell-result", "profile":"6.1.0", "stdout":"first 0\n"} -->
+<!-- example: {"id":"shell-result", "profile":"7.0.0", "stdout":"first 0\n"} -->
 ```python
 from contextlib import closing
 from sshscript import Session
@@ -464,7 +464,7 @@ matching: `iter_stdout()` yields chunks, not packets or lines. Put `stop()` in
 `finally`, so condition matches, exceptions, and KeyboardInterrupt all trigger
 cleanup. This credential-free example uses a continuous Python process:
 
-<!-- example: {"id":"stream-condition", "profile":"6.1.0", "stdout":"cancelled confirmed\n"} -->
+<!-- example: {"id":"stream-condition", "profile":"7.0.0", "stdout":"cancelled confirmed\n"} -->
 ```python
 from contextlib import closing
 import sys
@@ -529,7 +529,7 @@ the current Bash console's channel, cwd, environment and identity. It does not
 launch through the underlying Session. Ordinary `console(command)` / `$command`
 still waits and returns `CommandResult`; no migration is needed for finite commands.
 
-<!-- example: {"id":"console-stream", "profile":"6.1.0", "stdout":"cancelled confirmed\nconsole-alive\n"} -->
+<!-- example: {"id":"console-stream", "profile":"7.0.0", "stdout":"cancelled confirmed\nconsole-alive\n"} -->
 ```python
 from contextlib import closing
 import shlex
@@ -797,7 +797,7 @@ editing reserved variables. `Console(session)` borrows the connection, while
 [API and lifecycle contract]({{ site.baseurl }}/v3a/reference/embedded-console/) for structured updates,
 credentials, identity, PTY limits, exceptions and runnable examples.
 
-The unreleased console also supports `$.input(secret=True)` for a hidden
+The 7.0.0 console also supports `$.input(secret=True)` for a hidden
 single-line reply to an entered program. Terminal interaction automatically uses
 this reader for recognized password prompts; detection is a heuristic, and late
 or unfamiliar prompts need the explicit operation. Embedded hosts provide
@@ -824,6 +824,6 @@ ScriptResult with exitcode, stopped and message attributes; run_file() returns
 the integer status. Cleanup failures still propagate. Python SystemExit remains
 separate from normal script completion.
 
-*Last modified: 2026-10-24 14:06:51*
+*Last modified: 2026-10-24 16:35:46*
 
-Last Updated: 2026-10-24 14:06:51
+Last Updated: 2026-10-24 16:35:46

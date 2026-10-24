@@ -7,14 +7,14 @@ has_toc: false
 
 # SSHScript Documentation
 
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
+
 > **Development status: not stable.** SSHScript is under active development.
 > APIs, CLI options, configuration and data formats may change incompatibly
 > without a deprecation period. Pin the exact version or source revision,
 > review changes before upgrading, and validate your automation again.
 
-> Connection examples use the unreleased development API; published 6.1.0
-> uses the previous parameter names. Use a matching checkout or artifact and
-> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
 
 SSHScript aims to help engineers and AI agents execute, understand, and hand
 off automation reliably. Use the regular Python Session API first; optional
@@ -24,8 +24,8 @@ reconcile unknown termination. A zero exit status does not prove deployment
 success; closing an SSH channel does not prove its remote process stopped.
 
 The credential-free example baseline is **3.1.5**. Current connection examples
-use the **unreleased development contract**, including keyword-only options and
-the new snake_case connection names. Published **6.1.0** has the earlier names;
+use the **7.0.0 source contract**, including keyword-only options and
+the new snake_case connection names. The previously published **6.1.0** package has the earlier names;
 a documentation or source update does not publish a new package. See
 [version policy and connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/)
 before selecting a matching checkout or artifact.
@@ -58,6 +58,6 @@ project for reusable recipes and operations management workflows. It is
 currently an initial documentation scaffold, without executable recipes or an
 implemented management system.
 
-*Last modified: 2026-10-24 13:22:20*
+*Last modified: 2026-10-24 16:35:46*
 
-Last Updated: 2026-10-24 13:22:20
+Last Updated: 2026-10-24 16:35:46

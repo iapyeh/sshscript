@@ -9,14 +9,14 @@ permalink: /v3a/ai-agents/
 
 # SSHScript for AI Agents
 
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
+
 > **Development status: not stable.** SSHScript is under active development.
 > APIs, CLI options, configuration and data formats may change incompatibly
 > without a deprecation period. Pin the exact version or source revision,
 > review changes before upgrading, and validate your automation again.
 
-> Connection examples use the unreleased development API; published 6.1.0
-> uses the previous parameter names. Use a matching checkout or artifact and
-> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
 
 Give your agent this page to prepare for future tasks or to complete a current
 task. SSHScript lets it write Python automation for local and SSH commands,
@@ -24,15 +24,15 @@ retain command output and status, and manage
 persistent shells and streaming jobs. Start with the regular Python `Session`
 API; optional `.spy` syntax uses the same execution contract.
 
-**Documentation contract: SSHScript 6.1.0; Python 3.11+.** Check the installed
+**Documentation contract: SSHScript 7.0.0; Python 3.11+.** Check the installed
 version before selecting APIs. Older 3.1.5 console behavior differs from 4.0.
 The `/v3a/` URL is the maintained documentation location, not a package-version
 identifier. Reading this page does not install anything or authorize execution.
 
 ## SSHScript 6.0 source contract
 
-The guide and complete skill bundle target the 6.1.0 public Console contract.
-Install `sshscript==6.1.0` and check the actual import. Backward compatibility is
+The guide and complete skill bundle target the 7.0.0 public Console contract.
+Use the matching 7.0.0 source checkout or verified wheel and check the actual import. Backward compatibility is
 not required during development unless explicitly requested; read major differences
 before reusing older automation.
 Read [6.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/)
@@ -151,6 +151,6 @@ collection logic, schemas and vault updates belong to their recipe project.
 Follow the [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 for feedback; public submission requires the user's authorization.
 
-*Last modified: 2026-10-24 13:19:20*
+*Last modified: 2026-10-24 16:39:22*
 
-Last Updated: 2026-10-24 13:19:20
+Last Updated: 2026-10-24 16:39:22

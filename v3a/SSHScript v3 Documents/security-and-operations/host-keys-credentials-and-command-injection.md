@@ -8,9 +8,9 @@ permalink: /v3a/security-and-operations/host-keys-credentials-and-command-inject
 
 # Host Keys, Credentials, and Command Injection
 
-> Connection examples use the unreleased development API; published 6.1.0
-> uses the previous parameter names. Use a matching checkout or artifact and
-> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
+
 
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
 > Session settings and managed jobs/deadlines are features available in 5.0.0.
@@ -234,6 +234,6 @@ a narrowly scoped privileged command to install it. Remove the staged copy in a
 Continue with [Timeouts, Retries, and Cleanup](../timeouts-retries-and-cleanup/)
 and the [Failure Model and Production Checklist](../failure-model-and-production-checklist/).
 
-*Last modified: 2026-10-24 13:19:20*
+*Last modified: 2026-10-24 16:35:46*
 
-Last Updated: 2026-10-24 13:19:20
+Last Updated: 2026-10-24 16:35:46
