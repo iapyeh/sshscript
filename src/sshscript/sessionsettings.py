@@ -7,10 +7,21 @@ from paramiko import MissingHostKeyPolicy
 from types import MappingProxyType
 
 DEFAULTS = MappingProxyType(dict(check=False, verbose=False, verbose_stderr=False,
-                                log_level=logging.INFO, policy=None,
-                                known_hosts='parent', known_hosts_path=None))
+                                log_level=logging.INFO, missing_host_key_policy=None,
+                                known_hosts_source='parent', known_hosts_path=None))
 UNSET = object()
 _defaults = ContextVar('sshscript_execution_defaults', default={})
+_cli_output = ContextVar('sshscript_cli_output', default=None)
+
+
+@contextmanager
+def cli_output(stdout, stderr):
+    """Scope CLI terminal defaults without changing library Session settings."""
+    token = _cli_output.set((stdout, stderr))
+    try:
+        yield
+    finally:
+        _cli_output.reset(token)
 
 
 def validate(values):
@@ -18,17 +29,17 @@ def validate(values):
     for key, value in result.items():
         if key not in DEFAULTS:
             raise ValueError(f'unknown Session setting: {key}')
-        if key == 'policy':
+        if key == 'missing_host_key_policy':
             if value is not None and not (
                 isinstance(value, MissingHostKeyPolicy) or
                 (isinstance(value, type) and issubclass(value, MissingHostKeyPolicy))
             ):
-                raise TypeError('policy must be a MissingHostKeyPolicy instance, subclass, or None')
-        elif key == 'known_hosts':
+                raise TypeError('missing_host_key_policy must be a MissingHostKeyPolicy instance, subclass, or None')
+        elif key == 'known_hosts_source':
             if not isinstance(value, str):
-                raise TypeError('known_hosts must be local, parent, or chain')
+                raise TypeError('known_hosts_source must be local, parent, or chain')
             if value not in ('local', 'parent', 'chain'):
-                raise ValueError('known_hosts must be local, parent, or chain')
+                raise ValueError('known_hosts_source must be local, parent, or chain')
         elif key == 'known_hosts_path':
             if value is not None:
                 if not isinstance(value, (str, os.PathLike)):

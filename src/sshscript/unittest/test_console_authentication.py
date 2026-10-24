@@ -56,7 +56,7 @@ if mode not in ("nopassword", "banner"):
     if mode == "hang":
         time.sleep(30)
         sys.exit(1)
-    if mode == "policy":
+    if mode == "missing_host_key_policy":
         sys.stderr.write("\nsudo: user is not allowed to run this command\n")
         sys.stderr.flush()
         sys.exit(1)
@@ -225,7 +225,7 @@ class ConsoleAuthenticationTests(unittest.TestCase):
     def test_policy_exit_is_not_reported_as_bad_password(self):
         with self.session.shell() as parent:
             with self.assertRaisesRegex(RuntimeError, "exited before readiness"):
-                self.console(parent, mode="policy").__enter__()
+                self.console(parent, mode="missing_host_key_policy").__enter__()
             stdout, _, exitcode = parent("printf recovered")
             self.assertIn("recovered", str(stdout))
 

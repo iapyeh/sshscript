@@ -1,6 +1,7 @@
 """Check PEP 561 consumer behavior using real positive and negative examples."""
 from pathlib import Path
 import shutil
+import re
 import subprocess
 import sys
 import tempfile
@@ -13,15 +14,15 @@ s = Session()
 s.set(check=True, log_level="DEBUG")
 s.verbose = False
 s.log_level = "WARNING"
-s.set(policy=AutoAddPolicy())
-s.set(known_hosts="chain", known_hosts_path=Path("/trust/known_hosts"))
-s.known_hosts = "parent"
+s.set(missing_host_key_policy=AutoAddPolicy())
+s.set(known_hosts_source="chain", known_hosts_path=Path("/trust/known_hosts"))
+s.known_hosts_source = "parent"
 s.known_hosts_path = None
-assert_type(s.get("known_hosts"), Literal["local", "parent", "chain"])
+assert_type(s.get("known_hosts_source"), Literal["local", "parent", "chain"])
 assert_type(s.get("known_hosts_path"), str | None)
-s.policy = AutoAddPolicy
-s.policy = None
-assert_type(s.get("policy"), MissingHostKeyPolicy | type[MissingHostKeyPolicy] | None)
+s.missing_host_key_policy = AutoAddPolicy
+s.missing_host_key_policy = None
+assert_type(s.get("missing_host_key_policy"), MissingHostKeyPolicy | type[MissingHostKeyPolicy] | None)
 assert_type(s.get("check"), bool)
 assert_type(s.get("log_level"), int)
 r = s.exec_command(["printf", "ready"], check=True)
@@ -46,7 +47,11 @@ with Console(s, credential_resolver=lambda request: SwitchCredentials(None)) as 
     assert_type(embedded.poll().stdout, str)
     assert_type(embedded.connection, Session)
     assert_type(embedded.environments[0].effective_user, str)
-with s.connect("host", known_hosts="local") as remote:
+    embedded.enter("python3 -q", prompt=">>>")
+    assert_type(embedded.input(secret=True), None)
+    assert_type(embedded.input("reply"), str | None)
+    assert_type(embedded.exit("quit()"), None)
+with s.connect(hostname="host", known_hosts_source="local", parent_key_filename=Path("/key"), passphrase="fixture", proxy_command=None, proxy_jump=None, timeout=3, allow_agent=False) as remote:
     assert_type(remote, Session)
 '''
 INVALID = '''from sshscript import Session
@@ -55,9 +60,19 @@ s.set(chek=True)
 s.verbose = "yes"
 s.exec_command(123)
 s.exec_command(["true"], check="yes")
-s.set(known_hosts="typo")
+s.set(known_hosts_source="typo")
 s.set(known_hosts_path=123)
-s.connect("host", known_hosts="typo")
+s.connect("host", known_hosts_source="typo")
+s.connect("host", key_path="/key")
+s.connect("host", pkey_path="/key")
+s.connect("host", proxyCommand="unused")
+s.connect("host", known_hosts="local")
+s.connect("host", policy=None)
+s.connect("host", "user")
+from sshscript import Console
+c = Console(s)
+c.input(secret="yes")
+c.input("plaintext", secret=True)
 '''
 
 def main():
@@ -81,9 +96,13 @@ def main():
             output = result.stdout + result.stderr
             if name == 'valid' and result.returncode:
                 raise RuntimeError(output)
-            if name == 'invalid' and (result.returncode != 1 or 'Found 7 errors' not in output):
-                raise RuntimeError('Expected all seven invalid uses to be rejected:\n' + output)
-        print('Public types: valid consumer accepted; seven invalid uses rejected')
+            if name == 'invalid':
+                expected = {index for index, line in enumerate(INVALID.splitlines(), 1)
+                            if line.startswith(('s.', 'c.input'))}
+                rejected = {int(line) for line in re.findall(r'invalid\.py:(\d+): error:', output)}
+                if result.returncode != 1 or not expected <= rejected:
+                    raise RuntimeError('Expected every invalid use to be rejected:\n' + output)
+        print('Public types: valid consumer accepted; fifteen invalid uses rejected')
 
 if __name__ == '__main__':
     main()

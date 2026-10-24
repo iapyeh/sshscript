@@ -67,14 +67,14 @@ termination. Verify application outcomes and reconcile unknown termination.
 
 SSH connections reject unknown or changed keys by default. SSHScript 4.0.2 and earlier
 load localhost system host keys. SSHScript 5.0.0 defaults to
-`known_hosts="parent"`, reading the calling Session host's trust file. Remote
+`known_hosts_source="parent"`, reading the calling Session host's trust file. Remote
 trust files are read over SFTP using the original SSH login account; verification
 still runs locally. `"chain"` trusts the nearest source with a target record;
 it never falls back after a mismatch or file error. Trusting a parent's records
 also trusts that host/account to maintain them. Use `"local"` to retain the
 previous source selection. See the [host-key source contract](API_GUIDE.md#host-key-sources-unreleased).
 
-The application is responsible for provisioning `known_hosts` and
+The application is responsible for provisioning `known_hosts_source` and
 verifying a new fingerprint through an independent channel. Supplying an
 automatic-acceptance Paramiko policy is an explicit opt-out from this default
 and is not recommended for production enrollment.
@@ -125,3 +125,5 @@ Use the [official PyPI project](https://pypi.org/project/sshscript/) and
 unverified mirror. Provenance and automated checks reduce supply-chain risk;
 they do not establish that a script, command, or deployment is safe for a
 particular environment.
+
+*Last modified: 2026-10-24 13:17:19*

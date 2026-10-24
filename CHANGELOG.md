@@ -1,5 +1,41 @@
 # Changelog
 
+## 7.0.0 — 2026-10-24 (source publication)
+
+- Keep minimum-backend CI on Paramiko 2.11 with cryptography<48, and use
+  encrypted OpenSSH RSA fixtures for key-passphrase forwarding tests.
+
+- Add console-only `input(secret=True)` and automatic hidden input for recognized
+  password/passphrase/PIN/token prompts in entered programs. Bypass Python parsing
+  and readline history, restore terminal echo after cancellation, and reject
+  getpass plaintext fallback. Embedded hosts supply their own password_func.
+- Rename connection arguments to hostname, parent_key_filename, proxy_command,
+  proxy_jump, missing_host_key_policy and known_hosts_source with no aliases.
+  Rename matching Session settings/properties and CLI flags. Keep key_filename
+  as a local-file option; caller-host RSA keys use parent_key_filename and
+  passphrase, falling back to password for decryption.
+- Make connection arguments after hostname keyword-only. Explicit username
+  always overrides a user embedded in hostname; remove password guessing.
+  Reject unknown/backend-unsupported keywords and socket/key conflicts before
+  opening connections. Provide typed Paramiko keyword options.
+- State prominently that the project is not stable and incompatible changes
+  may occur without a deprecation period; pin and revalidate before upgrading.
+
+- Add `:error` and `:traceback` diagnostics that also work inside entered
+  programs; retain original syntax/protocol exceptions for explicit inspection.
+- Preserve entered-program output on input timeouts and before subsequent input.
+  Recognize parent-shell returns without a configured program prompt even when
+  the silence wait times out. Do not send another reply after a delayed return.
+
+- Add console-only `$.exit()` to leave one layer and `$.exit("command")` to
+  supply an entered program's exit sequence when leaving. With no explicit or
+  configured sequence, display a reminder without sending input. Keep the layer
+  until the program's return to its parent shell is detected.
+- Display script CLI command output automatically for each stream connected to
+  a terminal. Add `--quiet`/`-q`; retain `--verbose`/`-v` and `--stderr` overrides
+  for redirection. The three output options are mutually exclusive. Explicit
+  Python output is unchanged; library defaults remain unchanged.
+
 ## 6.1.0 — 2026-10-23
 
 - Add public `Console(existing_session)` for terminal and host/AI-agent interaction
@@ -337,4 +373,4 @@ verified artifacts in the
 [Unreleased]: https://github.com/iapyeh/sshscript/compare/v3.1.4...release
 [3.1.4]: https://github.com/iapyeh/sshscript/releases/tag/v3.1.4
 
-*Last modified: 2026-10-23 18:39:31*
+*Last modified: 2026-10-24 16:46:57*

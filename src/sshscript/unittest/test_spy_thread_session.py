@@ -123,7 +123,7 @@ class SpyThreadSessionTests(unittest.TestCase):
         username=None,
         password=None,
         port=22,
-        policy=None,
+        missing_host_key_policy=None,
         **kwargs,
     ):
         child = session_module.Session(parent)

@@ -3,8 +3,9 @@ from dataclasses import FrozenInstanceError
 import shlex
 import subprocess
 import sys
+import time
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from commandresult import CommandResult
 from session import Session
@@ -73,6 +74,28 @@ class ConsoleResultTests(unittest.TestCase):
             with shell.enter(command, exit=chr(3)) as capture:
                 self.assertIsNotNone(capture.expect('capture-ready', timeout=5))
             self.assertEqual(shell('printf alive', check=True).stdout, 'alive')
+
+    def test_delayed_program_return_is_preserved_before_next_input(self):
+        session = self.local()
+        command = shlex.join([sys.executable, '-u', '-c',
+                              "input('ready> '); import time; time.sleep(2)"])
+        with session.shell('bash') as shell:
+            with shell.enter(command, prompt='ready> ') as program:
+                with self.assertRaises(TimeoutError):
+                    program.input('quit', timeout=1)
+                # The timeout must be the readiness wait, not a failed write.
+                program.channel._raise_if_unusable()
+                parent_prompt = program.channel.prompts[-2]
+                deadline = time.monotonic() + 10
+                while not any(parent_prompt in str(buffer) for buffer in
+                              (program.channel._stdout, program.channel._stderr)):
+                    self.assertLess(time.monotonic(), deadline,
+                                    'fixture did not return to its parent shell')
+                    time.sleep(.01)
+                with patch.object(program.channel, 'send', wraps=program.channel.send) as send:
+                    self.assertEqual(program.input('must-not-reach-shell'), 'exited')
+                    send.assert_not_called()
+            self.assertEqual(shell('printf parent-alive').stdout, 'parent-alive')
 
     def test_managed_continuous_output_explicit_stop(self):
         session = self.local()

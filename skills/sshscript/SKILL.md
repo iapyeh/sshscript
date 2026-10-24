@@ -3,6 +3,11 @@ name: sshscript
 description: Write, adapt, and verify Python or .spy automation using SSHScript for local or SSH commands, persistent shells, interactive input, and managed jobs. Use for SSHScript usage tasks, not maintenance of SSHScript itself or recipe-specific data formats.
 ---
 
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
+
+
+
 # Use SSHScript
 
 SSHScript is currently in development. Unless the user explicitly requests
@@ -11,7 +16,7 @@ interfaces, compatibility layers, or fallback/migration paths solely for older
 versions. Briefly identify the main differences and any required caller changes;
 do not expand the task into compatibility work. This policy is specific to SSHScript.
 
-This skill describes the **SSHScript 6.1.0 contract, Python 3.11+**. Read
+This skill describes the **SSHScript 7.0.0 contract, Python 3.11+**. Read
 [the agent guide](references/agent-guide.md) before generating automation.
 Select only the API sections needed for the user's task.
 
@@ -21,19 +26,22 @@ and explicit Session reuse reporting. Read the guide section
 [Existing Session integration](references/agent-guide.md#existing-session-integration-unified-console)
 and the matching EMBEDDED_CONSOLE.md (bundled references/embedded-console.md).
 CLI and embedding callers share one Console core. Earlier CLI compatibility is
-not maintained. Require 6.1.0 or a verified equivalent source revision for this API.
+not maintained. Require 7.0.0 or a verified equivalent source revision for this API.
 Do not reconnect, edit reserved variables, log credentials or treat silence as success.
 After program interrupt(), follow the returned state: waiting_input means its
 configured prompt matched; running means keep polling. KeyboardInterrupt alone
 does not establish readiness or program failure.
 
 For retained, step-by-step interaction, read
-[Interactive console (6.1)](references/agent-guide.md#interactive-console-61).
-Install `sshscript==6.1.0` or use a matching verified artifact. Earlier 6.0
+[Interactive console (7.0)](references/agent-guide.md#interactive-console-61).
+Install the matching 7.0.0 source checkout or verified wheel. Earlier 6.0
 console internals do not supply the supported host integration contract.
-In the console, `exit`/`exit()` leave one layer and `quit`/`quit()`
-close all layers. `$.stop()` completes a script; `$.exit()` is removed in
-both modes. Use the matching checkout's `CONSOLE.md` for the full contract.
+In the console, `exit`/`exit()`/`$.exit()` leave one layer and `quit`/`quit()`
+close all layers. `$.exit("command")` supplies an entered program's exit sequence
+when leaving; without an explicit or configured sequence, only a reminder is
+shown and the program stays open. Confirm a return to the parent shell before
+continuing shell commands. `$.stop()` completes a script; script-mode `$.exit()`
+remains unavailable. Use the matching checkout's `CONSOLE.md` for the full contract.
 
 1. Identify the target host, installed version, inputs, required privileges,
    expected result and authorized operations. Use version-matched documentation;
@@ -53,7 +61,7 @@ both modes. Use the matching checkout's `CONSOLE.md` for the full contract.
    cleanup evidence separately from code review or syntax checks.
 
 Before generating SSH authentication code, identify which host owns the key.
-`parent.connect(..., pkey_path=path)` reads an RSA private key from the
+`parent.connect(..., parent_key_filename=path)` reads an RSA private key from the
 **calling parent Session's host**: localhost for a local Session, or the
 connected host through SFTP for a remote Session. `connect()` returns a child
 Session; it does not change the parent into that child. `key_filename=` reads
@@ -64,8 +72,8 @@ for the localhost → host1 → host2 example before generating nested connectio
 ### Host-key sources in 5.0
 
 SSHScript 4.0.2 and earlier load localhost known_hosts for every connection.
-SSHScript 5.0.0 adds `known_hosts="parent"` as its default, reading the calling Session's
-trust file over SFTP for nested connections, consistent with `pkey_path`.
+The current API uses `known_hosts_source="parent"` as its default, reading the calling Session's
+trust file over SFTP for nested connections, consistent with `parent_key_filename`.
 Use these settings only with SSHScript 5.0.0 or newer. Check the installed
 version before applying them to a 4.x environment. Provision a readable, valid
 trust file on every selected source host before attempting the connection;
@@ -77,15 +85,15 @@ a permissive policy cannot bypass a missing file.
   rejects even if a distant source matches. Only missing target records allow
   fallback; unreadable/missing files and parse errors stop the connection.
 - Set each Session's `known_hosts_path` on that host; paths are not inherited.
-  Strategies are inherited, and `connect(known_hosts=...)` overrides one
-  connection only. `pkey_path` stays on the calling host for every strategy.
-- `policy` handles unknown keys after selected sources are exhausted.
+  Strategies are inherited, and `connect(known_hosts_source=...)` overrides one
+  connection only. `parent_key_filename` stays on the calling host for every strategy.
+- `missing_host_key_policy` handles unknown keys after selected sources are exhausted.
   `AutoAddPolicy` does not persist keys into these local or remote trust files.
   Do not enable it to bypass a mismatch or a file error.
 
 Read [host-key sources](references/agent-guide.md#host-key-sources-unreleased)
 for path rules, supported formats and migration. Set
-`local.set(known_hosts="local")` to retain previous nested trust behavior.
+`local.set(known_hosts_source="local")` to retain previous nested trust behavior.
 
 In script mode, console objects from `shell()`/`sudo()`/`su()`/`enter()`
 do not provide `connect()`; `$.connect()` is unavailable while such a console is current.
@@ -104,4 +112,4 @@ official links in the agent guide and confirm their contract version.
 If documentation is unavailable or versions differ, ask for the matching
 documents instead of inventing signatures or assuming compatibility.
 
-*Last modified: 2026-10-23 18:39:31*
+*Last modified: 2026-10-24 16:35:46*

@@ -1,13 +1,17 @@
-# Interactive console (6.1)
+# Interactive console (7.0)
 
-The SSHScript 6.1 console runs from the flat development checkout:
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
+
+
+The SSHScript 7.0 console runs from the flat development checkout:
 
 ```sh
 python3 -B sshscript.py console
 ```
 
 Use Python 3.11 or newer with the project's dependencies. Install
-`sshscript==6.1.0` for `sshscript console`. No installation into the flat
+a matching 7.0.0 wheel or source distribution for `sshscript console`. No installation into the flat
 development checkout is required.
 
 ## Embed an existing Session (new API)
@@ -17,7 +21,7 @@ credential hooks and explicit cleanup/reuse reporting. Read
 [the embedded console contract](EMBEDDED_CONSOLE.md) and its executable examples.
 The CLI uses the same Console core and ownership contract. Earlier 6.0 CLI
 compatibility is not maintained; see the linked contract for removed entry points
-and aliases. This guide describes the 6.1.0 release contract.
+and aliases. This guide describes the 7.0.0 release contract.
 
 ## A Python console with dollar syntax
 
@@ -26,7 +30,7 @@ namespace. No Python/shell language-mode switching is required:
 
 ```text
 local [user]> hostname
-NameError: operation failed; inspect error for details.
+NameError: operation failed; use :error or :traceback for details.
 local [user]> hostname = "a Python variable"
 local [user]> hostname
 'a Python variable'
@@ -91,8 +95,8 @@ python3 -B sshscript.py console ops@host1 --port 2222 --timeout 15
 python3 -B sshscript.py console my-ssh-alias --ask-pass
 ```
 
-CLI options include `--username`, `--port`, `--pkey-path`, `--timeout`,
-`--ssh-config`, `--known-hosts`, `--known-hosts-path` and `--ask-pass`.
+CLI options include `--username`, `--port`, `--parent-key-filename`, `--timeout`,
+`--ssh-config`, `--known-hosts-source`, `--known-hosts-path` and `--ask-pass`.
 For interactive parameter dictionaries, use the normal Session.connect keyword
 names. Configure a custom trust path with `$.set(known_hosts_path="...")` on the
 calling Session before connecting. Never disable host-key verification merely
@@ -125,14 +129,22 @@ credentials or the account owning its SFTP/key-file reads.
 Use explicit enter() for a program that asks questions or provides a REPL:
 
 ```text
-local [user]> $.enter("python3 -q -u", prompt=">>>", exit="quit()")
+local [user]> $.enter("python3 -q -u", prompt=">>>")
 local [?] program> print(6 * 7)
 42
-local [?] program> exit()
+local [?] program> $.exit("quit()")
 local [user]>
 ```
 
-Configure the program's actual readiness prompt and exit sequence. Plain input
+Configure the program's actual readiness prompt. The exit sequence can be supplied
+when leaving with `$.exit("quit()")`, or configured in advance with
+`$.enter(..., exit="quit()")`. Bare `exit`, `exit()` and `$.exit()` use that
+configured sequence. Without a sequence, they display a reminder and leave the
+program open; they send neither Ctrl-C nor EOF. A supplied exit command is sent
+once. The layer closes only after a detected return to its parent shell; if the
+program continues or the read times out, the layer stays open and `poll()` can
+observe a later return. Native program exit commands (for example MySQL `\q`)
+can also return automatically. Bare `quit`/`quit()` remain whole-console controls. Plain input
 in this layer goes to the program; `exit`, `exit()`, `quit`, `quit()`, lines
 beginning with `$.` and the colon management commands remain reserved. Use
 `$.input(...)` or `$.send(...)` to send text that would otherwise be interpreted as a management expression.
@@ -153,11 +165,43 @@ Command results retain up to 8 MiB per stream; reaching that capture limit is
 reported and the displayed stream may omit output. PTY stdout/stderr can merge.
 Readiness or silence is not interpreted as a successful process exit.
 
+## Hidden program input (7.0)
+
+In the terminal console, recognized prompts such as `Enter password:`,
+`Password for user:`, `Enter passphrase for key ...:`, PIN/token prompts and
+common Chinese password prompts use hidden input for the next reply. Input
+then returns to the normal reader. Detection checks the current output tail
+before reading a new line, including prompts split across output chunks and
+ANSI-colored prompts. It is a heuristic: an unfamiliar or late-arriving prompt
+may not be recognized, and an already active normal input read cannot switch
+retroactively. For those cases, enter this control expression instead of the
+secret itself:
+
+```python
+$.input(secret=True)
+```
+
+It reads one hidden line and sends it directly to the current enter() program,
+without evaluating Python/dollar syntax or adding the secret to readline history.
+The operation returns None. It is console-only and requires an entered program.
+`$.input("reply")` keeps its existing line-input behavior. For SSH credentials,
+use `$.connect("user@host", password=getpass("SSH password: "))`.
+Use `getpass()` inside an argument or assignment: a bare `getpass()` expression
+returns a string that the Python REPL displays. Use `$.input(secret=True)` for a
+program reply instead.
+
+No characters or asterisks are displayed. If the terminal cannot disable echo,
+input fails rather than falling back to plaintext. Ctrl-C/EOF restore the local
+terminal settings; no completed secret line is sent when reading is cancelled.
+The receiving program must also disable its own echo: remote output is displayed
+as received, without automatic secret redaction. Do not put literal secrets in
+Python expressions, print them, or ask an untrusted program to echo them.
+
 ## Stop a script, leave a layer, or quit
 
 - `$.stop(code=0, message="")` normally completes the nearest script execution.
   It is unavailable at the console prompt itself.
-- Bare `exit` and `exit()` leave one managed interactive layer. At the local
+- Bare `exit`, `exit()` and `$.exit()` leave one managed interactive layer. At the local
   root they close the console. These are console helpers, not script APIs.
 - Bare `help` or `help()` displays console instructions; `help(object)` retains
   Python's object documentation behavior.
@@ -182,7 +226,7 @@ Readiness or silence is not interpreted as a successful process exit.
 
 The console intentionally gives `exit` and `exit()` the same one-layer behavior.
 Use `quit` or `quit()` for all layers, and `$.stop()` for normal script
-completion. `$.exit()` is removed in both console and script mode.
+completion. `$.exit()` is available only at the console prompt; it is not a script API.
 
 `script_result = $.run(source)` executes in the current connection Session; it
 does not inherit an elevated console as its command target. `$.run_file(path)` uses the public
@@ -202,9 +246,10 @@ remain errors even if the script requested normal completion.
 Replace `$.break(...)` with `$.stop(...)`. Replace script-ending `$.exit(...)`
 with `$.stop(...)` for normal completion, or Python `sys.exit(...)` when the
 caller should receive SystemExit. The old Break/Exit exception classes and the
-old direct wrapper exit behavior are removed. `$.exit()`, `Session.exit()`
-and wrapper `.exit()` are no longer available. In the console, use `exit` or
-`exit()` to leave one managed layer. In scripts, let Python manage lexical
+old direct wrapper exit behavior are removed. `Session.exit()` and wrapper
+`.exit()` remain unavailable. In the console, use `exit`, `exit()` or `$.exit()`
+to leave one managed layer; use `$.exit("command")` to supply a program exit
+sequence when leaving. In scripts, let Python manage lexical
 `with` blocks. The earlier preview's bare-exit reminder and whole-console
 `exit()` behavior are replaced by this one-layer rule.
 
@@ -212,6 +257,17 @@ The initial shell-first preview's `:python` and `:shell` commands are removed.
 Input now follows Python/dollar syntax throughout; prefix shell commands with `$`.
 
 Type `help` for a reminder. Operation failures display their type without
-reprinting credential-bearing input; inspect `error` at the prompt for details.
+reprinting credential-bearing input. Use `:error` to display the original error
+message, or `:traceback` for the full traceback. Both commands work inside entered
+programs and are never sent to the program. Details are displayed only on request
+and may include values from the original exception. `print(error)` is also
+available at the Python prompt, but inside enter() plain text goes to the program.
 
-*Last modified: 2026-10-23 18:39:31*
+Entered programs do not require `prompt=` to retain output or detect a return to
+the parent shell. Output received during an input timeout is still displayed;
+pending output is drained before another reply replaces the capture buffers.
+A late parent-shell return is checked before sending another program reply.
+Use `prompt="mysql>"` if you also want explicit MySQL readiness detection.
+Do not add a newline to `$.exit("quit")`; one is supplied automatically.
+
+*Last modified: 2026-10-24 16:36:46*
