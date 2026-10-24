@@ -42,6 +42,11 @@ installed with `python3 -m pip install /path/to/sshscript-7.0.0-py3-none-any.whl
 Do not assume `pip install sshscript` from PyPI provides the current source API.
 Pin transitive dependencies in your application's lock file as well.
 
+For future PR/candidate snapshots, including installation of their matching
+agent documents and complete skill, follow
+[Testing an unreleased source snapshot]({{ site.baseurl }}/v3a/ai-agents/guide/#testing-an-unreleased-source-snapshot).
+The same workflow covers returning to `release`.
+
 ## Verify CLI and import
 
 ```sh
@@ -78,6 +83,6 @@ lock file and repeat your SSH, host-key, PAM and sudoers checks.
 Run the [5-Minute Quickstart]({{ site.baseurl }}/v3a/getting-started/quickstart/),
 then use the [canonical guide]({{ site.baseurl }}/v3a/recommended-api/).
 
-*Last modified: 2026-10-24 19:37:01*
+*Last modified: 2026-10-24 20:10:23*
 
-Last Updated: 2026-10-24 19:37:01
+Last Updated: 2026-10-24 20:10:23

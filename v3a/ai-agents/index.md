@@ -29,17 +29,28 @@ version before selecting APIs. Older 3.1.5 console behavior differs from 4.0.
 The `/v3a/` URL is the maintained documentation location, not a package-version
 identifier. Reading this page does not install anything or authorize execution.
 
-## SSHScript 6.0 source contract
+## SSHScript 7.0 source contract
 
 The guide and complete skill bundle target the 7.0.0 public Console contract.
 Use the matching 7.0.0 source checkout or verified wheel and check the actual import. Backward compatibility is
 not required during development unless explicitly requested; read major differences
 before reusing older automation.
-Read [6.0 migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/)
+Read [version differences]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/)
 before upgrading. The new [interactive console]({{ site.baseurl }}/v3a/reference/interactive-console/)
 retains Python variables and shell state: `exit`/`exit()` leave one layer,
 `quit`/`quit()` close all layers, and `$.stop()` completes a script.
-`$.exit()` and the old break API are removed.
+`$.exit()` leaves one layer; `$.exit("command")` supplies a program exit sequence.
+`$.stop()` completes a script.
+
+## Test an unreleased version
+
+For a PR, candidate branch, or commit not yet on `release` or PyPI, use
+[Testing an unreleased source snapshot]({{ site.baseurl }}/v3a/ai-agents/guide/#testing-an-unreleased-source-snapshot).
+It includes exact download and installation steps, a reusable UI-agent prompt,
+and the procedure for switching back to `release`. Update the Python package,
+matching documents, and complete skill together from one full source SHA.
+Generate the skill from that checkout rather than assuming the latest website
+ZIP matches. A source push or pending CI does not establish a published release.
 
 ## Prompt to set up for future tasks
 
@@ -151,6 +162,6 @@ collection logic, schemas and vault updates belong to their recipe project.
 Follow the [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 for feedback; public submission requires the user's authorization.
 
-*Last modified: 2026-10-24 16:39:22*
+*Last modified: 2026-10-24 20:10:23*
 
-Last Updated: 2026-10-24 16:39:22
+Last Updated: 2026-10-24 20:10:23

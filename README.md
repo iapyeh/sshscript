@@ -25,6 +25,7 @@ differences are briefly documented. Historical examples remain explicitly labell
 Recommended entry points:
 
 - [Installation and Verification](https://iapyeh.github.io/sshscript/v3a/getting-started/installation-and-verification/)
+- [Unreleased Test Snapshots and UI-Agent Update Prompt](https://iapyeh.github.io/sshscript/v3a/ai-agents/guide/#testing-an-unreleased-source-snapshot)
 - [5-Minute Quickstart](https://iapyeh.github.io/sshscript/v3a/getting-started/quickstart/)
 - [Module API Tutorial](https://iapyeh.github.io/sshscript/v3a/SSHScript%20v3%20Documents/tutorial/)
 - [Session and Console API Reference](https://iapyeh.github.io/sshscript/v3a/reference/session-and-console-api/)
@@ -63,7 +64,7 @@ targets branch-level publishing files such as this README or `_config.yml`.
 - Do not duplicate the sidebar with a manually maintained child-page table of
   contents.
 - End each maintained v3a Markdown document with
-  `Last Updated: YYYY-MM-DD HH:MM:SS` and match its filesystem mtime.
+  `Last Updated: 2026-10-24 20:12:09
 
 ## Sidebar navigation
 
@@ -126,6 +127,6 @@ SSHScript source code, releases, and issue tracking are available in the
 [iapyeh/sshscript repository](https://github.com/iapyeh/sshscript).
 SSHScript is released under the MIT License.
 
-*Last modified: 2026-10-24 16:37:41*
+*Last modified: 2026-10-24 20:12:09*
 
-Last Updated: 2026-10-24 16:37:41
+Last Updated: 2026-10-24 20:12:09
