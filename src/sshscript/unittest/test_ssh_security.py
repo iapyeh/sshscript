@@ -32,13 +32,13 @@ class HostKeyPolicyTests(unittest.TestCase):
         def __init__(self):
             self.transport = HostKeyPolicyTests.Transport()
             self.loaded_system_keys = False
-            self.policy = None
+            self.missing_host_key_policy = None
 
         def load_system_host_keys(self):
             self.loaded_system_keys = True
 
-        def set_missing_host_key_policy(self, policy):
-            self.policy = policy
+        def set_missing_host_key_policy(self, missing_host_key_policy):
+            self.missing_host_key_policy = missing_host_key_policy
 
         def connect(self, *args, **kwargs):
             self.connect_args = args
@@ -59,7 +59,7 @@ class HostKeyPolicyTests(unittest.TestCase):
             return client
 
         parent = Session()
-        parent.set(known_hosts='local')
+        parent.set(known_hosts_source='local')
         self.addCleanup(parent.close)
         with patch.object(session_module.paramiko, 'SSHClient', factory), \
              patch.object(parent, '_read_known_hosts', return_value=paramiko.HostKeys()) as read_keys:
@@ -67,15 +67,15 @@ class HostKeyPolicyTests(unittest.TestCase):
 
         read_keys.assert_called_once()
         self.assertFalse(created[0].loaded_system_keys)
-        self.assertIsNone(created[0].policy)
+        self.assertIsNone(created[0].missing_host_key_policy)
         child.close()
 
     def test_auto_add_policy_requires_explicit_opt_in(self):
         client = self.Client()
         parent = Session()
-        parent.set(known_hosts='local')
+        parent.set(known_hosts_source='local')
         self.addCleanup(parent.close)
-        policy = paramiko.AutoAddPolicy()
+        missing_host_key_policy = paramiko.AutoAddPolicy()
         with patch.object(
             session_module.paramiko,
             'SSHClient',
@@ -85,10 +85,10 @@ class HostKeyPolicyTests(unittest.TestCase):
                 'example.test',
                 ssh_config=False,
                 username='user',
-                policy=policy,
+                missing_host_key_policy=missing_host_key_policy,
             )
 
-        self.assertIs(client.policy, policy)
+        self.assertIs(client.missing_host_key_policy, missing_host_key_policy)
         child.close()
 
 
@@ -102,7 +102,7 @@ class KnownHostsTests(unittest.TestCase):
         self.folder = self.enterContext(tempfile.TemporaryDirectory())
         self.local = Session()
         self.addCleanup(self.local.close)
-        self.path = Path(self.folder) / 'known_hosts'
+        self.path = Path(self.folder) / 'known_hosts_source'
         self.path.write_text('')
         self.local.known_hosts_path = self.path
         self.host1 = self.remote(self.local, 'host1')
@@ -136,17 +136,17 @@ class KnownHostsTests(unittest.TestCase):
         return client.get_host_keys()
 
     def test_default_and_settings_validation_path_is_not_inherited(self):
-        self.assertEqual(self.local.known_hosts, 'parent')
+        self.assertEqual(self.local.known_hosts_source, 'parent')
         self.assertIsNone(self.host1.known_hosts_path)
-        self.host1.set(known_hosts='chain', known_hosts_path='/trust/host1')
+        self.host1.set(known_hosts_source='chain', known_hosts_path='/trust/host1')
         child = Session(self.host1)
         self.addCleanup(child.close)
-        self.assertEqual(child.known_hosts, 'chain')
+        self.assertEqual(child.known_hosts_source, 'chain')
         self.assertIsNone(child.known_hosts_path)
         before = child.get()
         for value, exception in [('other', ValueError), (None, TypeError), (1, TypeError)]:
             with self.assertRaises(exception):
-                child.set(check=True, known_hosts=value)
+                child.set(check=True, known_hosts_source=value)
             self.assertEqual(child.get(), before)
         for value, exception in [('', ValueError), ('x\x00', ValueError), (b'path', TypeError), (True, TypeError)]:
             with self.assertRaises(exception):
@@ -213,7 +213,7 @@ class KnownHostsTests(unittest.TestCase):
         self.host2._sftp.open.assert_called_once_with(path, 'rb')
         self.host2._client.exec_command.assert_not_called()
 
-    def handshake(self, policy=None, strategy=None, pkey_path=None):
+    def handshake(self, missing_host_key_policy=None, strategy=None, parent_key_filename=None):
         client_socket, server_socket = socket.socketpair()
         self.addCleanup(client_socket.close)
         self.addCleanup(server_socket.close)
@@ -235,23 +235,23 @@ class KnownHostsTests(unittest.TestCase):
         options = dict(username='fixture', password='fixture', ssh_config=False,
                        look_for_keys=False, allow_agent=False, timeout=3,
                        banner_timeout=3, auth_timeout=3)
-        if policy is not None:
-            options['policy'] = policy
+        if missing_host_key_policy is not None:
+            options['missing_host_key_policy'] = missing_host_key_policy
         if strategy is not None:
-            options['known_hosts'] = strategy
-        if pkey_path is not None:
-            options['pkey_path'] = pkey_path
+            options['known_hosts_source'] = strategy
+        if parent_key_filename is not None:
+            options['parent_key_filename'] = parent_key_filename
         child = self.host2.connect('host3', **options)
         self.addCleanup(child.close)
         return child
 
     def test_real_handshake_parent_default_and_chain_override_snapshot(self):
-        self.host2.known_hosts = 'parent'
+        self.host2.known_hosts_source = 'parent'
         self.trust(self.host1, self.line('host3'))
         child = self.handshake(strategy='chain')
         self.assertTrue(child.connected)
-        self.assertEqual(child.known_hosts, 'parent')
-        self.assertEqual(self.host2.known_hosts, 'parent')
+        self.assertEqual(child.known_hosts_source, 'parent')
+        self.assertEqual(self.host2.known_hosts_source, 'parent')
         self.assertIsNone(child.known_hosts_path)
 
     def test_real_handshake_parent_default_accepts_near_match(self):
@@ -261,12 +261,12 @@ class KnownHostsTests(unittest.TestCase):
         self.host1._sftp.open.assert_not_called()
 
     def test_real_handshake_near_mismatch_rejects_despite_distant_match_and_autoadd(self):
-        self.host2.known_hosts = 'chain'
+        self.host2.known_hosts_source = 'chain'
         self.trust(self.host2, self.line('host3', self.stale))
         self.trust(self.host1, self.line('host3'))
         self.trust(self.local, self.line('host3'))
         with self.assertRaises(paramiko.BadHostKeyException):
-            self.handshake(policy=paramiko.AutoAddPolicy())
+            self.handshake(missing_host_key_policy=paramiko.AutoAddPolicy())
         self.host1._sftp.open.assert_not_called()
         self.assertEqual(self.host2.subsessions, [])
 
@@ -276,15 +276,15 @@ class KnownHostsTests(unittest.TestCase):
             self.handshake()
 
     def test_near_record_for_another_algorithm_still_blocks_fallback(self):
-        self.host2.known_hosts = 'chain'
+        self.host2.known_hosts_source = 'chain'
         self.trust(self.host2, self.line('host3', paramiko.ECDSAKey.generate()))
         self.trust(self.host1, self.line('host3'))
         with self.assertRaises(paramiko.BadHostKeyException):
-            self.handshake(policy=paramiko.AutoAddPolicy())
+            self.handshake(missing_host_key_policy=paramiko.AutoAddPolicy())
         self.host1._sftp.open.assert_not_called()
 
     def test_chain_unknown_rejects_after_all_sources_are_read(self):
-        self.host2.known_hosts = 'chain'
+        self.host2.known_hosts_source = 'chain'
         with self.assertRaisesRegex(paramiko.SSHException, 'not found in known_hosts'):
             self.handshake()
         self.host1._sftp.open.assert_called_once()
@@ -300,15 +300,15 @@ class KnownHostsTests(unittest.TestCase):
         with patch.dict(os.environ, {'HOME': self.folder}):
             for strategy in ('parent', 'chain', 'local'):
                 with self.assertRaisesRegex(SSHScriptException, 'localhost.*FileNotFoundError'):
-                    self.local.connect('host3', known_hosts=strategy,
-                        policy=paramiko.AutoAddPolicy(), ssh_config=False)
+                    self.local.connect('host3', known_hosts_source=strategy,
+                        missing_host_key_policy=paramiko.AutoAddPolicy(), ssh_config=False)
 
     def test_unknown_policy_autoadd_is_in_memory_and_pkey_stays_on_caller(self):
-        self.host2.known_hosts = 'chain'
+        self.host2.known_hosts_source = 'chain'
         sentinel_path = '/host2/key'
         with patch.object(self.host2, 'pkey', return_value=self.good) as read_key:
-            child = self.handshake(policy=paramiko.AutoAddPolicy(), pkey_path=sentinel_path)
-        read_key.assert_called_once_with(sentinel_path)
+            child = self.handshake(missing_host_key_policy=paramiko.AutoAddPolicy(), parent_key_filename=sentinel_path)
+        read_key.assert_called_once_with(sentinel_path, password='fixture')
         self.assertEqual(child._client.get_host_keys()['host3']['ssh-rsa'], self.good)
         self.assertEqual(self.path.read_text(), '')
         for source in (self.host1, self.host2):
@@ -316,7 +316,7 @@ class KnownHostsTests(unittest.TestCase):
 
     def test_invalid_strategy_fails_before_opening_tunnel(self):
         with self.assertRaises(ValueError):
-            self.host2.connect('host3', known_hosts='invalid')
+            self.host2.connect('host3', known_hosts_source='invalid')
         self.host2._client.get_transport.return_value.open_channel.assert_not_called()
 
 

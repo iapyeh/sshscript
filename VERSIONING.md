@@ -1,5 +1,10 @@
 # Version policy and major differences
 
+> **Development status: not stable.** SSHScript is under active development.
+> APIs, CLI options, configuration and data formats may change incompatibly
+> without a deprecation period. Pin the exact version or source revision,
+> review changes before upgrading, and validate your automation again.
+
 SSHScript aims to let engineers and AI reliably execute, understand, and take
 over automation. A version identifies a public execution contract, not a
 claim that a command or deployment is safe or successful.
@@ -23,6 +28,7 @@ require their existing authorization.
 | 4.0.2 | Previous production contract: completed console results, settings, managed jobs and authenticated-console handshakes; incompatible with parts of 3.1.5. |
 | 5.0.0 | Previous published contract: calling-host trust by default, explicit local/chain strategies and strict known_hosts file errors; preserves the 4.0 command execution contract. |
 | 6.0.0 | Previous release contract: interactive Python/dollar console, normal script completion with stop(), ScriptResult metadata, and removal of old exit/break APIs and control exceptions. |
+| 7.0.0 | Current source contract: renamed, keyword-only connection options without aliases; hidden program input, console exit controls, diagnostics and terminal output defaults. Source publication does not publish a GitHub Release/PyPI package. |
 | 6.1.0 | Public Console(existing_session), host/agent updates, credential hooks, explicit ownership and cleanup/reuse status; unified CLI and corrected program Ctrl-C readiness. |
 
 Version 4.0.1 introduced the published 4.0 contract after release validation.
@@ -31,12 +37,56 @@ execution contract. Native-system validation limits remain documented.
 Use the normal Python Session API as the canonical entry point; optional .spy
 syntax follows the same versioned execution contract.
 
+## 7.0.0 connection parameter changes
+
+These changes define the 7.0.0 source contract. The previously published 6.1.0
+package uses the old names. A source push does not publish a new package.
+Old names are rejected immediately; there are no compatibility aliases or
+migration tools. Update scripts, connection dictionaries and Session settings.
+
+| Previous name | Current name |
+| --- | --- |
+| `host` parameter | `hostname` |
+| `pkey_path` | `parent_key_filename` |
+| `proxyCommand` / `proxyJump` | `proxy_command` / `proxy_jump` |
+| `policy` | `missing_host_key_policy` |
+| `known_hosts` strategy | `known_hosts_source` |
+| `--pkey-path` | `--parent-key-filename` |
+| `--known-hosts` | `--known-hosts-source` |
+
+Only hostname may be positional. Replace `connect("user@host", "password")`
+with `connect("user@host", password="password")`. Explicit username takes
+precedence over the embedded username and is never interpreted as a password.
+`key_filename` still reads local Python-host files; `parent_key_filename` reads
+an RSA key from the calling Session's host. Supply passphrase to decrypt it;
+password is the fallback when passphrase is omitted. Do not combine the latter
+with pkey or key_filename. Explicit sock is incompatible with nested/proxy
+connections. `known_hosts_path` remains a Session setting and is not renamed.
+
+Use the same new policy/source names in `set()`, `get()` and Session properties.
+CLI proxy options are `--proxy-command` and `--proxy-jump`; OpenSSH config files
+still use their standard `ProxyCommand` and `ProxyJump` directives.
+The historical sections below retain the names used by those releases.
+
+## 7.0.0 console changes
+
+The working checkout adds console-only `$.exit()` alongside `exit` and `exit()`.
+For entered programs, `$.exit("command")` supplies the exit sequence on departure;
+without an explicit or configured sequence, the program stays open with a reminder.
+Script-mode `$.exit()`, `Session.exit()` and wrapper `.exit()` remain unavailable.
+Script CLI output now defaults to each stream's TTY status, with mutually exclusive
+`--quiet`, `--verbose` and `--stderr` overrides. Scripts that also print captured
+output may display it twice on a terminal; use `--quiet` when printing it yourself.
+Hidden program replies use `$.input(secret=True)`; recognized password prompts
+select hidden input in terminal interaction. These are 7.0.0 source changes; the
+following migration table is historical.
+
 ## 6.0 console and script completion migration
 
 6.0.0 is an incompatible major version, approved for the new execution contract.
 A source push and successful CI do not create a GitHub Release, tag or PyPI upload.
 The 6.0.0 package was published separately; this historical section records its
-script-completion changes. The current integration contract is 6.1.0.
+script-completion changes. The current source contract is 7.0.0.
 
 | Previous use | 6.0 replacement |
 | --- | --- |
@@ -88,6 +138,9 @@ command contracts keep their existing responsibilities.
 The maintainer selected 6.1.0 for this feature release under the current
 development policy. It includes the above incompatible console changes, without
 compatibility aliases. Read [the integration contract](EMBEDDED_CONSOLE.md).
+
+The maintainer selected **7.0.0** for the new connection contract because old
+connection arguments, settings and CLI flags are rejected directly.
 
 ## Numbering and compatibility
 
@@ -183,4 +236,4 @@ Consult that artifact's version-labelled API guide before generating examples.
 Production gates reject prerelease/local versions before uploading; they never
 silently relabel development builds as stable.
 
-*Last modified: 2026-10-23 18:39:31*
+*Last modified: 2026-10-24 16:35:46*

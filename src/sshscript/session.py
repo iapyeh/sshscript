@@ -44,7 +44,7 @@ import weakref
 from functools import wraps
 from select import select
 if __package__:
-    from .sessionsettings import UNSET, validate, root_defaults, SessionLogger
+    from .sessionsettings import UNSET, validate, root_defaults, SessionLogger, _cli_output
     from .commandjob import CommandJob, CommandTimeoutError, JobResult
     from .commandresult import CommandResult
     from .sshconfig import resolve_connection
@@ -56,7 +56,7 @@ if __package__:
     from . import dollarparser
 
 else:
-    from sessionsettings import UNSET, validate, root_defaults, SessionLogger
+    from sessionsettings import UNSET, validate, root_defaults, SessionLogger, _cli_output
     from commandjob import CommandJob, CommandTimeoutError, JobResult
     from commandresult import CommandResult
     from sshconfig import resolve_connection
@@ -405,6 +405,7 @@ class Session(object):
         # A child shares its tree lock; independent roots do not block each other.
         self._lifecycle_lock = parent._lifecycle_lock if parent is not None else threading.RLock()
         self._settings = parent.get() if parent is not None else root_defaults()
+        self._output_defaults = parent._output_defaults if parent is not None else _cli_output.get()
         if parent is not None:
             # A path belongs to this host, not to the host of the parent.
             self._settings['known_hosts_path'] = None
@@ -449,6 +450,8 @@ class Session(object):
         """Atomically update this Session's validated settings."""
         values = validate(settings)
         self._settings.update(values)
+        if 'verbose' in values or 'verbose_stderr' in values:
+            self._output_defaults = None
 
     @export2Dollar
     def get(self, name=None):
@@ -463,8 +466,8 @@ class Session(object):
     verbose = property(lambda self: self.get('verbose'), lambda self, v: self.set(verbose=v))
     verbose_stderr = property(lambda self: self.get('verbose_stderr'), lambda self, v: self.set(verbose_stderr=v))
     log_level = property(lambda self: self.get('log_level'), lambda self, v: self.set(log_level=v))
-    policy = property(lambda self: self.get('policy'), lambda self, v: self.set(policy=v))
-    known_hosts = property(lambda self: self.get('known_hosts'), lambda self, v: self.set(known_hosts=v))
+    missing_host_key_policy = property(lambda self: self.get('missing_host_key_policy'), lambda self, v: self.set(missing_host_key_policy=v))
+    known_hosts_source = property(lambda self: self.get('known_hosts_source'), lambda self, v: self.set(known_hosts_source=v))
     known_hosts_path = property(lambda self: self.get('known_hosts_path'), lambda self, v: self.set(known_hosts_path=v))
 
     ## added in v2.0.3
@@ -761,62 +764,66 @@ class Session(object):
                 return
 
     @export2Dollar
-    def connect(self,host,username=None,password=None,port=None,policy=UNSET,*,ssh_config=None,known_hosts=UNSET,**kw):
+    def connect(self, hostname, *, port=None, username=None, password=None,
+                pkey=None, key_filename=None, parent_key_filename=None,
+                passphrase=None, sock=None, proxy_command=UNSET, proxy_jump=UNSET,
+                ssh_config=None, missing_host_key_policy=UNSET,
+                known_hosts_source=UNSET, **kw):
         """Return a connected child session, optionally through this session's SSH link.
 
         Use with session.connect("user@host") as remote to scope the connection.
         A nested connect() uses the parent as a jump host. In ordinary Python,
         connect() alone does not activate the child for .spy execution; use with.
 
-        host may include the username; connect("user@host", password) is supported.
-        pkey_path loads an RSA key from this session's host (local for a new Session).
+        hostname may include a username. Explicit username always takes precedence.
+        All arguments after hostname are keyword-only. key_filename uses the local
+        Python filesystem; parent_key_filename loads an RSA key from this Session's
+        host. passphrase decrypts that key, falling back to password when omitted.
         Local connections read ~/.ssh/config by default; ssh_config=False opts
         out, and a path selects a config file. Explicit parameters win. Nested
         connections skip local config unless a path is explicitly supplied.
         resolve_connection() previews effective settings without connecting.
         Other connection keywords are forwarded to SSHClient.connect().
 
-        Unknown and changed host keys are rejected by default. Omitted policy uses
-        this Session's policy setting; an explicit policy overrides it for this
+        Unknown and changed host keys are rejected by default. An omitted
+        missing_host_key_policy inherits the Session setting; an explicit value overrides it for this
         connection only. Explicit None uses Paramiko's default RejectPolicy.
-        Children inherit the parent's settings, including policy; changing a
-        setting affects future connections only. proxyCommand is supported only on a local
+        Children inherit the parent's settings, including missing_host_key_policy; changing a
+        setting affects future connections only. proxy_command is supported only on a local
         parent; its connect/banner/auth timeouts default to 30 seconds and may be
         overridden. KEEPALIVE_INTERVAL sets keepalive seconds (default 60; 0 disables).
         Connection failures propagate.
 
-        known_hosts selects local, parent (default: this Session's host), or
+        known_hosts_source selects local, parent (default: this Session's host), or
         chain (this host, then ancestors through localhost). Children inherit
         the setting; a connect override affects only that connection. Each
         source uses its own known_hosts_path or ~/.ssh/known_hosts. Paths are
         not inherited. The nearest source containing the target is authoritative:
         a mismatch never falls back. Read/parse failures propagate in all modes.
-        Unknown keys use policy only after all selected sources lack the target.
+        Unknown keys use missing_host_key_policy only after all selected sources lack the target.
         These sources are read-only, including with AutoAddPolicy.
         """
         
         if self.closed:
             raise RuntimeError('cannot connect from a closed session')        
 
-        if policy is UNSET:
-            policy = self.policy
-        if known_hosts is UNSET:
-            known_hosts = self.known_hosts
-        validate({'known_hosts': known_hosts})
+        if missing_host_key_policy is UNSET:
+            missing_host_key_policy = self.missing_host_key_policy
+        if known_hosts_source is UNSET:
+            known_hosts_source = self.known_hosts_source
+        validate({'known_hosts_source': known_hosts_source,
+                  'missing_host_key_policy': missing_host_key_policy})
         
-        ## host might be in format of "username@hostname"
-        if isinstance(host, str) and '@' in host:
-            if username and password is None:
-                password = username
-                username = None
-            embedded_username,host = host.rsplit('@', 1)
-            if username is None:
-                username = embedded_username
-
         is_nested = self._client is not None
+        for name, value in (('pkey', pkey), ('key_filename', key_filename),
+                            ('parent_key_filename', parent_key_filename),
+                            ('passphrase', passphrase), ('sock', sock)):
+            if value is not None:
+                kw[name] = value
         effective = resolve_connection(
-            host, username, port,
+            hostname, username=username, port=port,
             ssh_config=False if is_nested and ssh_config is None else ssh_config,
+            proxy_command=proxy_command, proxy_jump=proxy_jump,
             **kw,
         )
         host = effective.pop('hostname')
@@ -824,7 +831,7 @@ class Session(object):
         port = effective.pop('port')
         kw = effective
 
-        has_proxy = 'proxyCommand' in kw
+        has_proxy = 'proxy_command' in kw
         self.logger.debug(
             'Opening SSH connection (host=%s, port=%s, username=%s, nested=%s, proxy=%s)',
             host,
@@ -834,12 +841,12 @@ class Session(object):
             has_proxy,
         )
 
-        def connect_client(host,username,password,port,policy,**kw):
+        def connect_client(host,username,password,port,missing_host_key_policy,**kw):
             client = paramiko.SSHClient()
             try:
-                self._load_connection_host_keys(client, host, port, known_hosts)
-                if policy is not None:
-                    client.set_missing_host_key_policy(policy)
+                self._load_connection_host_keys(client, host, port, known_hosts_source)
+                if missing_host_key_policy is not None:
+                    client.set_missing_host_key_policy(missing_host_key_policy)
                 client.connect(host,username=username,password=password,port=port,**kw)
                 return client
             except BaseException:
@@ -853,25 +860,21 @@ class Session(object):
                         type(cleanup_exc).__name__,
                     )                
                 raise
-        if policy == 0:
-            warnings.warn(
-                'policy=0 is deprecated; omit policy to use secure host-key '
-                'verification',
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            policy = None
-
-        ## convert pkey_path to pkey, if "pkey" has existed, would raise ValueError
-        if 'pkey_path' in kw:
-            if 'pkey' in kw: raise ValueError(f'"pkey_path" was given when "pkey" has existed')
-            kw['pkey'] = self.pkey(kw['pkey_path'])
-            del kw['pkey_path']
+        if sock is not None and (is_nested or has_proxy):
+            raise ValueError('sock cannot be combined with a nested connection or a proxy')
 
         if is_nested and has_proxy:
             raise NotImplementedError(
-                'proxyCommand is not supported in a nested session'
+                'proxy_command is not supported in a nested session'
             )
+
+        # Caller-host keys have distinct ownership from Paramiko's local files.
+        if 'parent_key_filename' in kw:
+            if 'pkey' in kw or 'key_filename' in kw:
+                raise ValueError('parent_key_filename cannot be combined with pkey or key_filename')
+            kw['pkey'] = self.pkey(kw['parent_key_filename'],
+                                  password=passphrase if passphrase is not None else password)
+            del kw['parent_key_filename']
 
         ## If this session already has a connection, create a child Session
         ## which uses it as the parent for the nested connection.
@@ -892,7 +895,7 @@ class Session(object):
                 dest_addr = (host,port)
                 local_addr = (self.host,self.port)
                 subsession._sock = self._client.get_transport().open_channel("direct-tcpip", dest_addr, local_addr)
-                subsession._client = connect_client(host,username,password,port,policy,sock=subsession._sock,**kw)
+                subsession._client = connect_client(host,username,password,port,missing_host_key_policy,sock=subsession._sock,**kw)
             elif has_proxy:
                 self.logger.debug(
                     'Opening SSH connection through proxy command '
@@ -901,12 +904,12 @@ class Session(object):
                     port,
                     username,
                 )
-                subsession._sock = subsession._socket_of_proxy_command(kw['proxyCommand'])
-                del kw['proxyCommand']
+                subsession._sock = subsession._socket_of_proxy_command(kw['proxy_command'])
+                del kw['proxy_command']
                 kw.setdefault('banner_timeout', 30)
                 kw.setdefault('timeout', 30)
                 kw.setdefault('auth_timeout', 30)                
-                subsession._client = connect_client(host,username,password,port,policy,sock=subsession._sock,**kw)
+                subsession._client = connect_client(host,username,password,port,missing_host_key_policy,sock=subsession._sock,**kw)
             else:
                 self.logger.debug(
                     'Opening direct SSH transport (host=%s, port=%s, username=%s)',
@@ -914,7 +917,7 @@ class Session(object):
                     port,
                     username,
                 )
-                subsession._client = connect_client(host,username,password,port,policy,**kw)
+                subsession._client = connect_client(host,username,password,port,missing_host_key_policy,**kw)
             ## keep alive (added from v1.1.18)
             keepAliveInterval = int(os.environ.get('KEEPALIVE_INTERVAL','60'))
             if keepAliveInterval > 0:
@@ -966,9 +969,10 @@ class Session(object):
         """Load an RSA private key from this session's host; password decrypts it.
 
         A connected session reads via SFTP; a local session reads a local file.
-        The returned key can be passed to connect(pkey=...), or use pkey_path there.
+        The returned key can be passed to connect(pkey=...), or use parent_key_filename there.
         """
         self._ensure_open()
+        pathOfRsaPrivate = os.fspath(pathOfRsaPrivate)
         if self.connected:
             # Read through SFTP instead of interpolating the path into a remote
             # shell command.  Besides handling arbitrary valid filenames, this
@@ -1718,7 +1722,7 @@ class Session(object):
         ## don't acquire self.runLocker, since this might be called by self.run()
         ##self.runLocker.acquire(timeout=60)
                  
-        ## close the socket of proxyCommand, if any
+        ## close the socket of proxy_command, if any
         if self._sock is not None:
             try:
                 if isinstance(self._sock,paramiko.proxy.ProxyCommand):

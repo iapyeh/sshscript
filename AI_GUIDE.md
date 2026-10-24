@@ -1,9 +1,13 @@
 # SSHScript for AI agents
 
-**Documentation contract: SSHScript 6.1.0; Python 3.11+.**
+> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> A source push does not publish a GitHub Release or PyPI package.
 
-This guide targets SSHScript 6.1.0 and its public Console integration API.
-Install `sshscript==6.1.0` and verify the imported package version.
+
+**Documentation contract: SSHScript 7.0.0; Python 3.11+.**
+
+This guide targets SSHScript 7.0.0 and its public Console integration API.
+Install the matching 7.0.0 source checkout or verified wheel and verify its version.
 For nested SSH, provision known_hosts on each calling host: `"parent"` is the
 default. Read the 4.0.2-to-5.0 migration before reusing older automation.
 
@@ -26,20 +30,22 @@ before driving it. Require structured completion/exit status and confirmed reuse
 keep host account policy and credentials in the resolver. A prompt/silence is not
 a success signal. See the bundled skill for the matching agent guidance.
 
-## Interactive console (6.1)
+## Interactive console (7.0)
 
 For step-by-step use from a human or UI agent's retained terminal, see the
 [console guide](CONSOLE.md) and the agent guide's
 [console instructions](skills/sshscript/references/agent-guide.md#interactive-console-61).
 Run `python3 -B sshscript.py console` from the matching development checkout;
-an installed 6.1.0 wheel provides `sshscript console`. Use public
+an installed 7.0.0 wheel provides `sshscript console`. Use public
 Console(session) for host integration; older 6.0 console internals are removed.
 
 Input remains Python with dollar commands: `$hostname` executes a command,
 `print($.stdout)` reads its result, and variables persist between inputs.
-`exit`/`exit()` leave one layer; `quit`/`quit()` close all layers. Script
-completion uses `$.stop()`; `$.exit()`, `Session.exit()` and wrapper `.exit()`
-are removed. These incompatible 6.0 rules do not describe stable 5.0.0.
+`exit`/`exit()`/`$.exit()` leave one layer; `quit`/`quit()` close all layers. Script
+completion uses `$.stop()`; script-mode `$.exit()`, `Session.exit()` and wrapper
+`.exit()` are unavailable. In an entered program, `$.exit("command")` supplies
+its exit sequence when leaving. Without a supplied or configured exit sequence,
+`$.exit()` only displays a reminder and keeps the program layer open. These incompatible 6.0 rules do not describe stable 5.0.0.
 
 ## Share one URL
 
@@ -116,4 +122,4 @@ Validate links, skill structure, example behavior, source/ZIP equality and
 the rendered website. Source and website publishing are separate operations;
 copying files does not publish either of them.
 
-*Last modified: 2026-10-23 18:39:31*
+*Last modified: 2026-10-24 16:35:46*

@@ -40,7 +40,7 @@ def warning_on_one_line(message, category, filename, lineno, file=None, line=Non
 if __package__:
     from .interactive import Console, ConsoleUpdate, Environment, SwitchRequest, SwitchCredentials, SwitchOutcome, CredentialsRequiredError, ConsoleInitializationError, ConsoleCleanupError
     from ._version import __version__
-    from .sessionsettings import execution_defaults
+    from .sessionsettings import execution_defaults, cli_output
     from .session import ScriptResult, Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
     from .errorutils import get_logger, set_logger, SSHScriptException,command_summary
     ## 2025/3/3 v2.0.3 feature: import *.spy file directly
@@ -52,7 +52,7 @@ else:
     if not mydir in sys.path: sys.path.insert(0,mydir)
     from interactive import Console, ConsoleUpdate, Environment, SwitchRequest, SwitchCredentials, SwitchOutcome, CredentialsRequiredError, ConsoleInitializationError, ConsoleCleanupError
     from _version import __version__
-    from sessionsettings import execution_defaults
+    from sessionsettings import execution_defaults, cli_output
     from session import ScriptResult, Session, CommandResult, CommandJob, CommandTimeoutError, JobResult
     from errorutils import get_logger, set_logger, SSHScriptException,command_summary
     import spyimporter
@@ -294,11 +294,14 @@ def main():
                         default=False,
                         help='show the converted python script only, no execution.')
 
-    parser.add_argument('--verbose','-v', dest='verbose', action='store_true',
+    output_options = parser.add_mutually_exclusive_group()
+    output_options.add_argument('--quiet', '-q', action='store_true',
+                                help='disable automatic command output dumping.')
+    output_options.add_argument('--verbose','-v', dest='verbose', action='store_true',
                         default=False,
                         help='dump stdout,stderr to console.')   
 
-    parser.add_argument('--stderr', dest='verbose_stderr', action='store_true',
+    output_options.add_argument('--stderr', dest='verbose_stderr', action='store_true',
                         default=False,
                         help='dump stderr only to console.')   
 
@@ -371,13 +374,15 @@ def main():
         
         sys.argv[0] = args.path
 
-        policy = {}
+        execution_policy = {}
         if args.debug is not None:
-            policy['log_level'] = max(10, args.debug)
-        if args.verbose:
-            policy['verbose'] = True
+            execution_policy['log_level'] = max(10, args.debug)
+        if args.quiet:
+            execution_policy.update(verbose=False, verbose_stderr=False)
+        elif args.verbose:
+            execution_policy['verbose'] = True
         elif args.verbose_stderr:
-            policy.update(verbose=False, verbose_stderr=True)
+            execution_policy.update(verbose=False, verbose_stderr=True)
 
         try:
             if args.check:
@@ -387,7 +392,9 @@ def main():
                     parser.error('--check and --script cannot be combined')
                 exitcode = check_file(args.path)
             else:
-                with execution_defaults(**policy):
+                with execution_defaults(**execution_policy), cli_output(
+                        not args.quiet and sys.stdout.isatty(),
+                        not args.quiet and sys.stderr.isatty()):
                     exitcode = run_file(
                         args.path,
                         showScript=args.showScript,

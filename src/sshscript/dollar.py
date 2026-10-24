@@ -71,6 +71,7 @@ class Dollar(object):
         self.argv = None
         self.session = session # Session instance in context
         self.settings = session.get()
+        self.output_defaults = session._output_defaults
         self.logger = SessionLogger(self.settings)
         self.channel = None
         self.use_shell = use_shell

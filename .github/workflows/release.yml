@@ -70,15 +70,21 @@ jobs:
         include:
           - python-version: '3.11'
             paramiko: 'paramiko==2.11.0'
+            # Paramiko 2.11 imports TripleDES from the pre-48 namespace.
+            cryptography: 'cryptography<48'
             dependency-label: minimum
           - python-version: '3.14'
             paramiko: 'paramiko==2.11.0'
+            # Paramiko 2.11 imports TripleDES from the pre-48 namespace.
+            cryptography: 'cryptography<48'
             dependency-label: minimum-new-python
           - python-version: '3.11'
             paramiko: 'paramiko>=3,<4'
+            cryptography: 'cryptography'
             dependency-label: 3.x
           - python-version: '3.14'
             paramiko: 'paramiko>=4,<5'
+            cryptography: 'cryptography'
             dependency-label: 4.x
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -92,7 +98,7 @@ jobs:
           name: python-package-distributions
           path: dist
       - name: Install verified wheel
-        run: python -m pip install dist/*.whl "${{ matrix.paramiko }}"
+        run: python -m pip install dist/*.whl "${{ matrix.paramiko }}" "${{ matrix.cryptography }}"
       - name: Provision loopback OpenSSH server
         run: bash tools/setup_openssh_ci.sh "$GITHUB_ENV"
       - name: Test installed wheel against OpenSSH

@@ -5,10 +5,13 @@ import builtins
 import code
 from io import StringIO
 import tokenize
+import traceback
 from contextlib import ExitStack, redirect_stdout, redirect_stderr
 from dataclasses import dataclass, field
 import threading
-from getpass import getpass
+from getpass import getpass, GetPassWarning
+import re
+import warnings
 import sys
 import time
 import subprocess
@@ -26,7 +29,8 @@ else:
 
 
 class _LeaveLayer(BaseException):
-    pass
+    def __init__(self, command=None):
+        self.command = command
 
 
 class _QuitConsole(BaseException):
@@ -134,7 +138,8 @@ class _PythonConsole(code.InteractiveConsole):
                                        flags=self.compile.compiler.flags)
             if compiled is None:
                 return True
-        except (SyntaxError, OverflowError, ValueError):
+        except (SyntaxError, OverflowError, ValueError) as error:
+            self.locals["error"] = error
             self.cell += 1
             self.last_error = type(sys.exc_info()[1]).__name__
             self.showsyntaxerror(filename)
@@ -144,7 +149,7 @@ class _PythonConsole(code.InteractiveConsole):
         return False
 
     def showsyntaxerror(self, filename=None):
-        self.write("SyntaxError: input compilation failed.\n")
+        self.write("SyntaxError: input compilation failed; use :error or :traceback for details.\n")
 
     def runcode(self, code_object):
         try:
@@ -155,7 +160,7 @@ class _PythonConsole(code.InteractiveConsole):
             self.last_error = type(error).__name__
             self.locals['error'] = error
             # Source and exception text may contain credentials.
-            self.write(f'{type(error).__name__}: operation failed; inspect error for details.\n')
+            self.write(f'{type(error).__name__}: operation failed; use :error or :traceback for details.\n')
 
 
 
@@ -170,6 +175,19 @@ class _Layer:
     result: object = None
     program_buffers: tuple = ()
     program_positions: tuple = (0, 0)
+    exit_command: str | None = None
+    input_tail: str = ''
+    secret_pending: bool = False
+
+
+_SECRET_PROMPT = re.compile(
+    r'(?:\[sudo\]\s*)?(?:(?:enter|confirm|retype|new|current|old)\s+)*'
+    r"(?:[\w.@+-]+'s\s+)?(?:UNIX\s+)?"
+    r'(?:password|passphrase|pin|token|verification code|one[- ]time (?:password|code))'
+    r'(?:\s+for\b[^\r\n:：]*)?\s*[:：]\s*|'
+    r'(?:請)?(?:輸入|输入)(?:密碼|密码|驗證碼|验证码|PIN|token)\s*[:：]\s*',
+    re.IGNORECASE)
+_TERMINAL_ESCAPE = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
 
 
 
@@ -318,7 +336,39 @@ class Console:
         self._console_layer('enter', *args, **kwargs)
 
     def _exit_layer(self):
-        raise _LeaveLayer()
+        self.exit()
+
+    def exit(self, command=None):
+        """Leave one console layer, optionally sending a program's exit command.
+
+        Without an explicit or configured command, an entered program stays open.
+        Prompt-level calls unwind the current Python cell before leaving.
+        """
+        self._check(idle=True)
+        if command is not None:
+            if not isinstance(command, str):
+                raise TypeError('exit command must be str or None')
+            if not command.strip() or '\n' in command or '\r' in command:
+                raise ValueError('exit command must be a nonempty single line')
+            if self.current.kind != 'program':
+                raise ValueError('exit command requires an enter() program')
+        if self._submitting:
+            raise _LeaveLayer(command)
+        self._request_exit(command)
+
+    def _request_exit(self, command=None):
+        if self.current.kind != 'program':
+            self.leave()
+            return
+        command = command if command is not None else self.current.exit_command
+        if command is None:
+            self._write('Program remains open: use $.exit("exit command") or enter its native exit command.\n', self._stderr)
+            self._state = 'running'
+            return
+        self._send_input(command)
+        if self.layers and self.current.kind == 'program':
+            self._write('Program has not returned to its parent shell; current layer remains open.\n', self._stderr)
+
 
     def quit(self):
         """Unwind Python contexts before closing every managed layer."""
@@ -371,7 +421,7 @@ class Console:
         # Non-environment operations keep the regular API's session/console owner.
         if name in ('upload', 'download', 'pkey', 'set', 'get'):
             return getattr(self.current.session, name)
-        if name in ('send', 'input', 'expect'):
+        if name in ('send', 'expect'):
             return getattr(self.current.console, name)
         if name in ('stdout', 'stderr', 'exitcode'):
             if self.current.kind == 'program':
@@ -418,6 +468,11 @@ class Console:
                 if isinstance(parent_prompt, str):
                     visible = visible.replace(parent_prompt, '')
             self._write(visible, stream)
+            if visible:
+                layer.input_tail = (layer.input_tail + visible)[-1024:]
+                tail = _TERMINAL_ESCAPE.sub('', layer.input_tail)
+                tail = re.split(r'[\r\n]', tail)[-1].strip()
+                layer.secret_pending = _SECRET_PROMPT.fullmatch(tail) is not None
             positions.append(len(text))
         layer.program_buffers = buffers
         layer.program_positions = tuple(positions)
@@ -425,6 +480,8 @@ class Console:
     def _program_control(self, character):
         """Send Ctrl-C/D without a newline and observe the program's real prompts."""
         self._drain_program()
+        self.current.input_tail = ''
+        self.current.secret_pending = False
         channel = self.current.console.channel
         try:
             outcome = channel._input_text(character, timeout=2, append_newline=False)
@@ -467,6 +524,12 @@ class Console:
         try:
             while not self.done:
                 try:
+                    self._poll()
+                    if self.done:
+                        break
+                    if self.current.kind == 'program' and self.current.secret_pending:
+                        self.input(secret=True)
+                        continue
                     line = self.input_func(self.prompt)
                 except EOFError:
                     self.eof()
@@ -491,7 +554,7 @@ class Console:
                     # Avoid echoing credential-bearing expressions or arbitrary
                     # server error text; the original exception is available as error.
                     self.namespace['error'] = error
-                    self._write('Operation failed (' + type(error).__name__ + '). Use :status or inspect error.\n', self._stderr)
+                    self._write('Operation failed (' + type(error).__name__ + '). Use :error or :traceback for details.\n', self._stderr)
         finally:
             self.close()
 
@@ -518,6 +581,14 @@ class Console:
                 self.help()
             elif helper == 'exit':
                 self._exit_layer()
+            elif not self.more and line.strip() in (':error', ':traceback'):
+                error = self.namespace.get('error')
+                if error is None:
+                    self._write('No recorded error.\n', self._stderr)
+                else:
+                    detail = (traceback.format_exception(error) if line.strip() == ':traceback'
+                              else traceback.format_exception_only(type(error), error))
+                    self._write(''.join(detail), self._stderr)
             elif not self.more and line.strip() == ':status':
                 for layer in self.layers:
                     self._write(f'{layer.kind}: {layer.host} [{layer.user}]\n', self._stdout)
@@ -531,10 +602,10 @@ class Console:
             self.close()
         except KeyboardInterrupt:
             self._interrupt()
-        except _LeaveLayer:
+        except _LeaveLayer as request:
             self.python.resetbuffer()
             self.more = False
-            self.leave()
+            self._request_exit(request.command)
         except SystemExit as error:
             self.python.last_error = type(error).__name__
             self.python.resetbuffer()
@@ -547,7 +618,13 @@ class Console:
     def _terminal_password(prompt='Password: '):
         if not sys.stdin.isatty():
             raise CredentialsRequiredError('terminal password input requires a terminal or host-provided credentials')
-        return getpass(prompt)
+        try:
+            with warnings.catch_warnings():
+                # Never let getpass fall back to echoed stdin input.
+                warnings.simplefilter('error', GetPassWarning)
+                return getpass(prompt)
+        except GetPassWarning:
+            raise CredentialsRequiredError('password input cannot disable terminal echo') from None
 
     @staticmethod
     def _missing_password(*args, **kwargs):
@@ -616,10 +693,13 @@ class Console:
         if layer.kind == 'program':
             raise RuntimeError('leave the interactive program before entering another layer')
         with ExitStack() as resources:
-            console = resources.enter_context(getattr(layer.console, kind)(*args, **kwargs))
+            wrapper = getattr(layer.console, kind)(*args, **kwargs)
+            console = resources.enter_context(wrapper)
             self._push(resources, layer.session, console,
                        'program' if kind == 'enter' else kind, layer.host,
                        program=kind == 'enter')
+            if kind == 'enter':
+                self.current.exit_command = wrapper.exit_command
         if kind == 'enter':
             self._drain_program()
 
@@ -712,7 +792,8 @@ class Console:
         self._check(idle=True)
         if self.done:
             return self._update()
-        if self.current.kind == 'program' and not line.lstrip().startswith('$.'):
+        if (self.current.kind == 'program' and not line.lstrip().startswith('$.')
+                and line.strip() not in (':status', ':error', ':traceback')):
             if self._bare_helper(line) is None:
                 try:
                     return self.send_input(line)
@@ -726,7 +807,9 @@ class Console:
         except ConsoleCleanupError:
             raise
         except (Exception, KeyboardInterrupt, SystemExit) as error:
+            self.namespace['error'] = error
             self._state, self._error_type = 'failed', type(error).__name__
+            self._write(f'{type(error).__name__}: operation failed; use :error or :traceback for details.\n', self._stderr)
         finally:
             self._submitting = False
         if self.python.last_error is not None:
@@ -785,6 +868,10 @@ class Console:
 
     def poll(self):
         """Return available output; never wait for a running command."""
+        self._poll()
+        return self._update()
+
+    def _poll(self):
         self._check()
         if self._job is not None:
             self._drain_job()
@@ -795,40 +882,82 @@ class Console:
             texts = (str(channel._stdout), str(channel._stderr))
             parent = channel.prompts[-2] if len(channel.prompts) > 1 else None
             prompt = channel.prompt
-            if isinstance(parent, str) and parent != prompt and any(parent in text for text in texts):
+            if isinstance(parent, str) and parent and parent != prompt and any(parent in text for text in texts):
                 channel._mark_interactive_layer_exited(channel.executing_lock)
                 self._drain_program()
                 self.leave()
             else:
-                if isinstance(prompt, str) and any(prompt in text for text in texts):
+                if isinstance(prompt, str) and prompt and any(prompt in text for text in texts):
                     self._state = 'waiting_input'
                 self._drain_program()
         self._discard_failed_layers()
-        return self._update()
 
     def send_input(self, text, *, newline=True, timeout=1):
         """Send a raw write or one line to an enter() program."""
+        self._send_input(text, newline=newline, timeout=timeout)
+        return self._update()
+
+    def input(self, text=None, timeout=60, *, secret=False):
+        """Send a line, or read a hidden reply with secret=True in an enter() layer.
+
+        Hidden input bypasses Python evaluation and readline history and returns
+        None. Embedded callers must supply password_func. Remote output is not
+        redacted: the receiving program must also avoid echoing secrets.
+        """
+        self._check(idle=True)
+        if not isinstance(secret, bool):
+            raise TypeError('secret must be bool')
+        if not secret:
+            if not isinstance(text, str):
+                raise TypeError('input text must be str')
+            return self.current.console.input(text, timeout=timeout)
+        if text is not None:
+            raise ValueError('secret input reads from password_func; do not supply text')
+        if self.current.kind != 'program':
+            raise RuntimeError('secret input requires an enter() program')
+        self._poll()
+        if self.current.kind != 'program':
+            return None
+        try:
+            text = self.password_func('Secret input (hidden): ')
+            if not isinstance(text, str):
+                raise TypeError('password_func must return str')
+            if '\n' in text or '\r' in text:
+                raise ValueError('secret input must be a single line')
+            self._send_input(text, timeout=timeout)
+        finally:
+            text = None
+        return None
+
+    def _send_input(self, text, *, newline=True, timeout=1):
         self._check()
         if self._job is not None:
             raise RuntimeError('shell jobs do not accept input; use enter() for an interactive program')
         if self.current.kind != 'program':
             raise RuntimeError('input requires a running job or enter() program')
+        # Drain pending output before input() replaces the capture buffers.
+        # A delayed parent prompt also means this input must not reach the shell.
+        self._poll()
+        if not self.layers or self.current.kind != 'program':
+            return
+        self.current.input_tail = ''
+        self.current.secret_pending = False
         self._last_result, self._error_type = None, None
+        outcome = None
         try:
             if newline:
                 outcome = self.current.console.input(text, timeout=timeout)
             else:
                 self.current.console.send(text)
-                outcome = None
-            self._drain_program()
-            if outcome == 'exited':
-                self.leave()
-            else:
-                self._state = 'waiting_input' if outcome == 'prompt' else 'running'
-        except TimeoutError:
+            self._state = 'waiting_input' if outcome == 'prompt' else 'running'
+        except TimeoutError as error:
+            self.namespace['error'] = error
             self._state, self._error_type = 'running', 'TimeoutError'
+        finally:
+            self._drain_program()
+        if outcome == 'exited':
+            self.leave()
         self._discard_failed_layers()
-        return self._update()
 
     def _interrupt(self):
         self.python.resetbuffer()
@@ -932,12 +1061,17 @@ $.connect(host, **options) connects and automatically enters a persistent shell.
 $.sudo(password=...), $.su("user", password=...) enter identity layers.
 $.shell("bash") enters a nested shell.
 $.enter("python3 -q", prompt=">>>", exit="quit()") enters a text program.
-exit / exit() leave one layer; at the local root they end the console.
+Password prompts in enter() use hidden input when recognized.
+$.input(secret=True) reads and sends one hidden reply for an unrecognized prompt.
+exit / exit() / $.exit() leave one layer; at the local root they end the console.
+$.exit("quit") sends a program exit command and waits for its return.
+Without an explicit or configured exit command, enter() stays open with a reminder.
 Use Python multiline blocks with a blank line to execute, just like a Python REPL.
 Python names: session (connection), console (current identity), result, error, getpass.
 $.run(source) / $.run_file(path) execute scripts; $.stop() ends only that script.
 help / help() show this guide; help(object) shows Python object documentation.
-quit / quit() close all layers. $.exit() is not available.
+:error shows the last error message; :traceback shows its full traceback, also in enter().
+quit / quit() close all layers. $.exit() is a console-only operation.
 :status shows the environment stack. Ctrl-C cancels current input or execution.
 Ctrl-D at the Python prompt closes the console. In enter(), Ctrl-C/D go to the program.
 Inside enter(), plain input goes to that program; $. expressions remain controls.
@@ -946,15 +1080,18 @@ No input history is persisted. Full-screen programs are not supported.'''
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(prog='sshscript console', description=HELP,
+    parser = argparse.ArgumentParser(prog='sshscript console', description=HELP, allow_abbrev=False,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('host', nargs='?')
     parser.add_argument('--username')
     parser.add_argument('--port', type=int)
-    parser.add_argument('--pkey-path')
+    parser.add_argument('--parent-key-filename')
+    parser.add_argument('--key-filename')
+    parser.add_argument('--proxy-command')
+    parser.add_argument('--proxy-jump')
     parser.add_argument('--timeout', type=float)
     parser.add_argument('--ssh-config')
-    parser.add_argument('--known-hosts', choices=('local', 'parent', 'chain'))
+    parser.add_argument('--known-hosts-source', choices=('local', 'parent', 'chain'))
     parser.add_argument('--known-hosts-path')
     parser.add_argument('--ask-pass', action='store_true')
     args = parser.parse_args(argv)
@@ -968,7 +1105,7 @@ def main(argv=None):
             session.set(known_hosts_path=args.known_hosts_path)
         with Console(session, ownership='owned', terminal=True) as console:
             if args.ask_pass:
-                options['password'] = getpass('SSH password: ')
+                options['password'] = console.password_func('SSH password: ')
             if args.host is not None:
                 console.connect(args.host, **options)
             console.interact()

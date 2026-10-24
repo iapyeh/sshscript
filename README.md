@@ -1,11 +1,15 @@
 # SSHScript
 
-**Development status:** SSHScript is still under active development. Backward
-compatibility is not maintained at this stage. APIs, CLI behavior, configuration
-and data formats may change; we provide only brief notes on major differences.
-Compatibility work is done only when explicitly requested by the maintainer.
+> **Development status: not stable.** SSHScript is under active development.
+> APIs, CLI options, configuration and data formats may change incompatibly
+> without a deprecation period. Pin the exact version or source revision,
+> review changes before upgrading, and validate your automation again.
 
-SSHScript 6.1.0: [borrow an existing Session for interactive operation](EMBEDDED_CONSOLE.md).
+These examples describe the **7.0.0 source contract**. Use the matching
+source checkout or verified wheel. A source push does not publish a GitHub
+Release or PyPI package. See [the connection changes](VERSIONING.md).
+
+SSHScript 7.0.0: [borrow an existing Session for interactive operation](EMBEDDED_CONSOLE.md).
 Run `python3 -B sshscript.py console` from the development checkout.
 
 
@@ -28,8 +32,8 @@ output and status, distinguish failure from timeout, and make cleanup and
 unknown termination explicit. A successful command exit is evidence about
 that command; verify the deployment or other application outcome separately.
 
-**Release contract: 6.1.0.** Install the matching distribution and verify its version.
-[Release notes](https://github.com/iapyeh/sshscript/releases/tag/v6.1.0)
+**Source contract: 7.0.0.** Use the matching source checkout or verified wheel.
+[Release notes](https://github.com/iapyeh/sshscript/blob/release/CHANGELOG.md)
 (development-stage project) · **Python:** 3.11 or newer · **Tested:** Python
 3.11–3.14 on Linux and macOS
 
@@ -39,7 +43,9 @@ that command; verify the deployment or other application outcome separately.
 [Security](https://github.com/iapyeh/sshscript/security/policy) ·
 [Support](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 
-**Version 6.1.0** adds public `Console(existing_session)` integration for terminals,
+**Version 7.0.0** standardizes connection names without aliases and adds hidden
+program input, console exit controls and explicit error diagnostics.
+Public `Console(existing_session)` integration supports terminals,
 host applications and AI agents. Python variables, shell state and text programs
 persist; structured updates distinguish readiness, execution, failure and cleanup.
 Borrowed Sessions remain owned by the host. Credential/policy hooks and verified
@@ -80,6 +86,16 @@ or URLs. Skill installation and persistent preferences depend on the agent's
 capabilities. See the [repository AI entry](AI_GUIDE.md),
 [agent guide](skills/sshscript/references/agent-guide.md) and
 [skill instructions](skills/sshscript/SKILL.md) for the source documents.
+
+## Test a version before release
+
+A PR or candidate branch may contain changes that are not yet on `release` or
+PyPI. Follow [Testing an unreleased source snapshot](skills/sshscript/references/agent-guide.md#testing-an-unreleased-source-snapshot)
+for download/install commands and a reusable UI-agent prompt. Pin a full source
+commit, retain its matching documents, and generate the complete skill bundle
+from that same checkout. Updating only the Python package or `SKILL.md` leaves
+an agent with mismatched instructions. The guide also explains returning to
+`release` without merging candidate changes into an existing checkout.
 
 ## Recommended API
 
@@ -132,21 +148,22 @@ importing the Python API raises `ImportError` with the same diagnostic.
 
 For a production deployment that requires repeatable dependency resolution,
 pin SSHScript and all transitive dependencies in your application's lock file.
-To install this release explicitly:
+To install the current source contract:
 
 ```sh
-python3 -m pip install "sshscript==6.1.0"
+python3 -m pip install "git+https://github.com/iapyeh/sshscript.git@5bc17cf190e215479af870437eeacd2770d9f283"
 ```
 
-Use `python3 -m pip install --upgrade sshscript` to upgrade. The optional
+This pins the 7.0.0 source snapshot. Integration into the protected `release`
+branch is tracked in [PR #29](https://github.com/iapyeh/sshscript/pull/29). PyPI installation/upgrade follows the separately published package. The optional
 `sshscript --check-updates` command queries PyPI and prints an upgrade command;
 it never installs an update by itself.
 
 ## 60-second local quickstart
 
-Install `sshscript==6.1.0` for the Console integration documented here.
+Use the matching 7.0.0 source checkout or verified wheel for this guide.
 
-This example runs on 6.1.0 and retains compatibility with the 3.1.5 command API.
+This example runs on 7.0.0 and retains compatibility with the 3.1.5 command API.
 The metadata below records that older compatibility baseline.
 
 <!-- example: {"id":"readme-quickstart", "profile":"3.1.5", "stdout":"sshscript is ready\nexit code: 0\n"} -->
@@ -264,11 +281,20 @@ session(["false"], check=False)  # Explicit per-command override.
 ```
 
 In `.spy`, use `$.set(...)` and `$.get(...)`. Settings are `check`, `verbose`,
-`verbose_stderr`, `log_level` (logging integer or level name), and `policy`
+`verbose_stderr`, `log_level` (logging integer or level name), and `missing_host_key_policy`
 (a Paramiko `MissingHostKeyPolicy` instance or subclass, or `None`). New root
-Sessions snapshot package/application defaults; CLI `-v`, `--stderr`, and
+Sessions snapshot package/application defaults; CLI `-v`, `--stderr`, `--quiet`, and
 `--debug` override defaults only in that execution context. Child Sessions
 snapshot their parent's current settings. Existing Sessions are independent.
+When running a script from the CLI, command stdout and stderr are displayed
+by default only when their respective destination is a terminal. Use `-v` to
+display both streams even with redirection, `--stderr` for stderr only, or
+`--quiet`/`-q` to disable command output dumping. These flags are mutually
+exclusive. Explicit Python `print()` output remains visible; printing captured
+command output again can duplicate terminal output. Library calls retain their
+existing defaults. Setting `verbose` or `verbose_stderr` on a Session explicitly
+replaces its automatic terminal output policy.
+
 `set()` validates every key/value before applying changes; unknown keys fail.
 Properties and set/get use the same storage. Command options override settings;
 running jobs retain their startup policy. Shell commands inherit check and can
@@ -277,10 +303,10 @@ Session logging never changes the shared logger level; application handler
 filters/levels still apply. Verbose explicitly prints command output and may
 expose sensitive output. No console logging handler is installed by Session.
 
-Set `session.set(policy=paramiko.AutoAddPolicy())` or assign `session.policy`
+Set `session.set(missing_host_key_policy=paramiko.AutoAddPolicy())` or assign `session.missing_host_key_policy`
 to choose the missing-host-key policy for future connections (import `paramiko`
 first). The default is `None`, retaining Paramiko's RejectPolicy. An explicit
-`connect(policy=...)` wins for that connection; `connect(policy=None)` uses
+`connect(missing_host_key_policy=...)` wins for that connection; `connect(missing_host_key_policy=None)` uses
 default rejection. Children inherit the Session setting, even when a connection
 uses an override. Settings dictionaries are copied, but policy objects are
 shared; custom policies should support reuse. Existing connections keep their
@@ -404,18 +430,18 @@ programs.
 
 ## Host-key sources in 5.0
 
-SSHScript 5.0.0 uses `known_hosts="parent"` as the default: a local
+The current API retains the 5.0.0 trust-source default, now spelled `known_hosts_source="parent"`: a local
 Session reads localhost's trust file; `host1.connect("host2")` reads host1's
-trust file over SFTP. This matches the host ownership of `pkey_path`.
+trust file over SFTP. This matches the host ownership of `parent_key_filename`.
 SSHScript 4.0.2 and earlier use localhost for all host-key checks.
 
-Set `session.set(known_hosts="chain")` to search from the calling Session
+Set `session.set(known_hosts_source="chain")` to search from the calling Session
 through its ancestors to localhost. The nearest layer with a target record
 wins; a mismatch or read/parse error stops the connection. Set
-`session.set(known_hosts="local")` to preserve previous behavior.
+`session.set(known_hosts_source="local")` to preserve previous behavior.
 Each Session can set its own `known_hosts_path`; this path is not inherited.
-`connect(known_hosts=...)` overrides only one connection. `pkey_path` remains
-on the calling host for every strategy. `policy` handles only unknown keys;
+`connect(known_hosts_source=...)` overrides only one connection. `parent_key_filename` remains
+on the calling host for every strategy. `missing_host_key_policy` handles only unknown keys;
 `AutoAddPolicy` does not write these trust files. See the
 [host-key source contract](API_GUIDE.md#host-key-sources-unreleased) for supported
 file formats, strict error handling and migration.
@@ -426,7 +452,7 @@ Connections from a local session read `~/.ssh/config` if it exists. Supported
 settings are `Host` patterns, `HostName`, `User`, `Port`, `IdentityFile`,
 `ProxyCommand`, and `ProxyJump`. Explicit API arguments override config, then
 built-in defaults apply. `port=None` means unspecified; an explicit `port=22`
-overrides a configured port. Explicit `pkey`, `pkey_path`, or `key_filename`
+overrides a configured port. Explicit `pkey`, `parent_key_filename`, or `key_filename`
 overrides configured identity files. Host-key verification remains enabled.
 
 ```python
@@ -446,13 +472,13 @@ to require a particular file. Nested connections do not read local config
 unless an explicit file is supplied; proxy options remain unsupported on
 nested sessions. `session.host` and `result.host` use the resolved HostName.
 `resolve_connection()` returns effective Paramiko keyword arguments plus
-`proxyCommand`, when applicable; it performs no network operations.
+`proxy_command`, when applicable; it performs no network operations.
 
 Config tokens `%h`, `%n`, `%p`, `%r`, `%u`, `%d`, and `%%` are expanded after
 explicit overrides for identity paths and configured proxy commands. Other
-tokens fail clearly. Explicit `proxyCommand` strings retain their historical
-verbatim behavior. Explicit `proxyCommand=None` disables configured proxies.
-You can also supply `proxyJump="user@bastion:2222"` or a comma-separated chain.
+tokens fail clearly. Explicit `proxy_command` strings retain their historical
+verbatim behavior. Explicit `proxy_command=None` disables configured proxies.
+You can also supply `proxy_jump="user@bastion:2222"` or a comma-separated chain.
 When both configured proxy types are active, select one explicitly or remove
 the conflict; SSHScript does not implement OpenSSH's first-proxy-wins rule.
 
@@ -596,4 +622,4 @@ For embedding an existing connected Session, see the new public
 [Console integration API](EMBEDDED_CONSOLE.md). CLI and embedding applications
 share one implementation; earlier 6.0 CLI compatibility is not maintained.
 
-*Last modified: 2026-10-23 18:39:31*
+*Last modified: 2026-10-24 20:10:23*

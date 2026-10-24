@@ -1,7 +1,7 @@
 from os import PathLike
 from types import TracebackType
-from typing import Any, ContextManager, Literal, TypedDict, overload
-from paramiko import MissingHostKeyPolicy
+from typing import Any, ContextManager, Literal, TypedDict, Unpack, overload
+from paramiko import MissingHostKeyPolicy, PKey
 from .commandjob import CommandJob, CommandTimeoutError as CommandTimeoutError, JobResult
 from .commandresult import CommandResult as CommandResult
 from .sessionwrapper import SessionWrapper
@@ -9,14 +9,32 @@ from .scriptcontrol import ScriptResult as ScriptResult
 
 Command = str | list[str] | tuple[str, ...]
 HostKeyPolicy = MissingHostKeyPolicy | type[MissingHostKeyPolicy] | None
-KnownHosts = Literal['local', 'parent', 'chain']
+KnownHostsSource = Literal['local', 'parent', 'chain']
+SSHConfigPath = str | PathLike[str] | Literal[False] | None
+class ParamikoOptions(TypedDict, total=False):
+    timeout: float | None
+    allow_agent: bool
+    look_for_keys: bool
+    compress: bool
+    gss_auth: bool
+    gss_kex: bool
+    gss_deleg_creds: bool
+    gss_host: str | None
+    gss_trust_dns: bool
+    banner_timeout: float | None
+    auth_timeout: float | None
+    channel_timeout: float | None
+    disabled_algorithms: dict[str, list[str]] | None
+    transport_factory: Any
+    auth_strategy: Any
+
 class SessionSettings(TypedDict):
     check: bool
     verbose: bool
     verbose_stderr: bool
     log_level: int
-    policy: HostKeyPolicy
-    known_hosts: KnownHosts
+    missing_host_key_policy: HostKeyPolicy
+    known_hosts_source: KnownHostsSource
     known_hosts_path: str | None
 
 class Session:
@@ -27,8 +45,8 @@ class Session:
     check: bool
     verbose: bool
     verbose_stderr: bool
-    policy: HostKeyPolicy
-    known_hosts: KnownHosts
+    missing_host_key_policy: HostKeyPolicy
+    known_hosts_source: KnownHostsSource
     @property
     def known_hosts_path(self) -> str | None: ...
     @known_hosts_path.setter
@@ -38,7 +56,7 @@ class Session:
     @log_level.setter
     def log_level(self, value: int | str) -> None: ...
     def __init__(self, parent: Session | None = ...) -> None: ...
-    def set(self, *, check: bool = ..., verbose: bool = ..., verbose_stderr: bool = ..., log_level: int | str = ..., policy: HostKeyPolicy = ..., known_hosts: KnownHosts = ..., known_hosts_path: str | PathLike[str] | None = ...) -> None: ...
+    def set(self, *, check: bool = ..., verbose: bool = ..., verbose_stderr: bool = ..., log_level: int | str = ..., missing_host_key_policy: HostKeyPolicy = ..., known_hosts_source: KnownHostsSource = ..., known_hosts_path: str | PathLike[str] | None = ...) -> None: ...
     @overload
     def get(self, name: None = ...) -> SessionSettings: ...
     @overload
@@ -46,9 +64,9 @@ class Session:
     @overload
     def get(self, name: Literal['log_level']) -> int: ...
     @overload
-    def get(self, name: Literal['policy']) -> HostKeyPolicy: ...
+    def get(self, name: Literal['missing_host_key_policy']) -> HostKeyPolicy: ...
     @overload
-    def get(self, name: Literal['known_hosts']) -> KnownHosts: ...
+    def get(self, name: Literal['known_hosts_source']) -> KnownHostsSource: ...
     @overload
     def get(self, name: Literal['known_hosts_path']) -> str | None: ...
     @overload
@@ -70,9 +88,9 @@ class Session:
     __call__ = exec_command
     send_line = exec_command
     def start(self, cmd: Command, *, shell: bool | str | None = ..., shell_executable: str | None = ..., timeout: float | None = ..., stop_timeout: float = ..., capture_limit: int = ..., check: bool = ..., input: str | bytes | None = ..., env: dict[str, str] | None = ..., get_pty: bool = ...) -> CommandJob: ...
-    def connect(self, host: str, username: str | None = ..., password: str | None = ..., port: int | None = ..., policy: Any = ..., *, ssh_config: str | PathLike[str] | bool | None = ..., known_hosts: KnownHosts = ..., **kw: Any) -> Session: ...
+    def connect(self, hostname: str, *, port: int | None = ..., username: str | None = ..., password: str | None = ..., pkey: PKey | None = ..., key_filename: str | list[str] | None = ..., parent_key_filename: str | PathLike[str] | None = ..., passphrase: str | None = ..., sock: Any = ..., proxy_command: str | None = ..., proxy_jump: str | None = ..., ssh_config: SSHConfigPath = ..., missing_host_key_policy: HostKeyPolicy = ..., known_hosts_source: KnownHostsSource = ..., **kw: Unpack[ParamikoOptions]) -> Session: ...
     @staticmethod
-    def resolve_connection(host: str, **kwargs: Any) -> dict[str, Any]: ...
+    def resolve_connection(hostname: str, *, username: str | None = ..., port: int | None = ..., ssh_config: SSHConfigPath = ..., proxy_command: str | None = ..., proxy_jump: str | None = ..., pkey: PKey | None = ..., key_filename: str | list[str] | None = ..., parent_key_filename: str | PathLike[str] | None = ..., passphrase: str | None = ..., sock: Any = ..., **kw: Unpack[ParamikoOptions]) -> dict[str, Any]: ...
     def shell(self, command: str | None = ..., funcname: str = ..., get_pty: bool = ..., *args: Any, **kw: Any) -> ContextManager[SessionWrapper]: ...
     def enter(self, command: str, expect: Any = ..., password: str | None = ..., exit: str | None = ..., shell: bool = ..., get_pty: bool = ..., prompt: Any = ...) -> ContextManager[SessionWrapper]: ...
     def sudo(self, password: str | None = ..., username: str | None = ..., expect: Any = ..., initials: Any = ..., shell: bool = ..., login: bool = ..., get_pty: bool = ..., enter_timeout: float = ...) -> ContextManager[SessionWrapper]: ...
