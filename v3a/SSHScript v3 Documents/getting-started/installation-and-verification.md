@@ -26,21 +26,18 @@ Paramiko backend; do not impose this cryptography cap on those installations.
 
 ## Install the matching source
 
-Create an isolated environment and install from the release source branch:
+Create an isolated environment and install the pinned 7.0.0 source snapshot:
 
 ```sh
 python3 --version
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install --upgrade pip
-git clone --branch release --depth 1 https://github.com/iapyeh/sshscript.git
-cd sshscript
-git rev-parse HEAD
-python3 -m pip install .
+python3 -m pip install "git+https://github.com/iapyeh/sshscript.git@5bc17cf190e215479af870437eeacd2770d9f283"
 ```
 
-Record the full commit SHA. The release branch can move; use the recorded full
-SHA when reproducing the installation. A verified local 7.0.0 wheel can also be
+The command pins the full source commit. Integration into the protected
+`release` branch is tracked in [PR #29](https://github.com/iapyeh/sshscript/pull/29). A verified local 7.0.0 wheel can also be
 installed with `python3 -m pip install /path/to/sshscript-7.0.0-py3-none-any.whl`.
 Do not assume `pip install sshscript` from PyPI provides the current source API.
 Pin transitive dependencies in your application's lock file as well.
@@ -81,6 +78,6 @@ lock file and repeat your SSH, host-key, PAM and sudoers checks.
 Run the [5-Minute Quickstart]({{ site.baseurl }}/v3a/getting-started/quickstart/),
 then use the [canonical guide]({{ site.baseurl }}/v3a/recommended-api/).
 
-*Last modified: 2026-10-24 16:46:57*
+*Last modified: 2026-10-24 19:37:01*
 
-Last Updated: 2026-10-24 16:46:57
+Last Updated: 2026-10-24 19:37:01

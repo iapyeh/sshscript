@@ -64,7 +64,7 @@ For a new environment, when installation is authorized:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install "git+https://github.com/iapyeh/sshscript.git@release"
+python3 -m pip install "git+https://github.com/iapyeh/sshscript.git@5bc17cf190e215479af870437eeacd2770d9f283"
 ```
 
 Pin the full source commit or verified 7.0.0 wheel hash and verify the imported version.
@@ -479,6 +479,6 @@ for reporting issues. Recipe-specific schemas and vault updates belong to that
 recipe's own documentation. Reading this guide does not authorize executing
 examples or submitting a public report.
 
-*Last modified: 2026-10-24 16:35:46*
+*Last modified: 2026-10-24 19:37:01*
 
-Last Updated: 2026-10-24 16:36:46
+Last Updated: 2026-10-24 19:37:02
