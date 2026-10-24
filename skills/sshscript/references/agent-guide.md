@@ -70,6 +70,137 @@ authorized migration. In particular, 3.1.5 persistent-console calls return
 two live buffers; 4.0 completed-console calls return `CommandResult` snapshots.
 Do not generate 4.0 settings or managed-job APIs against an older installation.
 
+## Testing an unreleased source snapshot
+
+Use this workflow when the user authorizes testing a PR, candidate branch, or
+source commit that has not reached `release` or PyPI. A source snapshot is not
+a published package release; CI may still be pending. Use the supplied full
+40-character source commit SHA. If given a PR or branch, resolve its current
+head once and record that SHA before downloading. Do not select a different
+commit just because its version string is the same.
+
+### Obtain code and matching documents
+
+Use a fresh snapshot directory rather than merging a candidate into an existing
+`release` checkout. The following POSIX-shell example uses `python3`; substitute
+the interpreter selected for the agent's environment. Save the resulting paths
+if the temporary directory will be removed later.
+
+```sh
+set -eu
+SOURCE_COMMIT='<full 40-character source commit SHA>'
+SNAPSHOT_ROOT=$(mktemp -d)
+SNAPSHOT="$SNAPSHOT_ROOT/source"
+git init "$SNAPSHOT"
+git -C "$SNAPSHOT" remote add origin https://github.com/iapyeh/sshscript.git
+git -C "$SNAPSHOT" fetch --depth 1 origin "$SOURCE_COMMIT"
+git -C "$SNAPSHOT" checkout --detach FETCH_HEAD
+test "$(git -C "$SNAPSHOT" rev-parse HEAD)" = "$SOURCE_COMMIT"
+```
+
+Use that snapshot's `README.md`, `API_GUIDE.md`, `VERSIONING.md`, `CONSOLE.md`,
+`EMBEDDED_CONSOLE.md`, and `skills/sshscript/references/agent-guide.md` as the
+documentation for this installation. Keep the checkout or archive these files.
+The maintained website and its latest ZIP can describe a different commit.
+A GitHub source ZIP alone does not install a skill or the Python package.
+
+For an isolated test environment:
+
+```sh
+python3 -m venv "$SNAPSHOT_ROOT/venv"
+TEST_PYTHON="$SNAPSHOT_ROOT/venv/bin/python"
+"$TEST_PYTHON" -m pip install "$SNAPSHOT"
+"$TEST_PYTHON" -m pip check
+"$TEST_PYTHON" -I -c 'import sshscript; print(sshscript.__version__); print(sshscript.__file__)'
+"$SNAPSHOT_ROOT/venv/bin/sshscript" --version
+"$TEST_PYTHON" -m pip freeze > "$SNAPSHOT_ROOT/installed-requirements.txt"
+```
+
+If the user instead requests updating an existing environment, use its actual
+interpreter (also set `TEST_PYTHON` to that executable for bundle generation)
+and `python -m pip install --force-reinstall "$SNAPSHOT"`, then run
+its `pip check`, import/version and CLI checks. This handles different commits
+with the same package version. Restart any process that already imported
+SSHScript, and verify the interpreter used by the UI agent, not just a shell's
+unrelated `python3`. The isolated `-I` import check avoids a local source file
+shadowing the installed package.
+
+### Build and load the complete matching skill
+
+Generate the bundle from the same source commit using the repository's bundle
+generator. This does not require a `gh-pages` checkout and does not publish:
+
+```sh
+"$TEST_PYTHON" -B - "$SNAPSHOT" "$SNAPSHOT_ROOT/sshscript-skill.zip" <<'PY'
+from pathlib import Path
+import runpy
+import sys
+source = Path(sys.argv[1]).resolve()
+generator = runpy.run_path(str(source / 'tools/sync_ai_docs.py'))
+bundle = generator['outputs']()['ai-agents/downloads/sshscript-skill.zip']
+Path(sys.argv[2]).write_bytes(bundle)
+PY
+```
+
+The ZIP includes the whole `sshscript/` skill: `SKILL.md`, the agent guide,
+API, version, CLI/embedded Console references, and embedded examples. Install
+that complete folder through the agent's skill mechanism. Replace the previous
+installed SSHScript skill as a unit; preserve any user customizations separately
+before replacement. Do not leave old references mixed with a new `SKILL.md`.
+Keep the downloaded checkout separate from the installed skill directory.
+Reload the skill or start a new conversation if the agent caches instructions.
+If skill installation is unsupported, provide the matching Markdown files as
+context and report that limitation.
+
+An already published skill ZIP is an alternative only when its contents have
+been verified against this snapshot's generated bundle. Pin the full
+`gh-pages` commit in its download URL and record both source and documentation
+commits. Matching `7.0.0` labels alone do not prove a matching snapshot.
+
+### Return to release later
+
+When asked to return to `release`, resolve its current head to a full commit
+and repeat the same snapshot, installation, document, and skill steps with
+that SHA. Confirm the requested changes have reached `release` before treating
+it as their successor. A squash merge produces a different SHA; record the
+new identity even if the version string stays unchanged. If `release` still
+contains an earlier version, switching to it is a downgrade.
+
+Package reinstallation and complete skill replacement do not merge Git
+histories. An untouched detached snapshot can simply be retained separately.
+If a user-maintained checkout or skill has local edits, preserve and reconcile
+those edits; do not reset or overwrite them silently. Re-run the application's
+relevant checks after any switch.
+
+### Reusable prompt for a UI agent
+
+Replace the source selector and environment description:
+
+```text
+Please update this UI agent's SSHScript environment to this unreleased test
+snapshot: <repository URL plus PR, candidate branch, or full commit SHA>.
+Target Python environment: <environment path or request a new isolated venv>.
+
+Follow "Testing an unreleased source snapshot" in the selected commit's
+skills/sshscript/references/agent-guide.md. Resolve the selector to one full
+source SHA and obtain a fresh checkout. Install that source, retain its matching
+documents, and generate and install the complete skill from that same checkout,
+including all references and examples. Do not update only pip or SKILL.md.
+If the selected snapshot predates these instructions, follow the workflow at
+https://iapyeh.github.io/sshscript/v3a/ai-agents/guide/#testing-an-unreleased-source-snapshot
+while taking code, API documents, and skill content from the selected SHA.
+
+Preserve local customizations. Reload the skill and restart any host process
+that already imported SSHScript when the environment permits it. Verify the
+actual agent interpreter, import path, package and CLI versions, pip check,
+and whether the new skill is loaded. Report the source SHA, documentation and
+skill provenance, dependency snapshot, current CI status, and anything not
+verified. Do not describe this as a published release or claim pending CI passed.
+This authorizes the local update and verification, not remote-host operations.
+When switching back to release later, resolve and pin its head and repeat the
+same process for code, documentation, and the complete skill together.
+```
+
 ## Credential-free quickstart
 
 This example uses the same Python interpreter for the child process. It sends
@@ -469,4 +600,4 @@ for reporting issues. Recipe-specific schemas and vault updates belong to that
 recipe's own documentation. Reading this guide does not authorize executing
 examples or submitting a public report.
 
-*Last modified: 2026-10-24 19:37:01*
+*Last modified: 2026-10-24 20:12:02*

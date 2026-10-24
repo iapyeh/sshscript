@@ -20,6 +20,13 @@ This skill describes the **SSHScript 7.0.0 contract, Python 3.11+**. Read
 [the agent guide](references/agent-guide.md) before generating automation.
 Select only the API sections needed for the user's task.
 
+For an authorized test install or update from a PR, candidate branch, or commit
+before release, follow [Testing an unreleased source snapshot](references/agent-guide.md#testing-an-unreleased-source-snapshot).
+Pin one full source SHA and update the package, matching documents, and complete
+skill together. Generate the skill bundle from that same checkout; a version
+label or the latest website ZIP alone does not establish a match. Repeat this
+workflow when switching back to `release` and reload cached skill instructions.
+
 For an existing host-owned Session, use the new public `Console(session)` API
 with a context manager, default borrowed ownership, structured submit/poll updates
 and explicit Session reuse reporting. Read the guide section
@@ -112,4 +119,4 @@ official links in the agent guide and confirm their contract version.
 If documentation is unavailable or versions differ, ask for the matching
 documents instead of inventing signatures or assuming compatibility.
 
-*Last modified: 2026-10-24 16:35:46*
+*Last modified: 2026-10-24 20:10:23*

@@ -87,6 +87,16 @@ capabilities. See the [repository AI entry](AI_GUIDE.md),
 [agent guide](skills/sshscript/references/agent-guide.md) and
 [skill instructions](skills/sshscript/SKILL.md) for the source documents.
 
+## Test a version before release
+
+A PR or candidate branch may contain changes that are not yet on `release` or
+PyPI. Follow [Testing an unreleased source snapshot](skills/sshscript/references/agent-guide.md#testing-an-unreleased-source-snapshot)
+for download/install commands and a reusable UI-agent prompt. Pin a full source
+commit, retain its matching documents, and generate the complete skill bundle
+from that same checkout. Updating only the Python package or `SKILL.md` leaves
+an agent with mismatched instructions. The guide also explains returning to
+`release` without merging candidate changes into an existing checkout.
+
 ## Recommended API
 
 Start with [the canonical API guide](API_GUIDE.md): version-labelled examples,
@@ -612,4 +622,4 @@ For embedding an existing connected Session, see the new public
 [Console integration API](EMBEDDED_CONSOLE.md). CLI and embedding applications
 share one implementation; earlier 6.0 CLI compatibility is not maintained.
 
-*Last modified: 2026-10-24 19:37:01*
+*Last modified: 2026-10-24 20:10:23*
