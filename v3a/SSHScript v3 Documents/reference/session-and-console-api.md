@@ -8,6 +8,10 @@ permalink: /v3a/reference/session-and-console-api/
 
 # Session and Console API Reference
 
+> Connection examples use the unreleased development API; published 6.1.0
+> uses the previous parameter names. Use a matching checkout or artifact and
+> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
 > **Version scope:** The base command API is available in 3.1.5.
 > Session settings, managed deadlines, and jobs below are features available in 5.0.0.
 
@@ -21,7 +25,7 @@ signatures, results, errors, and lifetime rules.
 ## Session settings (4.0 source API)
 
 `session.set(check=..., verbose=..., verbose_stderr=..., log_level=...,
-policy=..., known_hosts=..., known_hosts_path=...)` validates all supplied settings before applying changes.
+missing_host_key_policy=..., known_hosts_source=..., known_hosts_path=...)` validates all supplied settings before applying changes.
 `session.get()` returns a copy of the settings dictionary; `session.get(name)`
 reads one setting. Matching properties use the same storage. Unknown setting
 names raise `ValueError`; invalid policy values raise `TypeError`.
@@ -32,9 +36,9 @@ names raise `ValueError`; invalid policy values raise `TypeError`.
 | `verbose` | bool | application/environment default |
 | `verbose_stderr` | bool | application/environment default |
 | `log_level` | logging integer or level name | application logger level |
-| `known_hosts` (5.0) | `"parent"`, `"local"`, `"chain"` | `"parent"` |
+| `known_hosts_source` (5.0) | `"parent"`, `"local"`, `"chain"` | `"parent"` |
 | `known_hosts_path` (5.0) | text path, `PathLike[str]`, or `None` | `None` |
-| `policy` | Paramiko `MissingHostKeyPolicy` instance, subclass, or `None` | `None` (RejectPolicy) |
+| `missing_host_key_policy` | Paramiko `MissingHostKeyPolicy` instance, subclass, or `None` | `None` (RejectPolicy) |
 
 ```python
 import paramiko
@@ -42,9 +46,9 @@ from sshscript import Session
 
 session = Session()
 try:
-    session.set(policy=paramiko.AutoAddPolicy())
-    assert session.get("policy") is session.policy
-    session.policy = None
+    session.set(missing_host_key_policy=paramiko.AutoAddPolicy())
+    assert session.get("missing_host_key_policy") is session.missing_host_key_policy
+    session.missing_host_key_policy = None
 finally:
     session.close()
 ```
@@ -234,24 +238,31 @@ Use `sshscript --check file.spy` for the equivalent CLI check.
 
 ```python
 session.connect(
-    host,
+    hostname,
+    *,
     username=None,
     password=None,
     port=None,
-    policy=...,  # 4.0: omitted argument uses the Session setting.
-    *,
+    pkey=None,
+    key_filename=None,
+    parent_key_filename=None,
+    passphrase=None,
+    sock=None,
+    proxy_command=...,
+    proxy_jump=...,
     ssh_config=None,
-    known_hosts=...,  # 5.0: omitted argument uses the Session setting.
-    **connect_options,
+    missing_host_key_policy=...,
+    known_hosts_source=...,
+    **paramiko_options,
 ) -> Session
 ```
 
-In published 3.1.5, the signature uses `policy=None`. In SSHScript 4.0,
-an omitted policy uses `session.policy`; explicit `None` selects default
-RejectPolicy. A supplied policy overrides only this connection, without
+Only hostname may be positional. Explicit username overrides an embedded user
+and is never treated as a password. Omitted missing_host_key_policy inherits
+`session.missing_host_key_policy`; explicit `None` selects default RejectPolicy. A supplied policy overrides only this connection, without
 changing inherited child settings. The omitted value is an internal sentinel.
 
-Returns a connected child Session. `host` may be a hostname or the shorthand
+Returns a connected child Session. `hostname` may be a hostname or the shorthand
 `"user@host"`. Remaining supported options are passed to
 `paramiko.SSHClient.connect()`.
 
@@ -275,19 +286,19 @@ bootstrap decision.
 
 ### Host-key sources (5.0)
 
-SSHScript 5.0.0 defaults to `known_hosts="parent"`, reading the
+SSHScript 5.0.0 defaults to `known_hosts_source="parent"`, reading the
 calling Session host's `~/.ssh/known_hosts` (over SFTP for a remote Session),
-consistent with `pkey_path`. Set each source Session's `known_hosts_path` to
+consistent with `parent_key_filename`. Set each source Session's `known_hosts_path` to
 select another file; paths are not inherited. Strategies are inherited.
-`connect(known_hosts=...)` overrides only the current connection.
+`connect(known_hosts_source=...)` overrides only the current connection.
 
 `"local"` uses only localhost and preserves previous behavior. `"chain"` uses
 the caller, then ancestors through localhost: host2 → host1 → localhost when
 host2 connects to host3. The nearest source with the target hostname/port
 record is authoritative; mismatches and read/parse errors stop immediately.
-Only absence of a target record allows fallback. `pkey_path` remains only on
+Only absence of a target record allows fallback. `parent_key_filename` remains only on
 the calling host regardless of strategy. Authentication and verification
-still run locally. `policy` handles unknown keys only after all sources lack
+still run locally. `missing_host_key_policy` handles unknown keys only after all sources lack
 the target. AutoAddPolicy does not write these trust files.
 
 Missing or unreadable files are errors in all strategies; an empty file
@@ -296,7 +307,7 @@ allows the missing-key policy to decide. See the
 for strict parsing and supported known_hosts formats. SSHScript 4.0.2 and earlier do not provide these settings.
 
 A connection created from an already connected Session tunnels through its
-parent, enabling bastion workflows. `proxyCommand=...` is supported only from
+parent, enabling bastion workflows. `proxy_command=...` is supported only from
 a local parent; combining it with a nested connection raises
 `NotImplementedError`. Direct proxy connections default their connection,
 banner, and authentication timeouts to 30 seconds unless overridden.
@@ -307,13 +318,15 @@ means unspecified and falls back to 22. Nested connections skip local config
 unless a file is explicitly selected. `Session.resolve_connection(...)`
 previews effective settings without connecting. It accepts `host`, `username`,
 `port`, `ssh_config`, and connection options, and returns a dict of effective
-Paramiko arguments plus `proxyCommand` when needed.
+Paramiko arguments plus `proxy_command` when needed.
 
 Supported config keys and ProxyJump prerequisites are documented in
 [Connections, Authentication, and Bastions]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Basic/connect/).
 
-`pkey_path=...` loads an RSA private key from the parent Session's host.
-Supplying both `pkey_path` and `pkey` raises `ValueError`. The
+`parent_key_filename=...` loads an RSA private key from the parent Session's host.
+Combining `parent_key_filename` with `pkey` or `key_filename` raises `ValueError`.
+Use `passphrase` to decrypt the caller-host RSA key; when omitted, it falls back
+to `password`. The
 `KEEPALIVE_INTERVAL` environment variable controls SSH keepalives; its default
 is 60 seconds and `0` disables it.
 
@@ -807,6 +820,6 @@ Disconnected `Session.sftp`, upload, and download raise `SSHScriptException`.
 Paramiko failures retain their original exception and traceback. See
 [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-*Last modified: 2026-10-23 01:05:21*
+*Last modified: 2026-10-24 13:27:36*
 
-Last Updated: 2026-10-23 01:05:21
+Last Updated: 2026-10-24 13:27:36

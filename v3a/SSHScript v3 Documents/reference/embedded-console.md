@@ -10,6 +10,9 @@ permalink: /v3a/reference/embedded-console/
 
 # Unified Console API
 
+> Connection API and hidden-input changes require the matching unreleased
+> development checkout or artifact; published 6.1.0 uses the previous names.
+
 **Contract: SSHScript 6.1.0; Python 3.11+.**
 
 Design and lifecycle contract, written before implementation.
@@ -31,6 +34,18 @@ persistent-shell foreground job; `poll()` reads incremental output without waiti
 `send_input(text, newline=False)` sends raw text to an enter() program.
 Shell jobs reject stdin writes: a late write could reach the parent shell after
 the process exits. Use enter() for interactive applications.
+`input(secret=True, timeout=60)` reads a hidden single-line reply through
+`password_func`, sends it directly to the current enter() program, and returns
+None. Supply no text argument. It bypasses Python evaluation and readline history.
+A non-terminal host must provide `password_func`; otherwise CredentialsRequiredError
+is raised before reading or sending. Cancellation/reader failure sends no line.
+`input(text, timeout=60)` retains the wrapper's existing prompt/exit/silence result.
+Automatic password-prompt detection selects this hidden reader in `interact()`;
+hosts driving submit/poll use the explicit operation and their own credential UI.
+The terminal reader refuses plaintext fallback and restores echo after success or
+cancellation. Program output is not redacted; the receiving program must disable
+its own echo. See the [terminal guide]({{ site.baseurl }}/v3a/reference/interactive-console/) for detection limits.
+
 `interrupt()` stops a job with bounded recovery, or sends Ctrl-C to a program;
 otherwise it discards unfinished Python input. After program Ctrl-C, a matched
 program prompt returns `waiting_input` and remains ready across polls, even when
@@ -38,9 +53,24 @@ the protocol has consumed the prompt text. A control-read timeout stays `running
 a later prompt can restore readiness through `poll()`. `error_type=KeyboardInterrupt`
 records the interruption attempt, not program completion or failure. If the program
 exits, its restored exit status determines `completed` or `failed`. `eof()` leaves program EOF behavior
-unchanged; at the Python prompt it closes the console. `leave()` exits one layer,
+unchanged; at the Python prompt it closes the console.
+`exit(command=None)` requests a one-layer exit. For an entered program, it sends
+the supplied command or the entry's configured `exit=` sequence, and only removes
+the layer after detecting the parent shell. With neither, it writes a reminder
+without sending input. A program that continues stays open; call `poll()` for a
+later return. `submit('$.exit("quit()")')` uses the same behavior, unwinding the
+Python cell first. Script-mode `$.exit()` remains unavailable.
+`leave()` is the existing host cleanup operation and exits one layer,
 including the root shell; `close()` unwinds everything. `quit` closes everything.
 Python SystemExit is reported as failed input and leaves the console open.
+Input timeouts retain already received program output in ConsoleUpdate. Pending
+output and delayed returns are checked before sending another program reply;
+a reply is not forwarded to an already restored parent shell. This also applies
+when enter() has no configured readiness prompt.
+`submit(':error')` displays the original exception message, and
+`submit(':traceback')` displays its traceback. Both work inside program layers
+without forwarding text. These explicit diagnostics may contain exception values;
+automatic error diagnostics remain limited to the exception type.
 A host exception in `with Console(...)` runs cleanup; cleanup failure is never
 suppressed. Initialization failure cleans up the acquired channel.
 
@@ -207,6 +237,6 @@ appeared successful. If the host body and cleanup both fail, both errors are
 preserved in a BaseExceptionGroup. Do not reuse an unknown Session on the strength
 of a prompt or a successful command from an unrelated shell.
 
-*Last modified: 2026-10-23 18:42:01*
+*Last modified: 2026-10-24 14:13:47*
 
-Last Updated: 2026-10-23 18:42:01
+Last Updated: 2026-10-24 14:13:47

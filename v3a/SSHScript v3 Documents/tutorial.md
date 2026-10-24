@@ -93,7 +93,7 @@ finally:
 ```
 
 SSHScript loads system host keys and rejects unknown or changed host keys by
-default. Add the server key to `known_hosts` before connecting. See
+default. Add the server key to `known_hosts_source` before connecting. See
 [Connections, Authentication, and Bastions](../Basic/connect/) for
 authentication, trusted bootstrap, and nested connections.
 
@@ -195,6 +195,6 @@ In v3.1, one `$` handles both direct commands and shell features. The former
 `$$` form is deprecated. See the [Dollar Syntax Reference](../Basic/dollar/)
 if this notation suits the project.
 
-*Last modified: 2026-10-23 18:41:27*
+*Last modified: 2026-10-24 13:19:20*
 
-Last Updated: 2026-10-23 18:41:27
+Last Updated: 2026-10-24 13:19:20

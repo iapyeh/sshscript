@@ -90,7 +90,7 @@ keys in a public report.
 
 An `unknown host key` or `host key changed` error means installation worked
 and SSHScript's secure connection policy rejected an unverified server.
-Verify the server identity and update `known_hosts`. Do not disable
+Verify the server identity and update `known_hosts_source`. Do not disable
 verification as a general workaround. See
 [Connections, Authentication, and Bastions]({{ site.baseurl }}/v3a/SSHScript%20v3%20Documents/Basic/connect/).
 
@@ -106,4 +106,6 @@ sshscript --version
 Use `--traceback` only in a protected diagnostic environment because a full
 trace can expose source, commands, paths, or secrets.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:19:20*
+
+Last Updated: 2026-10-24 13:19:20

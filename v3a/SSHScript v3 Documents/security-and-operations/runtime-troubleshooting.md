@@ -62,7 +62,7 @@ investigating the network.
 
 | Symptom | Likely boundary | First checks |
 | --- | --- | --- |
-| Unknown or changed host key | Server identity | Stop; compare the fingerprint through an independent channel and repair `known_hosts` only after verification. |
+| Unknown or changed host key | Server identity | Stop; compare the fingerprint through an independent channel and repair `known_hosts_source` only after verification. |
 | `AuthenticationException` or repeated authentication failure | Client identity or server policy | Confirm username, agent contents, key permissions, allowed methods, certificate lifetime, PAM, and account state. |
 | DNS, refused connection, or `NoValidConnectionsError` | Name, route, firewall, port, or listener | Resolve the exact hostname, test the configured port from the runner, and inspect the nested/bastion path. |
 | Banner or authentication timeout | Slow, filtered, or non-SSH endpoint | Verify the port and server logs; keep separate connection, banner, and authentication limits. |
@@ -200,4 +200,6 @@ consult the [Session and Console API Reference](../../reference/session-and-cons
 and open a report using the project's
 [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md).
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:19:20*
+
+Last Updated: 2026-10-24 13:19:20

@@ -8,6 +8,10 @@ permalink: /v3a/security-and-operations/host-keys-credentials-and-command-inject
 
 # Host Keys, Credentials, and Command Injection
 
+> Connection examples use the unreleased development API; published 6.1.0
+> uses the previous parameter names. Use a matching checkout or artifact and
+> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
 > Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
@@ -22,7 +26,7 @@ argument boundary.
 
 `Session.connect()` in 5.0.0 reads the calling host's known_hosts and rejects
 an unknown or changed key by default. Authentication and verification run
-locally; remote trust files are read over SFTP with the original login account. Prepare `known_hosts` before the automation
+locally; remote trust files are read over SFTP with the original login account. Prepare `known_hosts_source` before the automation
 runs:
 
 1. Obtain the server fingerprint through an independent trusted channel, such
@@ -66,13 +70,13 @@ by another trusted mechanism and persists the verified result. Treat a changed
 key as a security event until rotation or compromise has been independently
 resolved.
 
-`known_hosts="chain"` searches the caller then its ancestors through localhost.
+`known_hosts_source="chain"` searches the caller then its ancestors through localhost.
 The nearest target record is authoritative; mismatches and file errors never
-fall back. `known_hosts="local"` keeps trust lookup on localhost.
+fall back. `known_hosts_source="local"` keeps trust lookup on localhost.
 `AutoAddPolicy` accepts unknown keys in memory only and writes no trust file.
 
 Each hop has its own trust boundary. A nested connection through a bastion must
-verify the destination key as well as the bastion key. A `proxyCommand` is a
+verify the destination key as well as the bastion key. A `proxy_command` is a
 local process with the privileges and environment of the caller; allow only a
 reviewed, fixed command rather than constructing it from untrusted text.
 
@@ -120,7 +124,7 @@ has been erased. It merely shortens the obvious lifetime. For unattended use,
 prefer an agent, certificate, or secret-manager integration and apply the least
 privilege possible to both the SSH account and any `sudoers` rule.
 
-`pkey_path=` is a compatibility helper that loads an RSA key from the parent
+`parent_key_filename=` is a compatibility helper that loads an RSA key from the parent
 Session's host. For normal local authentication, Paramiko's `key_filename=` and
 agent support are clearer and also avoid transferring private-key contents into
 application code.
@@ -214,7 +218,7 @@ a narrowly scoped privileged command to install it. Remove the staged copy in a
 
 - [ ] The exact host and port are known before connection.
 - [ ] Every host fingerprint is verified independently and installed in
-      `known_hosts`.
+      `known_hosts_source`.
 - [ ] Unknown and changed keys fail closed.
 - [ ] Credentials come from an agent, protected key, certificate, or approved
       runtime secret source.
@@ -230,4 +234,6 @@ a narrowly scoped privileged command to install it. Remove the staged copy in a
 Continue with [Timeouts, Retries, and Cleanup](../timeouts-retries-and-cleanup/)
 and the [Failure Model and Production Checklist](../failure-model-and-production-checklist/).
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:19:20*
+
+Last Updated: 2026-10-24 13:19:20

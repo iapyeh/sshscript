@@ -9,8 +9,17 @@ permalink: /v3a/recommended-api/
 
 # Recommended SSHScript API
 
+> **Development status: not stable.** SSHScript is under active development.
+> APIs, CLI options, configuration and data formats may change incompatibly
+> without a deprecation period. Pin the exact version or source revision,
+> review changes before upgrading, and validate your automation again.
+
+The connection parameter names below describe the **unreleased development
+checkout**, not the published 6.1.0 package. Use a matching checkout or
+verified development artifact. See the connection changes in [VERSIONING.md]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
 This is the canonical entry point for new code and AI-generated examples.
-**Current release contract: 6.1.0**, Python 3.11+. Sections marked **4.0** require
+**Base release contract: 6.1.0; connection changes are unreleased**, Python 3.11+. Sections marked **4.0** require
 SSHScript 4.0.2 or newer; installing `sshscript==3.1.5` does not provide them.
 Examples labelled 3.1.5 remain verified compatibility examples for that baseline.
 Pin the exact artifact version and record it with execution diagnostics when
@@ -44,6 +53,11 @@ Install `sshscript==6.1.0` for this contract. Verify the installed version and
 artifact before operational use; source publication alone does not install it.
 For reproducing only the historical compatibility baseline, explicitly install
 `sshscript==3.1.5`; the 4.0 sections require the current release.
+Only hostname may be positional in connect(); all other parameters are keyword-only.
+An explicit username overrides a user embedded in hostname. Unknown or
+backend-version-unsupported keywords fail before connection I/O; explicit sock
+cannot be combined with a nested connection or a proxy.
+
 An argv list is one command, not a batch. Shell-looking argument text stays data.
 
 <!-- example: {"id":"argv", "profile":"3.1.5", "stdout":"a; b\n"} -->
@@ -100,24 +114,25 @@ with closing(Session()) as local:
 
 ### Private-key paths and nested connections
 
-`parent.connect(..., pkey_path=path)` loads an RSA private key from the
+`parent.connect(..., parent_key_filename=path)` loads an RSA private key from the
 **calling parent Session's host**. A local Session reads the file on localhost;
 a Session connected to host1 reads it on host1 through SFTP before connecting
 to host2. `connect()` returns a child Session and leaves the parent on its
 original host. Calling the original local Session again therefore still reads
 the key on localhost.
 
-For example, `local.connect("host1", pkey_path="/local/key_rsa")` reads
+For example, `local.connect("host1", parent_key_filename="/local/key_rsa")` reads
 `/local/key_rsa` locally and returns `host1`. Then
-`host1.connect("host2", pkey_path="/remote/key_rsa")` reads `/remote/key_rsa`
+`host1.connect("host2", parent_key_filename="/remote/key_rsa")` reads `/remote/key_rsa`
 on host1. In `.spy`, an inner `with $.connect(...)` uses the outer scope's
 current Session as its parent.
 
 `key_filename=` is forwarded to Paramiko and reads from the local Python
 process's filesystem even for nested connections; it supports additional key
-formats. For an encrypted RSA key, use
-`pkey=parent.pkey(path, password=key_passphrase)` to retain the same host-based
-reading rule. Supplying both `pkey_path` and `pkey` raises `ValueError`.
+formats. For an encrypted caller-host RSA key, pass `parent_key_filename=path` and
+`passphrase=key_passphrase`. If passphrase is omitted, password is also tried for
+decryption. `parent_key_filename` cannot be combined with `pkey` or
+`key_filename`; local `pkey` and `key_filename` retain Paramiko semantics.
 See the [agent guide's complete nested example](https://iapyeh.github.io/sshscript/v3a/ai-agents/guide/#ssh-connections-and-private-key-paths).
 
 <a id="host-key-sources-unreleased"></a>
@@ -125,7 +140,7 @@ See the [agent guide's complete nested example](https://iapyeh.github.io/sshscri
 ### Host-key sources (5.0)
 
 This section requires SSHScript 5.0.0 or newer.
-`known_hosts` selects the host-key trust source independently of `policy`:
+`known_hosts_source` selects the host-key trust source independently of `missing_host_key_policy`:
 
 | Value | Sources, in order |
 | --- | --- |
@@ -134,7 +149,7 @@ This section requires SSHScript 5.0.0 or newer.
 | `"chain"` | Calling Session, then each ancestor through localhost |
 
 For localhost → host1 → host2 → host3, `host2.connect("host3",
-known_hosts="chain")` consults host2, host1, then localhost. The nearest source
+known_hosts_source="chain")` consults host2, host1, then localhost. The nearest source
 with a record for the resolved target hostname and port is authoritative.
 A matching key is accepted; a changed key is rejected even if a more distant
 source matches. Only absence of a target record permits continuing the chain.
@@ -148,23 +163,23 @@ account. Remote `~/` paths refer to the login account's SFTP home; `~user` paths
 are unsupported. Relative remote paths use the SFTP working directory.
 
 ```py
-local.set(known_hosts="chain")
+local.set(known_hosts_source="chain")
 # After connecting to host1 and host2:
 host1.set(known_hosts_path="/home/ops/.ssh/known_hosts")
 host2.set(known_hosts_path="/etc/ssh/ssh_known_hosts")
-with host2.connect("deploy@host3", pkey_path="/home/ops/.ssh/host3_rsa") as host3:
+with host2.connect("deploy@host3", parent_key_filename="/home/ops/.ssh/host3_rsa") as host3:
     result = host3.exec_command(["hostname"], check=True, command_timeout=10)
 ```
 
 The strategy is inherited by future child Sessions; the path is host-specific
 and is **not inherited**. `known_hosts_path=None` restores the standard path.
-A `connect(known_hosts=...)` override affects only that connection; it does not
+A `connect(known_hosts_source=...)` override affects only that connection; it does not
 change the parent setting or the child's inherited strategy. `set()`, `get()`
 and matching properties expose both settings. `known_hosts_path` accepts text
 paths and `PathLike[str]`; it is a Session setting, not a `connect()` keyword.
 
-`pkey_path` always reads only from the calling Session's host, including with
-`known_hosts="chain"`; private keys are never searched through ancestors.
+`parent_key_filename` always reads only from the calling Session's host, including with
+`known_hosts_source="chain"`; private keys are never searched through ancestors.
 
 An absent trust file, permission failure, read failure, invalid UTF-8 or invalid
 entry raises an error; no distant source or permissive policy bypasses it.
@@ -174,20 +189,20 @@ and `@revoked`, wildcard/negated host patterns and unsupported key types raise
 an error rather than being silently ignored. A source file is fully parsed
 before its records are used. Nonstandard ports use `[hostname]:port` records.
 
-When every selected source lacks the target, `policy` handles the unknown key.
+When every selected source lacks the target, `missing_host_key_policy` handles the unknown key.
 `AutoAddPolicy` accepts it into the new client's memory only; these trust files
 are read-only and are not automatically updated locally or remotely.
 
 **Migration from 4.0.2:** earlier releases always load localhost host keys. The new default
-`"parent"` makes nested host-key sources consistent with `pkey_path`. To retain
-the previous behavior, set `local.set(known_hosts="local")` before connecting.
+`"parent"` makes nested host-key sources consistent with `parent_key_filename`. To retain
+the previous behavior, set `local.set(known_hosts_source="local")` before connecting.
 All strategies require a readable, valid file, including the default localhost
 path. Unlike 4.0.2, a missing local file is an error; create an empty
 file if the configured missing-key policy should handle unknown hosts.
 
 ### Private keys readable only in a privileged console
 
-Remote `pkey()` and `pkey_path` use SFTP with the original SSH login account.
+Remote `pkey()` and `parent_key_filename` use SFTP with the original SSH login account.
 Entering `sudo()` or `su()` does not change that identity, so even
 `$.pkey("/root/.ssh/id_rsa")` inside a root console can fail with a permission
 error. When authorized, read the file with a console command and construct
@@ -244,20 +259,20 @@ print(result.stdout)
 
 ## 4.0: settings and managed jobs
 
-Use SSHScript 6.1.0 for the following examples. CLI `-v`, `--stderr`, and
+Use the matching development checkout for the following examples. CLI `-v`, `--stderr`, `--quiet`, and
 `--debug` override root defaults only for that execution. Child Sessions copy
 their parent's settings. `set()` validates before changing anything; `get()`
 returns a copy. Explicit command options override Session policy.
 
-The `policy` setting controls future SSH connections. It defaults to `None`
+The `missing_host_key_policy` setting controls future SSH connections. It defaults to `None`
 (Paramiko's RejectPolicy) and accepts a Paramiko `MissingHostKeyPolicy` instance
-or subclass. For example, `local.set(policy=paramiko.AutoAddPolicy())` makes
+or subclass. For example, `local.set(missing_host_key_policy=paramiko.AutoAddPolicy())` makes
 subsequent `local.connect(...)` calls accept unknown host keys. Import `paramiko`
-before using its policies. The matching `local.policy` property and
-`local.get("policy")` use the same setting.
+before using its policies. The matching `local.missing_host_key_policy` property and
+`local.get("missing_host_key_policy")` use the same setting.
 
-An explicit `connect(policy=...)` overrides the setting for that connection;
-`connect(policy=None)` restores default rejection for that connection. These
+An explicit `connect(missing_host_key_policy=...)` overrides the setting for that connection;
+`connect(missing_host_key_policy=None)` restores default rejection for that connection. These
 overrides do not change the settings inherited by child Sessions. Children copy
 the settings dictionary at creation; the policy object itself is shared, so
 custom policies with mutable state must account for reuse. Changing the setting
@@ -271,7 +286,7 @@ from sshscript import Session
 
 with closing(Session()) as local:
     local.set(check=True, verbose=False, log_level="WARNING",
-              policy=paramiko.AutoAddPolicy())
+              missing_host_key_policy=paramiko.AutoAddPolicy())
     print(local.get("check"))
     result = local.exec_command(["false"], check=False, command_timeout=5)
     print(result.exitcode)
@@ -782,6 +797,13 @@ editing reserved variables. `Console(session)` borrows the connection, while
 [API and lifecycle contract]({{ site.baseurl }}/v3a/reference/embedded-console/) for structured updates,
 credentials, identity, PTY limits, exceptions and runnable examples.
 
+The unreleased console also supports `$.input(secret=True)` for a hidden
+single-line reply to an entered program. Terminal interaction automatically uses
+this reader for recognized password prompts; detection is a heuristic, and late
+or unfamiliar prompts need the explicit operation. Embedded hosts provide
+`password_func`. See [hidden program input]({{ site.baseurl }}/v3a/reference/interactive-console/)
+for no-echo behavior and the remote-output boundary.
+
 ## Interactive console and script completion (6.0)
 
 See [the console guide]({{ site.baseurl }}/v3a/reference/interactive-console/) for the 6.0 Python-first dollar REPL, retained
@@ -793,12 +815,15 @@ local root. Bare `quit` and `quit()` close the whole console.
 Use `help` or `help()` for console instructions and `help(object)` for Python
 object documentation.
 `$.stop(code=0, message="")` normally completes the nearest script runner;
-`$.exit()`, `Session.exit()` and wrapper `.exit()` are removed in both modes,
+`$.exit()` is console-only and leaves one layer; `$.exit("quit")` supplies a
+program's exit command at departure. Without an explicit or configured exit
+command, an entered program stays open with a reminder. Script-mode `$.exit()`,
+`Session.exit()` and wrapper `.exit()` remain unavailable,
 as is the old `$.break()` name. Session.run()/run_script() return a dictionary-like
 ScriptResult with exitcode, stopped and message attributes; run_file() returns
 the integer status. Cleanup failures still propagate. Python SystemExit remains
 separate from normal script completion.
 
-*Last modified: 2026-10-23 18:39:31*
+*Last modified: 2026-10-24 14:06:51*
 
-Last Updated: 2026-10-23 18:41:28
+Last Updated: 2026-10-24 14:06:51

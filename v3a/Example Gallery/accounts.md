@@ -36,7 +36,7 @@ quoted account value is not interpreted as shell syntax.
 ### Prerequisites
 
 - SSHScript 5.0.0 and Python 3.11 or newer on the runner;
-- the target's verified key in `known_hosts`;
+- the target's verified key in `known_hosts_source`;
 - authorization to view account and group membership; and
 - a non-secret account name supplied as input.
 
@@ -146,4 +146,6 @@ target, least-privilege rule, before/after audit evidence, idempotent behavior,
 secret handling, rollback, and a test on the site's actual directory/PAM
 stack.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:19:20*
+
+Last Updated: 2026-10-24 13:19:20

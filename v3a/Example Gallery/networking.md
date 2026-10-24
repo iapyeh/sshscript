@@ -38,7 +38,7 @@ sequence before it succeeds or fails.
 - explicit authorization to connect to the endpoint;
 - SSHScript 5.0.0 and Python 3.11 or newer on the runner;
 - `python3` on the remote host;
-- the SSH host's verified key in `known_hosts`; and
+- the SSH host's verified key in `known_hosts_source`; and
 - a firewall policy that permits the intended test.
 
 This is not a port scanner. Do not loop over unapproved addresses or ports.
@@ -160,4 +160,6 @@ inspection, packet capture, and firewall changes have different permissions
 and data exposure; publish each as its own case with protocol-specific
 verification and cleanup.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:19:20*
+
+Last Updated: 2026-10-24 13:19:20

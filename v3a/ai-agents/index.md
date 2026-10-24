@@ -9,6 +9,15 @@ permalink: /v3a/ai-agents/
 
 # SSHScript for AI Agents
 
+> **Development status: not stable.** SSHScript is under active development.
+> APIs, CLI options, configuration and data formats may change incompatibly
+> without a deprecation period. Pin the exact version or source revision,
+> review changes before upgrading, and validate your automation again.
+
+> Connection examples use the unreleased development API; published 6.1.0
+> uses the previous parameter names. Use a matching checkout or artifact and
+> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
 Give your agent this page to prepare for future tasks or to complete a current
 task. SSHScript lets it write Python automation for local and SSH commands,
 retain command output and status, and manage
@@ -142,6 +151,6 @@ collection logic, schemas and vault updates belong to their recipe project.
 Follow the [support policy](https://github.com/iapyeh/sshscript/blob/release/SUPPORT.md)
 for feedback; public submission requires the user's authorization.
 
-*Last modified: 2026-10-23 23:31:42*
+*Last modified: 2026-10-24 13:19:20*
 
-Last Updated: 2026-10-23 23:31:42
+Last Updated: 2026-10-24 13:19:20

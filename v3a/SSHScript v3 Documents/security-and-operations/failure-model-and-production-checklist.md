@@ -170,7 +170,7 @@ SSHScript loads system host keys and rejects unknown or changed keys by
 default. Before deployment:
 
 - verify each server fingerprint through an independent trusted channel;
-- install the verified key in the account's `known_hosts`;
+- install the verified key in the account's `known_hosts_source`;
 - treat a changed key as a security event, not an inconvenience; and
 - never use `AutoAddPolicy` as a general production workaround.
 
@@ -266,7 +266,7 @@ controlled diagnostic environment, and review all output before sharing it.
 
 ### Trust and secrets
 
-- [ ] Host fingerprints are verified and present in `known_hosts`.
+- [ ] Host fingerprints are verified and present in `known_hosts_source`.
 - [ ] No permissive host-key policy is used outside controlled bootstrap.
 - [ ] Passwords, keys, tokens, commands, and sensitive stderr are redacted.
 - [ ] Each account and privilege rule has the minimum required access.
@@ -307,4 +307,6 @@ timeout, and transport failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:19:20*
+
+Last Updated: 2026-10-24 13:19:20

@@ -25,7 +25,7 @@ and the [5-Minute Quickstart](../quickstart/) first. You also need:
 
 - a reachable SSH server and port;
 - an authorized account and authentication method;
-- the server's host key in the automation account's `known_hosts`; and
+- the server's host key in the automation account's `known_hosts_source`; and
 - permission to run the example command.
 
 Obtain the host-key fingerprint through an independent trusted channel before
@@ -214,4 +214,6 @@ with
 Before production use, read
 [Host Keys, Credentials, and Command Injection](../../security-and-operations/host-keys-credentials-and-command-injection/).
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:19:20*
+
+Last Updated: 2026-10-24 13:19:20

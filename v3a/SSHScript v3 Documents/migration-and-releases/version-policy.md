@@ -10,6 +10,11 @@ permalink: /v3a/migration-and-releases/version-policy/
 
 # Version policy and major differences
 
+> **Development status: not stable.** SSHScript is under active development.
+> APIs, CLI options, configuration and data formats may change incompatibly
+> without a deprecation period. Pin the exact version or source revision,
+> review changes before upgrading, and validate your automation again.
+
 SSHScript aims to let engineers and AI reliably execute, understand, and take
 over automation. A version identifies a public execution contract, not a
 claim that a command or deployment is safe or successful.
@@ -40,6 +45,47 @@ Version 4.0.2 is a documentation and link maintenance patch with the same public
 execution contract. Native-system validation limits remain documented.
 Use the normal Python Session API as the canonical entry point; optional .spy
 syntax follows the same versioned execution contract.
+
+## Unreleased connection parameter changes
+
+These changes describe the current checkout, not the published 6.1.0 package.
+Old names are rejected immediately; there are no compatibility aliases or
+migration tools. Update scripts, connection dictionaries and Session settings.
+
+| Previous name | Current name |
+| --- | --- |
+| `host` parameter | `hostname` |
+| `pkey_path` | `parent_key_filename` |
+| `proxyCommand` / `proxyJump` | `proxy_command` / `proxy_jump` |
+| `policy` | `missing_host_key_policy` |
+| `known_hosts` strategy | `known_hosts_source` |
+| `--pkey-path` | `--parent-key-filename` |
+| `--known-hosts` | `--known-hosts-source` |
+
+Only hostname may be positional. Replace `connect("user@host", "password")`
+with `connect("user@host", password="password")`. Explicit username takes
+precedence over the embedded username and is never interpreted as a password.
+`key_filename` still reads local Python-host files; `parent_key_filename` reads
+an RSA key from the calling Session's host. Supply passphrase to decrypt it;
+password is the fallback when passphrase is omitted. Do not combine the latter
+with pkey or key_filename. Explicit sock is incompatible with nested/proxy
+connections. `known_hosts_path` remains a Session setting and is not renamed.
+
+Use the same new policy/source names in `set()`, `get()` and Session properties.
+CLI proxy options are `--proxy-command` and `--proxy-jump`; OpenSSH config files
+still use their standard `ProxyCommand` and `ProxyJump` directives.
+The historical sections below retain the names used by those releases.
+
+## Current development console changes
+
+The working checkout adds console-only `$.exit()` alongside `exit` and `exit()`.
+For entered programs, `$.exit("command")` supplies the exit sequence on departure;
+without an explicit or configured sequence, the program stays open with a reminder.
+Script-mode `$.exit()`, `Session.exit()` and wrapper `.exit()` remain unavailable.
+Script CLI output now defaults to each stream's TTY status, with mutually exclusive
+`--quiet`, `--verbose` and `--stderr` overrides. Scripts that also print captured
+output may display it twice on a terminal; use `--quiet` when printing it yourself.
+These changes are unreleased; the following migration table is historical.
 
 ## 6.0 console and script completion migration
 
@@ -193,6 +239,6 @@ Consult that artifact's version-labelled API guide before generating examples.
 Production gates reject prerelease/local versions before uploading; they never
 silently relabel development builds as stable.
 
-*Last modified: 2026-10-23 18:41:27*
+*Last modified: 2026-10-24 13:17:19*
 
-Last Updated: 2026-10-23 18:41:27
+Last Updated: 2026-10-24 13:17:19

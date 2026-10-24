@@ -7,6 +7,10 @@ nav_order: 1
 
 # Running Commands and Shell Pipelines
 
+> Connection examples use the unreleased development API; published 6.1.0
+> uses the previous parameter names. Use a matching checkout or artifact and
+> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
 > Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
@@ -107,10 +111,10 @@ and remotely, after saving `session.last_result` and `exception.result`.
 
 ## Session host-key policy (4.0 source API)
 
-In SSHScript 4.0, `session.set(policy=paramiko.AutoAddPolicy())`
+In SSHScript 4.0, `session.set(missing_host_key_policy=paramiko.AutoAddPolicy())`
 configures future SSH connections; import `paramiko` first. The equivalent
-property is `session.policy`, and `session.get("policy")` reads the setting.
-Omitted `connect(policy=...)` uses that setting; an explicit policy overrides
+property is `session.missing_host_key_policy`, and `session.get("missing_host_key_policy")` reads the setting.
+Omitted `connect(missing_host_key_policy=...)` uses that setting; an explicit policy overrides
 it for one connection, and explicit `None` uses default RejectPolicy.
 
 Child Sessions inherit the parent's settings even when a connection uses an
@@ -198,4 +202,6 @@ timeout, and transport failures remain exceptions regardless of optimization.
 validation now uses explicit exceptions in both normal and optimized modes.
 See [Exceptions and Return Values]({{ site.baseurl }}/v3a/reference/exceptions-and-return-values/).
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:19:20*
+
+Last Updated: 2026-10-24 13:19:20

@@ -36,7 +36,7 @@ handling.
 
 - SSHScript 5.0.0 and Python 3.11 or newer on the runner;
 - a target account authenticated by an agent or configured key;
-- the target's independently verified key in `known_hosts`; and
+- the target's independently verified key in `known_hosts_source`; and
 - permission to collect the selected operational data.
 
 ### Complete script
@@ -143,4 +143,6 @@ target platform. Give each command its own stable name and status policy. For a
 state-changing operation, create a separate Gallery page with preconditions,
 backup, idempotency, verification, rollback, and partial-failure behavior.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:19:20*
+
+Last Updated: 2026-10-24 13:19:20

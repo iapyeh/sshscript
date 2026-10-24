@@ -7,6 +7,10 @@ nav_order: 2
 
 # Connections, Authentication, and Bastions
 
+> Connection examples use the unreleased development API; published 6.1.0
+> uses the previous parameter names. Use a matching checkout or artifact and
+> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
 > **Version scope:** The argv/CommandResult/check/config API is available in 3.1.5.
 > Session settings and managed jobs/deadlines are features available in 5.0.0.
 > Use the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/) to choose
@@ -35,7 +39,7 @@ finally:
 ```
 
 The `user@host` form supplies both the username and host. Separate
-`host="example.net"` and `username="ops"` arguments are also accepted.
+`hostname="example.net"` and `username="ops"` arguments are also accepted.
 
 ## Reuse SSH config and preview settings
 
@@ -43,7 +47,7 @@ Local connections read `~/.ssh/config` if present. Supported settings are
 `Host` patterns, `HostName`, `User`, `Port`, `IdentityFile`, `ProxyCommand`, and
 `ProxyJump`. Explicit API arguments override config, which overrides defaults.
 `port=None` means unspecified; `port=22` explicitly overrides a configured port.
-Explicit `pkey`, `pkey_path`, or `key_filename` overrides identity files.
+Explicit `pkey`, `parent_key_filename`, or `key_filename` overrides identity files.
 
 ```text
 Host production
@@ -65,7 +69,7 @@ with closing(Session()) as local:
         stdout, stderr, exitcode = result
 ```
 
-`resolve_connection()` returns effective Paramiko arguments plus `proxyCommand`
+`resolve_connection()` returns effective Paramiko arguments plus `proxy_command`
 when needed. It does no network operations. `ssh_config=False` disables config;
 a file path selects a config file that must exist. Nested connections skip
 local config unless an explicit file is supplied. `session.host` and saved
@@ -74,8 +78,8 @@ local config unless an explicit file is supplied. `session.host` and saved
 Identity paths and configured proxy commands expand `%h`, `%n`, `%p`, `%r`,
 `%u`, `%d`, and `%%` after explicit overrides. Unknown tokens fail clearly.
 `HostName` accepts `%h`, `%n`, and `%%`; `~` expands in identity paths.
-Explicit `proxyCommand` keeps its verbatim behavior and does not expand tokens.
-Use `proxyCommand=None` to disable configured proxies.
+Explicit `proxy_command` keeps its verbatim behavior and does not expand tokens.
+Use `proxy_command=None` to disable configured proxies.
 
 `Match`, `Include`, and hostname canonicalization are rejected before lookup.
 Other unapplied settings produce a warning; this is a subset of OpenSSH config,
@@ -85,7 +89,7 @@ in force. Config is trusted local input: connecting can execute proxy programs.
 
 ## ProxyJump
 
-Use config or an explicit `proxyJump="user@bastion:2222"`. Comma-separated
+Use config or an explicit `proxy_jump="user@bastion:2222"`. Comma-separated
 chains and bracketed IPv6 hosts are accepted. SSHScript uses the local `ssh`
 executable to forward to the target, and Paramiko authenticates and verifies
 the target connection. The forwarding command uses batch authentication and
@@ -140,8 +144,10 @@ finally:
     local.close(strict=True)
 ```
 
-When `host` uses `user@host`, a second positional argument is accepted as the
-password for compatibility. Prefer the explicit `password=` form in new code.
+Only `hostname` may be positional; supply the login password with `password=`.
+An explicit `username=` overrides the user embedded in `user@host`.
+For an encrypted caller-host RSA key, supply `parent_key_filename=...` and
+`passphrase=...`; when `passphrase` is omitted, `password` is used to decrypt it.
 
 ## Host-key verification
 
@@ -162,7 +168,7 @@ local = Session()
 try:
     with local.connect(
         "ops@new-host.example",
-        policy=paramiko.AutoAddPolicy(),
+        missing_host_key_policy=paramiko.AutoAddPolicy(),
     ) as remote:
         remote.exec_command("hostname", shell=False)
 finally:
@@ -171,14 +177,14 @@ finally:
 
 Use `AutoAddPolicy()` only in a trusted bootstrap environment where the new
 server identity has been verified out of band. It is not the production
-default. The legacy `policy=0` form is deprecated and now selects secure
+default. The legacy `missing_host_key_policy=0` form is deprecated and now selects secure
 default verification.
 
 <a id="default-host-key-policy-unreleased-source-api"></a>
 
 ## Default host-key policy (4.0 source API)
 
-In SSHScript 4.0, configure a Session once instead of passing `policy`
+In SSHScript 4.0, configure a Session once instead of passing `missing_host_key_policy`
 to every connection:
 
 ```python
@@ -188,20 +194,20 @@ from contextlib import closing
 from sshscript import Session
 
 with closing(Session()) as local:
-    local.set(policy=paramiko.AutoAddPolicy())
+    local.set(missing_host_key_policy=paramiko.AutoAddPolicy())
     with local.connect("ops@first.example.net") as first:
         first.exec_command(["hostname"], check=True)
     with local.connect("ops@second.example.net") as second:
         second.exec_command(["hostname"], check=True)
-    with local.connect("ops@verified.example.net", policy=None) as verified:
+    with local.connect("ops@verified.example.net", missing_host_key_policy=None) as verified:
         verified.exec_command(["hostname"], check=True)
 ```
 
 Use AutoAddPolicy only under the bootstrap conditions described above. The
-`policy` setting defaults to `None` and accepts a Paramiko `MissingHostKeyPolicy`
-instance or subclass. `local.policy = ...` and `local.get("policy")` access the
-same setting. In `.spy`, use `$.set(policy=paramiko.AutoAddPolicy())` and
-`$.get("policy")`.
+`missing_host_key_policy` setting defaults to `None` and accepts a Paramiko `MissingHostKeyPolicy`
+instance or subclass. `local.missing_host_key_policy = ...` and `local.get("missing_host_key_policy")` access the
+same setting. In `.spy`, use `$.set(missing_host_key_policy=paramiko.AutoAddPolicy())` and
+`$.get("missing_host_key_policy")`.
 
 Omitting the connect argument uses the Session setting. An explicit policy
 wins for that connection; explicit `None` uses Paramiko's default RejectPolicy.
@@ -212,7 +218,7 @@ settings dictionary is copied, but the policy object is shared; custom policies
 with mutable state must support reuse.
 
 This setting is not available in published 3.1.5. On that version, keep using
-`connect(policy=...)` for each connection.
+`connect(missing_host_key_policy=...)` for each connection.
 
 ## Nested connections
 
@@ -236,13 +242,13 @@ finally:
     local.close(strict=True)
 ```
 
-For a nested connection, `pkey_path` refers to an RSA private key readable
+For a nested connection, `parent_key_filename` refers to an RSA private key readable
 from the currently connected parent host; SSHScript reads that file through
 SFTP. Prefer Paramiko's normal key options for top-level connections.
 
 ## Private keys readable only in a privileged console
 
-Remote `pkey()` and `pkey_path` use SFTP with the original SSH login account.
+Remote `pkey()` and `parent_key_filename` use SFTP with the original SSH login account.
 Entering `sudo()` or `su()` does not change that identity, so even
 `$.pkey("/root/.ssh/id_rsa")` inside a root console can fail with a permission
 error. When authorized, read the file with a console command and construct
@@ -283,18 +289,18 @@ privilege. The example leaves the console first and calls the retained
 
 ## ProxyCommand and keepalives
 
-A top-level connection may use `proxyCommand`:
+A top-level connection may use `proxy_command`:
 
 ```python
 with local.connect(
     "ops@private.example.net",
-    proxyCommand="ssh -o StrictHostKeyChecking=yes -W private.example.net:22 jump.example.net",
+    proxy_command="ssh -o StrictHostKeyChecking=yes -W private.example.net:22 jump.example.net",
 ) as remote:
     remote.exec_command("hostname", shell=False)
 ```
 
 A nested connection already has a transport, so combining nested
-`connect()` with `proxyCommand` is not supported.
+`connect()` with `proxy_command` is not supported.
 
 SSH transports use a 60-second keepalive interval by default. Set the process
 environment variable `KEEPALIVE_INTERVAL` to another integer number of
@@ -313,4 +319,6 @@ with $.connect("ops@example.net"):
 Nested `$.connect()` blocks and the host-key policy follow the same Session
 API behavior.
 
-Last Updated: 2026-10-10 19:43:07
+*Last modified: 2026-10-24 13:27:36*
+
+Last Updated: 2026-10-24 13:27:36

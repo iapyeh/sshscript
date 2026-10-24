@@ -12,9 +12,15 @@ output, status and installed version, distinguish failure from timeout, and
 reconcile unknown termination. A zero exit status does not prove deployment
 success; closing an SSH channel does not prove its remote process stopped.
 
-**SSHScript is under active development. Backward compatibility is not maintained
-unless explicitly requested. APIs, CLI behavior, configuration and data formats
-may change; release notes briefly identify major differences.**
+> **Development status: not stable.** SSHScript is under active development.
+> APIs, CLI options, configuration and data formats may change incompatibly
+> without a deprecation period. Pin the exact version or source revision,
+> review changes before upgrading, and validate your automation again.
+
+> Connection examples use the unreleased development API; published 6.1.0
+> uses the previous parameter names. Use a matching checkout or artifact and
+> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
 
 The current contract is **6.1.0**. The public
 [Console integration API]({{ site.baseurl }}/v3a/reference/embedded-console/)
@@ -90,6 +96,6 @@ SSHScript is released under the MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-*Last modified: 2026-10-23 23:31:42*
+*Last modified: 2026-10-24 13:19:20*
 
-Last Updated: 2026-10-23 23:31:42
+Last Updated: 2026-10-24 13:19:20

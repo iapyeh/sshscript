@@ -7,6 +7,15 @@ has_toc: false
 
 # SSHScript Documentation
 
+> **Development status: not stable.** SSHScript is under active development.
+> APIs, CLI options, configuration and data formats may change incompatibly
+> without a deprecation period. Pin the exact version or source revision,
+> review changes before upgrading, and validate your automation again.
+
+> Connection examples use the unreleased development API; published 6.1.0
+> uses the previous parameter names. Use a matching checkout or artifact and
+> read the [connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
+
 SSHScript aims to help engineers and AI agents execute, understand, and hand
 off automation reliably. Use the regular Python Session API first; optional
 Dollar syntax shares the same execution semantics. Retain the command's host,
@@ -14,14 +23,12 @@ output, status and installed version, distinguish failure from timeout, and
 reconcile unknown termination. A zero exit status does not prove deployment
 success; closing an SSH channel does not prove its remote process stopped.
 
-The published example baseline is **3.1.5**. The current production
-contract is **5.0.0**, with host-key source changes from 4.0.2 and execution changes from 3.1.5; see
-[version policy and migration]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/).
-The new **6.0.0 source contract** adds an
-[interactive Python/dollar console]({{ site.baseurl }}/v3a/reference/interactive-console/)
-and incompatible script-control API changes. The published package remains
-5.0.0 until a separate package publication. The canonical API and agent skill
-now document 6.0; check installed versions before copying those examples.
+The credential-free example baseline is **3.1.5**. Current connection examples
+use the **unreleased development contract**, including keyword-only options and
+the new snake_case connection names. Published **6.1.0** has the earlier names;
+a documentation or source update does not publish a new package. See
+[version policy and connection changes]({{ site.baseurl }}/v3a/migration-and-releases/version-policy/)
+before selecting a matching checkout or artifact.
 
 Start with the [canonical API guide]({{ site.baseurl }}/v3a/recommended-api/)
 for version-labelled examples and lifetime rules.
@@ -51,6 +58,6 @@ project for reusable recipes and operations management workflows. It is
 currently an initial documentation scaffold, without executable recipes or an
 implemented management system.
 
-*Last modified: 2026-10-22 23:26:49*
+*Last modified: 2026-10-24 13:22:20*
 
-Last Updated: 2026-10-22 23:26:49
+Last Updated: 2026-10-24 13:22:20
