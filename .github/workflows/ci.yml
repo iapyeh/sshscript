@@ -4,7 +4,8 @@ permissions:
   contents: read
 jobs:
   verify:
-    timeout-minutes: 30
+    # macOS runs source and installed-sdist suites in normal and optimized modes.
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:

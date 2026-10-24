@@ -141,11 +141,11 @@ pin SSHScript and all transitive dependencies in your application's lock file.
 To install the current source contract:
 
 ```sh
-python3 -m pip install "git+https://github.com/iapyeh/sshscript.git@release"
+python3 -m pip install "git+https://github.com/iapyeh/sshscript.git@5bc17cf190e215479af870437eeacd2770d9f283"
 ```
 
-Record the full source commit; replace `release` with that SHA for reproducible
-installation. PyPI installation/upgrade follows the separately published package. The optional
+This pins the 7.0.0 source snapshot. Integration into the protected `release`
+branch is tracked in [PR #29](https://github.com/iapyeh/sshscript/pull/29). PyPI installation/upgrade follows the separately published package. The optional
 `sshscript --check-updates` command queries PyPI and prints an upgrade command;
 it never installs an update by itself.
 
@@ -612,4 +612,4 @@ For embedding an existing connected Session, see the new public
 [Console integration API](EMBEDDED_CONSOLE.md). CLI and embedding applications
 share one implementation; earlier 6.0 CLI compatibility is not maintained.
 
-*Last modified: 2026-10-24 16:35:46*
+*Last modified: 2026-10-24 19:37:01*
