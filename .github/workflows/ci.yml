@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install test and build dependencies
@@ -32,7 +32,7 @@ jobs:
         run: python tools/check_public_types.py
       - name: Build and verify installed release
         run: python tools/check_release.py --output '${{ runner.temp }}/verified-artifacts'
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: sshscript-${{ matrix.os }}-${{ matrix.python-version }}
           path: ${{ runner.temp }}/verified-artifacts/
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: '3.11'
       - run: python -m pip install 'sshscript==3.1.5'
@@ -81,7 +81,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install test and build dependencies
@@ -106,14 +106,14 @@ jobs:
         run: python tools/run_native_auth_ci.py --wheel "$RUNNER_TEMP"/verified-artifacts/*.whl --report "$RUNNER_TEMP/native-auth-report.json"
       - name: Save native authentication evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: native-auth-python-${{ matrix.python-version }}-${{ matrix.dependency-label }}
           if-no-files-found: warn
           path: ${{ runner.temp }}/native-auth-report.json
       - name: Upload OpenSSH server log
         if: ${{ failure() && env.SSHSCRIPT_OPENSSH_LOG != '' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: openssh-log-python-${{ matrix.python-version }}-${{ matrix.dependency-label }}
           if-no-files-found: warn
