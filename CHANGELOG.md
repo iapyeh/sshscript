@@ -1,7 +1,10 @@
 # Changelog
 
-## 7.0.0 — 2026-10-24 (source publication)
+## 7.0.0 — 2026-10-25
 
+- Document reproducible test-snapshot updates for code, matching documents and
+  the complete agent skill; make delayed program-return regressions independent
+  of short write timeouts on busy CI runners.
 - Keep minimum-backend CI on Paramiko 2.11 with cryptography<48, and use
   encrypted OpenSSH RSA fixtures for key-passphrase forwarding tests.
 
@@ -373,4 +376,4 @@ verified artifacts in the
 [Unreleased]: https://github.com/iapyeh/sshscript/compare/v3.1.4...release
 [3.1.4]: https://github.com/iapyeh/sshscript/releases/tag/v3.1.4
 
-*Last modified: 2026-10-24 16:46:57*
+*Last modified: 2026-10-25 15:09:47*

@@ -681,12 +681,24 @@ except KeyboardInterrupt:
         import shlex
         import time
         console, output, errors = self.open_console()
-        command = shlex.join([sys.executable, '-u', '-c',
-                              "input('ready> '); import time; time.sleep(.4)"])
+        fixture = tempfile.TemporaryDirectory()
+        self.addCleanup(fixture.cleanup)
+        release = Path(fixture.name) / 'return-to-parent'
+        wait = f"while not pathlib.Path({str(release)!r}).exists(): time.sleep(.01)"
+        program = "input('ready> '); import pathlib, time; exec(" + repr(wait) + ")"
+        command = shlex.join([sys.executable, '-u', '-c', program])
         console.submit('$.enter(' + repr(command) + ', prompt="ready> ")')
-        console.send_input('quit', timeout=.1)
         channel = console.current.console.channel
+        # Simulate an elapsed response wait after a real write, without also
+        # restricting the asynchronous write to a fragile 0.1-second budget.
+        with patch.object(channel, '_wait_input_completion',
+                          side_effect=TimeoutError('fixture readiness pending')):
+            update = console.send_input('quit', timeout=5)
+        self.assertEqual(update.state, 'running')
+        self.assertIsNone(channel._failure)
+        self.assertEqual(console.current.kind, 'program')
         parent_prompt = channel.prompts[-2]
+        release.touch()
         deadline = time.monotonic() + 10
         while not any(parent_prompt in str(buffer)
                       for buffer in (channel._stdout, channel._stderr)):
