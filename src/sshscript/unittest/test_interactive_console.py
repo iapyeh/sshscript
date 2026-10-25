@@ -511,17 +511,22 @@ class InteractiveTests(_CLITestCase):
 
     def test_password_banner_and_exit_without_configured_prompt(self):
         import shlex
-        import time
         console, output, errors = self.open_console()
-        program = ("import time; input('Password: '); time.sleep(.15); "
+        program = ("input('Password: '); "
                    "print('Welcome to the database', flush=True); "
                    "print('mysql> ', end='', flush=True); "
-                   "reply=input(); time.sleep(.15); "
+                   "reply=input(); "
                    "print('Bye' if reply == 'quit' else 'unexpected reply', flush=True)")
         command = shlex.join([sys.executable, '-u', '-c', program])
         console.submit('$.enter(' + repr(command) + ')')
         self.assertIn('Password:', output.getvalue())
-        update = console.send_input('fixture-password', timeout=.4)
+        channel = console.current.console.channel
+        def banner_then_timeout(*args, **kwargs):
+            channel.expect('mysql> ', timeout=10)
+            raise TimeoutError('fixture silence wait expired after banner')
+        with patch.object(channel, 'wait_for_silent', side_effect=banner_then_timeout):
+            update = console.send_input('fixture-password', timeout=5)
+        self.assertIsNone(channel._failure)
         self.assertIn('Welcome to the database', output.getvalue())
         self.assertIn('mysql>', output.getvalue())
         self.assertEqual(update.error_type, 'TimeoutError')

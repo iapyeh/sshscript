@@ -1,5 +1,10 @@
 name: CI
-on: [push, pull_request]
+# Every PR gets the full matrix; release pushes verify the integrated tree.
+# Candidate pushes are covered by their PR, avoiding duplicate same-SHA jobs.
+on:
+  push:
+    branches: [release]
+  pull_request:
 permissions:
   contents: read
 jobs:

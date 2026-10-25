@@ -3,8 +3,10 @@
 ## 7.0.0 — 2026-10-25
 
 - Document reproducible test-snapshot updates for code, matching documents and
-  the complete agent skill; make delayed program-return regressions independent
-  of short write timeouts on busy CI runners.
+  the complete agent skill; make interactive-input and program-return regressions
+  independent of short real-I/O deadlines on busy CI runners.
+- Run full CI on pull requests and release pushes without duplicate
+  candidate-push runs. Preserve all platform/backend matrices and required gates.
 - Keep minimum-backend CI on Paramiko 2.11 with cryptography<48, and use
   encrypted OpenSSH RSA fixtures for key-passphrase forwarding tests.
 
@@ -376,4 +378,4 @@ verified artifacts in the
 [Unreleased]: https://github.com/iapyeh/sshscript/compare/v3.1.4...release
 [3.1.4]: https://github.com/iapyeh/sshscript/releases/tag/v3.1.4
 
-*Last modified: 2026-10-25 15:09:47*
+*Last modified: 2026-10-25 15:43:18*
