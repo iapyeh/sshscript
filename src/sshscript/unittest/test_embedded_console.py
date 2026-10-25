@@ -220,6 +220,16 @@ class EmbeddedConsoleTests(unittest.TestCase):
                 self.assertFalse(session.closed)
                 self.assertEqual(session('printf owner-alive').stdout, 'owner-alive')
 
+    def test_exit_retains_final_output_in_submit_update_without_prompt(self):
+        console = self.console()
+        command = shlex.join([sys.executable, '-u', '-c',
+                              "input('ready> '); print('final-output', flush=True)"])
+        console.enter(command)
+        update = console.submit('$.exit("quit")')
+        self.assertIn('final-output', update.stdout)
+        self.assertEqual(len(console.environments), 1)
+        self.assertEqual(update.result.exitcode, 0)
+
     def test_running_program_interrupt_recovers_prompt(self):
         console = self.console()
         console.enter(shlex.quote(sys.executable) + ' -q -u',

@@ -86,6 +86,7 @@ class CommandJob:
                 raise ValueError('env contains an invalid name or value')
         self._session = session  # Keep the transport owner alive for this job.
         self.settings = session.get()
+        self._output_defaults = session._output_defaults
         self.logger = execution.logger
         self.command = execution.argv or execution.command
         self.host = session.host
@@ -149,7 +150,10 @@ class CommandJob:
                 tail.clear()
 
     def _capture(self, stream, data):
-        if self.settings['verbose'] or (stream == 1 and self.settings['verbose_stderr']):
+        enabled = ((True, True) if self.settings['verbose'] else
+                   (False, True) if self.settings['verbose_stderr'] else
+                   self._output_defaults or (False, False))
+        if enabled[stream]:
             target = sys.stdout if stream == 0 else sys.stderr
             target.write(data.decode('utf-8', errors='replace'))
             target.flush()

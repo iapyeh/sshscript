@@ -50,30 +50,30 @@ class SettingsTests(unittest.TestCase):
 
     def test_policy_validation_snapshot_and_context_defaults(self):
         parent = self.session()
-        self.assertIsNone(parent.policy)
-        policy = paramiko.AutoAddPolicy()
-        parent.set(policy=policy)
+        self.assertIsNone(parent.missing_host_key_policy)
+        missing_host_key_policy = paramiko.AutoAddPolicy()
+        parent.set(missing_host_key_policy=missing_host_key_policy)
         child = self.session(parent)
-        parent.policy = paramiko.RejectPolicy()
-        self.assertIs(child.get('policy'), policy)
-        self.assertIsNone(self.session().policy)
+        parent.missing_host_key_policy = paramiko.RejectPolicy()
+        self.assertIs(child.get('missing_host_key_policy'), missing_host_key_policy)
+        self.assertIsNone(self.session().missing_host_key_policy)
         before = child.get()
         for invalid in (0, False, 'autoadd', object(), paramiko.SSHClient):
             with self.assertRaises(TypeError):
-                child.set(check=True, policy=invalid)
+                child.set(check=True, missing_host_key_policy=invalid)
             self.assertEqual(child.get(), before)
-        child.policy = paramiko.WarningPolicy
-        self.assertIs(child.policy, paramiko.WarningPolicy)
-        child.policy = None
-        self.assertIsNone(child.policy)
-        with execution_defaults(policy=policy):
-            self.assertIs(self.session().policy, policy)
-        self.assertIsNone(self.session().policy)
+        child.missing_host_key_policy = paramiko.WarningPolicy
+        self.assertIs(child.missing_host_key_policy, paramiko.WarningPolicy)
+        child.missing_host_key_policy = None
+        self.assertIsNone(child.missing_host_key_policy)
+        with execution_defaults(missing_host_key_policy=missing_host_key_policy):
+            self.assertIs(self.session().missing_host_key_policy, missing_host_key_policy)
+        self.assertIsNone(self.session().missing_host_key_policy)
 
     def test_spy_policy_setting(self):
         namespace = sshscript.run_script(
-            'import paramiko\n$.set(policy=paramiko.AutoAddPolicy())\n'
-            'value = $.get("policy")\n'
+            'import paramiko\n$.set(missing_host_key_policy=paramiko.AutoAddPolicy())\n'
+            'value = $.get("missing_host_key_policy")\n'
         )
         self.assertIsInstance(namespace['value'], paramiko.AutoAddPolicy)
 
@@ -103,7 +103,7 @@ class SettingsTests(unittest.TestCase):
     def test_spy_thread_inherits_cli_context_defaults(self):
         with execution_defaults(check=True):
             namespace = sshscript.run_script(
-                'policy = $.get()\nimport threading\nfrom sshscript import Session\n'
+                'missing_host_key_policy = $.get()\nimport threading\nfrom sshscript import Session\n'
                 'values = []\ndef work():\n'
                 '    s = Session()\n    values.append(s.get("check"))\n    s.close()\n'
                 't = threading.Thread(target=work)\nt.start()\nt.join()\n'
@@ -136,6 +136,47 @@ class SettingsTests(unittest.TestCase):
             job.wait()
             session(['printf', 'hidden'], command_timeout=2)
         self.assertEqual(capture.getvalue(), 'shown\n')
+
+    def test_cli_terminal_output_is_per_stream_and_flags_override(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, 'output.spy')
+            path.write_text('$printf stdout-marker; printf stderr-marker >&2\n'
+                            '$.set(verbose=False, verbose_stderr=False)\n'
+                            '$printf hidden-marker\n')
+            launcher = ('import runpy, sys; '
+                        'sys.stdout.isatty=lambda: %r; sys.stderr.isatty=lambda: %r; '
+                        'sys.argv=sys.argv[1:]; runpy.run_path(sys.argv[0], run_name="__main__")')
+            env = os.environ.copy()
+            env.pop('VERBOSE', None)
+            env.pop('VERBOSE_STDERR', None)
+            cases = [(False, False, [], False, False),
+                     (True, False, [], True, False),
+                     (False, True, [], False, True),
+                     (True, True, [], True, True),
+                     (True, True, ['--quiet'], False, False),
+                     (False, False, ['-v'], True, True),
+                     (True, True, ['--stderr'], False, True)]
+            for out_tty, err_tty, flags, out_visible, err_visible in cases:
+                with self.subTest(out=out_tty, err=err_tty, flags=flags):
+                    result = subprocess.run(
+                        [sys.executable, '-c', launcher % (out_tty, err_tty),
+                         str(Path(sshscript.__file__)), str(path), *flags],
+                        capture_output=True, text=True, env=env, timeout=20)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual('stdout-marker' in result.stdout, out_visible)
+                    self.assertEqual('stderr-marker' in result.stderr, err_visible)
+                    self.assertNotIn('hidden-marker', result.stdout)
+
+    def test_terminal_defaults_cover_managed_jobs_and_remain_cli_scoped(self):
+        from sessionsettings import cli_output
+        with cli_output(True, False):
+            session = self.session()
+            child = self.session(session)
+        capture = StringIO()
+        with redirect_stdout(capture):
+            child.exec_command(['printf', 'managed-marker'], command_timeout=3)
+            self.session().exec_command(['printf', 'library-hidden'], command_timeout=3)
+        self.assertEqual(capture.getvalue(), 'managed-marker')
 
     def test_cli_sets_root_and_nested_defaults_without_environment_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -9,8 +9,37 @@ import re
 import shlex
 from urllib.parse import urlsplit
 import warnings
+import difflib
+import inspect
 
 import paramiko
+
+if __package__:
+    from .sessionsettings import UNSET
+else:
+    from sessionsettings import UNSET
+
+
+# Capture the installed backend's contract before tests/applications replace clients.
+_PARAMIKO_OPTIONS = frozenset(inspect.signature(paramiko.SSHClient.connect).parameters) - {'self', 'hostname'}
+_EXTENSIONS = {'parent_key_filename', 'proxy_command', 'proxy_jump', 'ssh_config',
+               'missing_host_key_policy', 'known_hosts_source'}
+_REMOVED_NAMES = {'host': 'hostname', 'pkey_path': 'parent_key_filename',
+                  'proxyCommand': 'proxy_command', 'proxyJump': 'proxy_jump',
+                  'policy': 'missing_host_key_policy', 'known_hosts': 'known_hosts_source'}
+
+
+def validate_connection_options(options):
+    """Reject unknown/version-unsupported kwargs before files or connections open."""
+    for name in options:
+        if name not in _PARAMIKO_OPTIONS | {'parent_key_filename'}:
+            candidates = _PARAMIKO_OPTIONS | _EXTENSIONS | {'hostname'}
+            suggestion = ([_REMOVED_NAMES[name]] if name in _REMOVED_NAMES else
+                          difflib.get_close_matches(name, sorted(candidates), n=1))
+            hint = f"; did you mean '{suggestion[0]}'?" if suggestion else ''
+            if name == 'key_path':
+                hint = "; use 'key_filename' for local files or 'parent_key_filename' for caller-host files"
+            raise TypeError(f"Unknown connect parameter '{name}'{hint}")
 
 
 class _RawConfig(paramiko.SSHConfig):
@@ -28,13 +57,19 @@ def _expand(value, tokens):
     return re.sub(r'%[%A-Za-z]', substitute, value)
 
 
-def resolve_connection(host, username=None, port=None, *, ssh_config=None, **options):
-    """Return effective Paramiko kwargs and proxyCommand without connecting.
+def resolve_connection(hostname, *, username=None, port=None, ssh_config=None,
+                       proxy_command=UNSET, proxy_jump=UNSET, **options):
+    """Return effective connection options without opening connections or keys.
 
     None reads ~/.ssh/config if it exists; False disables config; a path is
     required to exist. Explicit arguments override config. Only local callers
     should opt into reading local config for an already nested SSH connection.
     """
+    validate_connection_options(options)
+    for name in ('pkey', 'key_filename', 'parent_key_filename', 'passphrase', 'sock'):
+        if options.get(name, UNSET) is None:
+            options.pop(name)
+    host = hostname
     if not isinstance(host, str):
         raise TypeError('host must be str')
     if '@' in host:
@@ -82,20 +117,20 @@ def resolve_connection(host, username=None, port=None, *, ssh_config=None, **opt
     tokens = {'%%': '%', '%h': host, '%n': alias, '%p': port,
               '%r': username or getpass.getuser(), '%u': getpass.getuser(),
               '%d': os.path.expanduser('~')}
-    if not any(key in options for key in ('key_filename', 'pkey', 'pkey_path')):
+    if not any(key in options for key in ('key_filename', 'pkey', 'parent_key_filename')):
         keys = config.get('identityfile', [])
         if keys:
             options['key_filename'] = [os.path.expanduser(_expand(key, tokens)) for key in keys if key.lower() != 'none']
 
-    explicit_proxy = 'proxyCommand' in options or 'proxyJump' in options
-    command = options.pop('proxyCommand', None)
-    jump = options.pop('proxyJump', None)
+    explicit_proxy = proxy_command is not UNSET or proxy_jump is not UNSET
+    command = None if proxy_command is UNSET else proxy_command
+    jump = None if proxy_jump is UNSET else proxy_jump
     if not explicit_proxy:
         command, jump = config.get('proxycommand'), config.get('proxyjump')
     if command is not None and not isinstance(command, str):
-        raise TypeError('proxyCommand must be a string or None')
+        raise TypeError('proxy_command must be a string or None')
     if jump is not None and not isinstance(jump, str):
-        raise TypeError('proxyJump must be a string or None')
+        raise TypeError('proxy_jump must be a string or None')
     if command and command.lower() == 'none':
         command = None
     if jump and jump.lower() == 'none':
@@ -103,8 +138,8 @@ def resolve_connection(host, username=None, port=None, *, ssh_config=None, **opt
     if command and jump:
         raise ValueError('ProxyCommand and ProxyJump cannot both be active; override one explicitly')
     if command:
-        # Explicit proxyCommand retains its historical verbatim semantics.
-        options['proxyCommand'] = command if explicit_proxy else _expand(command, tokens)
+        # Explicit proxy_command retains its historical verbatim semantics.
+        options['proxy_command'] = command if explicit_proxy else _expand(command, tokens)
     elif jump:
         jumps = jump.split(',')
         if any(not item or any(c.isspace() or c in '\x00%' for c in item) for item in jumps):
@@ -123,5 +158,5 @@ def resolve_connection(host, username=None, port=None, *, ssh_config=None, **opt
         if endpoint.username is not None:
             args.extend(['-l', endpoint.username])
         args.append(endpoint.hostname)
-        options['proxyCommand'] = shlex.join(args)
+        options['proxy_command'] = shlex.join(args)
     return dict(options, hostname=host, username=username, port=port)

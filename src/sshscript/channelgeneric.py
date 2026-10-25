@@ -84,19 +84,15 @@ class GenericChannel(object):
         #self._command_session_id = 0
         settings = getattr(owner, 'settings', {})
         if settings.get('verbose', bool(os.environ.get('VERBOSE'))):
-            ## verbose-related
-            self.dump2sys = (1,1)
-            self.stdoutPrefix = os.environ.get('VERBOSE_STDOUT_PREFIX','🟩').encode('utf8')
-            self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🟨').encode('utf8')
+            self.dump2sys = (1, 1)
         elif settings.get('verbose_stderr', bool(os.environ.get('VERBOSE_STDERR'))):
-            self.dump2sys = (0,1)
-            self.stdoutPrefix = b''
-            self.stderrPrefix = os.environ.get('VERBOSE_STDERR_PREFIX','🟨').encode('utf8')
+            self.dump2sys = (0, 1)
         else:
-            self.dump2sys = (0,0)
-            self.stderrPrefix = b''
-            self.stdoutPrefix = b''
-        
+            self.dump2sys = getattr(owner, 'output_defaults', None) or (0, 0)
+        self.stdoutPrefix = (os.environ.get('VERBOSE_STDOUT_PREFIX', '🟩').encode('utf8')
+                             if self.dump2sys[0] else b'')
+        self.stderrPrefix = (os.environ.get('VERBOSE_STDERR_PREFIX', '🟨').encode('utf8')
+                             if self.dump2sys[1] else b'')
         self.closed = False
         self.withChannelWrapper = None
         
@@ -1532,6 +1528,15 @@ class GenericChannel(object):
                     'leave the with block before sending another input'
                 )
 
+            # A program can exit between inputs. Do not discard that evidence
+            # and send the next program reply to its restored parent shell.
+            with self._lock:
+                parent = self.prompts[-2] if len(self.prompts) > 1 else None
+                if (isinstance(parent, str) and parent and parent != self.prompt
+                        and any(parent in str(buffer) for buffer in (self._stdout, self._stderr))):
+                    self._mark_interactive_layer_exited(executing_lock)
+                    return 'exited'
+
             stdout,stderr = self.reset_buffer('input')[0]
 
             with self._lock:
@@ -1574,10 +1579,17 @@ class GenericChannel(object):
                 )
             else:
                 remaining = self._remaining(deadline)
-                self.wait_for_silent(
-                    1,
-                    max_seconds=max(0.01, remaining),
-                )
+                try:
+                    self.wait_for_silent(
+                        1,
+                        max_seconds=max(0.01, remaining),
+                    )
+                except TimeoutError:
+                    # A parent prompt confirms exit even when output has not
+                    # been silent for the full interval before the deadline.
+                    if not (parent_prompt and any(parent_prompt in str(buffer)
+                                                  for buffer in (stdout, stderr))):
+                        raise
 
                 if parent_prompt and (
                     parent_prompt in str(stdout)

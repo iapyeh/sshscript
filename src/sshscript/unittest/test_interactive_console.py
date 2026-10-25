@@ -257,11 +257,11 @@ class InteractiveTests(_CLITestCase):
         self.assertTrue(original.session.closed)
         console.close()
 
-    def test_dollar_session_and_wrapper_exit_are_removed_in_console(self):
+    def test_session_and_wrapper_exit_are_removed_in_console(self):
         console, _, _ = self.open_console()
         console.submit('$.shell("bash")')
         current = console.current
-        for source in ('$.exit()', 'session.exit()', 'console.exit()'):
+        for source in ('session.exit()', 'console.exit()'):
             console.submit(source)
             self.assertIsInstance(console.namespace['error'], AttributeError)
             self.assertIs(console.current, current)
@@ -312,7 +312,7 @@ class InteractiveTests(_CLITestCase):
         su.assert_called_once_with('other', password='fixture')
         self.assertEqual(len(console.layers), 3)
         console.submit('exit()')
-        console.submit('exit()')
+        console.submit('$.exit()')
         self.assertIs(console.current, original)
 
     def test_stop_returns_to_console_but_script_exit_cannot_pop_it(self):
@@ -488,10 +488,297 @@ class InteractiveTests(_CLITestCase):
         self.assertIn('42', output.getvalue())
         self.assertIn('KeyboardInterrupt', errors.getvalue())
 
+    def test_error_commands_work_in_python_and_program_without_sending(self):
+        console, output, errors = self.open_console()
+        console.submit('raise TypeError("specific-fixture-detail")')
+        self.assertNotIn('specific-fixture-detail', errors.getvalue())
+        console.submit(':error')
+        self.assertIn('TypeError: specific-fixture-detail', errors.getvalue())
+        self.enter_python(console)
+        channel = console.current.console.channel
+        with patch.object(channel, 'send', wraps=channel.send) as send:
+            console.submit(':error')
+            console.submit(':traceback')
+            console.submit(':status')
+            send.assert_not_called()
+        self.assertIn('Traceback (most recent call last)', errors.getvalue())
+        self.assertIn('program:', output.getvalue())
+        console.submit('$.exit()')
+        console.submit('broken = )')
+        console.submit(':error')
+        self.assertIsInstance(console.namespace['error'], SyntaxError)
+        self.assertIn('unmatched', errors.getvalue())
+
+    def test_password_banner_and_exit_without_configured_prompt(self):
+        import shlex
+        console, output, errors = self.open_console()
+        program = ("input('Password: '); "
+                   "print('Welcome to the database', flush=True); "
+                   "print('mysql> ', end='', flush=True); "
+                   "reply=input(); "
+                   "print('Bye' if reply == 'quit' else 'unexpected reply', flush=True)")
+        command = shlex.join([sys.executable, '-u', '-c', program])
+        console.submit('$.enter(' + repr(command) + ')')
+        self.assertIn('Password:', output.getvalue())
+        channel = console.current.console.channel
+        def banner_then_timeout(*args, **kwargs):
+            channel.expect('mysql> ', timeout=10)
+            raise TimeoutError('fixture silence wait expired after banner')
+        with patch.object(channel, 'wait_for_silent', side_effect=banner_then_timeout):
+            update = console.send_input('fixture-password', timeout=5)
+        self.assertIsNone(channel._failure)
+        self.assertIn('Welcome to the database', output.getvalue())
+        self.assertIn('mysql>', output.getvalue())
+        self.assertEqual(update.error_type, 'TimeoutError')
+        console.submit('$.exit("quit")')
+        self.assertEqual(len(console.layers), 1)
+        self.assertIn('Bye', output.getvalue())
+        console.submit('$printf restored-shell')
+        self.assertIn('restored-shell', output.getvalue())
+
+    def test_detected_secret_uses_password_reader_then_restores_normal_input(self):
+        import shlex
+        console, output, errors = self.open_console()
+        # This fixture disables its own PTY echo, as a real password reader does.
+        program = ("import sys,time,termios; a=termios.tcgetattr(0); "
+                   "a[3] &= ~termios.ECHO; termios.tcsetattr(0,termios.TCSANOW,a); "
+                   "sys.stdout.write('\\x1b[33mEnter pass'); sys.stdout.flush(); "
+                   "time.sleep(.05); value=input('word:\\x1b[0m '); "
+                   "print('accepted' if value == '$.exit()' else 'wrong'); "
+                   "a[3] |= termios.ECHO; termios.tcsetattr(0,termios.TCSANOW,a); "
+                   "input('mysql> '); print('finished')")
+        command = shlex.join([sys.executable, '-u', '-c', program])
+        replies = iter(['select 1;', 'quit'])
+        normal_calls = []
+        def read(prompt):
+            normal_calls.append(prompt)
+            return next(replies)
+        console.input_func = read
+        with patch.object(console, 'password_func', return_value='$.exit()') as password:
+            console.submit('$.enter(' + repr(command) + ')')
+            self.assertTrue(console.current.secret_pending)
+            console.interact()
+        password.assert_called_once()
+        self.assertEqual(len(normal_calls), 2)
+        self.assertIn('accepted', output.getvalue())
+        self.assertIn('finished', output.getvalue())
+        self.assertNotIn('$.exit()', output.getvalue() + errors.getvalue())
+
+    def test_manual_secret_input_is_literal_and_never_a_python_result(self):
+        import shlex
+        console, output, errors = self.open_console()
+        program = ("import termios; a=termios.tcgetattr(0); a[3] &= ~termios.ECHO; "
+                   "termios.tcsetattr(0,termios.TCSANOW,a); value=input('Custom challenge> '); "
+                   "print('literal-ok' if value == '$.exit()' else 'wrong')")
+        command = shlex.join([sys.executable, '-u', '-c', program])
+        console.submit('$.enter(' + repr(command) + ')')
+        self.assertFalse(console.current.secret_pending)
+        with patch.object(console, 'password_func', return_value='$.exit()'):
+            update = console.submit('$.input(secret=True)')
+        self.assertEqual(len(console.layers), 1)
+        self.assertIn('literal-ok', output.getvalue())
+        self.assertNotIn('$.exit()', output.getvalue() + errors.getvalue() + update.stdout)
+        self.assertIsNone(console.namespace['error'])
+
+    def test_secret_reader_failure_or_cancel_sends_nothing(self):
+        from interactive import CredentialsRequiredError
+        console, _, _ = self.open_console()
+        self.enter_python(console)
+        channel = console.current.console.channel
+        for error in (KeyboardInterrupt(), EOFError(), CredentialsRequiredError('unavailable')):
+            with self.subTest(error=type(error).__name__), \
+                 patch.object(console, 'password_func', side_effect=error), \
+                 patch.object(channel, 'send', wraps=channel.send) as send:
+                with self.assertRaises(type(error)):
+                    console.input(secret=True)
+                send.assert_not_called()
+        with patch.object(console, 'password_func') as password:
+            with self.assertRaises(ValueError):
+                console.input('plaintext', secret=True)
+            password.assert_not_called()
+        console.submit('$.exit()')
+        with patch.object(console, 'password_func') as password:
+            with self.assertRaises(RuntimeError):
+                console.input(secret=True)
+            password.assert_not_called()
+
+    def test_hidden_reader_refuses_getpass_echo_fallback(self):
+        from getpass import GetPassWarning
+        from interactive import CredentialsRequiredError
+        def unsafe_getpass(prompt):
+            warnings.warn('cannot control echo', GetPassWarning)
+            self.fail('getpass must not reach its plaintext fallback')
+        with patch('interactive.sys.stdin.isatty', return_value=True), \
+             patch('interactive.getpass', side_effect=unsafe_getpass):
+            with self.assertRaises(CredentialsRequiredError):
+                Console._terminal_password()
+
+    def test_terminal_secret_input_disables_and_restores_echo(self):
+        import os
+        import pty
+        import select
+        import signal
+        import termios
+        import time
+        script = '''from interactive import Console
+try:
+    value = Console._terminal_password('Hidden fixture: ')
+    print('ACCEPTED', len(value), flush=True)
+except KeyboardInterrupt:
+    print('CANCELLED', flush=True)
+'''
+        for cancel in (False, True):
+            with self.subTest(cancel=cancel):
+                master, slave = pty.openpty()
+                process = None
+                try:
+                    before = termios.tcgetattr(slave)
+                    process = subprocess.Popen([sys.executable, '-B', '-c', script],
+                                               stdin=slave, stdout=slave, stderr=slave,
+                                               start_new_session=True)
+                    deadline = time.monotonic() + 10
+                    result = bytearray()
+                    while b'Hidden fixture: ' not in result:
+                        self.assertIsNone(process.poll())
+                        self.assertLess(time.monotonic(), deadline, repr(result))
+                        if select.select([master], [], [], .05)[0]:
+                            result.extend(os.read(master, 4096))
+                    self.assertFalse(termios.tcgetattr(slave)[3] & termios.ECHO)
+                    if cancel:
+                        process.send_signal(signal.SIGINT)
+                    else:
+                        os.write(master, b'private-fixture\n')
+                    process.wait(timeout=10)
+                    self.assertEqual(process.returncode, 0)
+                    self.assertEqual(termios.tcgetattr(slave), before)
+                    while select.select([master], [], [], .1)[0]:
+                        result.extend(os.read(master, 4096))
+                    self.assertIn(b'CANCELLED' if cancel else b'ACCEPTED 15', result)
+                    self.assertNotIn(b'private-fixture', result)
+                finally:
+                    if process is not None and process.poll() is None:
+                        process.kill()
+                        process.wait()
+                    os.close(master)
+                    os.close(slave)
+
+    def test_password_prompt_detection_uses_only_current_output_tail(self):
+        from interactive import _Layer
+        from unittest.mock import Mock
+        from stdio import DequeString
+        console = object.__new__(Console)
+        console._stdout, console._stderr = io.StringIO(), io.StringIO()
+        channel = Mock()
+        channel._stdout, channel._stderr = DequeString(), DequeString()
+        channel._interactive_layer_exited.return_value = False
+        layer = _Layer(None, None, Mock(channel=channel), 'program', 'fixture', '?')
+        console.layers = [layer]
+        for part, expected in [('Enter pass', False), ('word: ', True),
+                               ('\nmysql> ', False), ('\nPassword for alice: ', True),
+                               ('\nprint("Password:")', False),
+                               ('\nEnter passphrase for key "/key": ', True),
+                               ('\n輸入密碼：', True), ('\nPassword: \nready> ', False)]:
+            channel._stdout.append(part)
+            console._drain_program()
+            self.assertEqual(layer.secret_pending, expected, repr(part))
+
+    def test_late_program_return_does_not_send_another_exit_to_parent(self):
+        import shlex
+        import time
+        console, output, errors = self.open_console()
+        fixture = tempfile.TemporaryDirectory()
+        self.addCleanup(fixture.cleanup)
+        release = Path(fixture.name) / 'return-to-parent'
+        wait = f"while not pathlib.Path({str(release)!r}).exists(): time.sleep(.01)"
+        program = "input('ready> '); import pathlib, time; exec(" + repr(wait) + ")"
+        command = shlex.join([sys.executable, '-u', '-c', program])
+        console.submit('$.enter(' + repr(command) + ', prompt="ready> ")')
+        channel = console.current.console.channel
+        # Simulate an elapsed response wait after a real write, without also
+        # restricting the asynchronous write to a fragile 0.1-second budget.
+        with patch.object(channel, '_wait_input_completion',
+                          side_effect=TimeoutError('fixture readiness pending')):
+            update = console.send_input('quit', timeout=5)
+        self.assertEqual(update.state, 'running')
+        self.assertIsNone(channel._failure)
+        self.assertEqual(console.current.kind, 'program')
+        parent_prompt = channel.prompts[-2]
+        release.touch()
+        deadline = time.monotonic() + 10
+        while not any(parent_prompt in str(buffer)
+                      for buffer in (channel._stdout, channel._stderr)):
+            self.assertLess(time.monotonic(), deadline,
+                            'fixture did not return to its parent shell')
+            time.sleep(.01)
+        with patch.object(channel, 'send', wraps=channel.send) as send:
+            console.submit('$.exit("quit")')
+        self.assertNotIn('quit\n', [call.args[0] for call in send.call_args_list])
+        self.assertEqual(len(console.layers), 1)
+        console.submit('$printf parent-still-alive')
+        self.assertIn('parent-still-alive', output.getvalue())
+
+    def test_cli_uses_new_connection_flags_and_rejects_removed_spellings(self):
+        from interactive import main
+        with patch('interactive.Console') as cls, patch('interactive.Session'):
+            main(['fixture', '--parent-key-filename', '/fixture/key',
+                  '--known-hosts-source', 'chain', '--proxy-command', 'fixture-command'])
+            cls.return_value.__enter__.return_value.connect.assert_called_once_with(
+                'fixture', parent_key_filename='/fixture/key', known_hosts_source='chain',
+                proxy_command='fixture-command')
+        for flag in ('--pkey-path', '--known-hosts'):
+            with self.subTest(flag=flag), patch('interactive.Session') as create, \
+                 patch('sys.stderr', io.StringIO()):
+                with self.assertRaises(SystemExit):
+                    main(['fixture', flag, 'value'])
+                create.assert_not_called()
+
     def enter_python(self, console):
         import shlex
         console.submit('$.enter(' + repr(shlex.quote(sys.executable) + ' -q -u') + ', prompt=">>>", exit="quit()")')
         self.assertEqual(console.current.kind, 'program')
+
+    def test_exit_without_program_command_warns_without_sending(self):
+        console, output, errors = self.open_console()
+        import shlex
+        console.submit('$.enter(' + repr(shlex.quote(sys.executable) + ' -q -u') + ', prompt=">>>")')
+        program = console.current
+        with patch.object(program.console.channel, 'send', wraps=program.console.channel.send) as send:
+            for source in ('$.exit()', 'exit', 'exit()'):
+                console.submit(source)
+                self.assertIs(console.current, program)
+            send.assert_not_called()
+        self.assertEqual(errors.getvalue().count('Program remains open'), 3)
+        self.assertEqual(console._state, 'running')
+        console.submit('$.exit("quit()")')
+        self.assertEqual(len(console.layers), 1)
+        self.assertEqual(console.namespace['result'].exitcode, 0)
+        console.submit('$printf recovered')
+        self.assertIn('recovered', output.getvalue())
+
+    def test_exit_command_must_really_exit_and_can_override_default(self):
+        console, output, errors = self.open_console()
+        self.enter_python(console)
+        program = console.current
+        console.submit('$.exit("print(42)")')
+        self.assertIs(console.current, program)
+        self.assertIn('42', output.getvalue())
+        self.assertIn('current layer remains open', errors.getvalue())
+        console.submit('$.exit()')
+        self.assertEqual(len(console.layers), 1)
+
+    def test_dollar_exit_unwinds_finally_and_leaves_only_one_layer(self):
+        console, _, errors = self.open_console()
+        parent = console.current
+        console.submit('$.shell("bash")')
+        for line in ('try:', '    $.exit()', 'finally:', '    cleaned=True', ''):
+            console.submit(line)
+        self.assertTrue(console.namespace['cleaned'])
+        self.assertIs(console.current, parent)
+        console.submit('$.exit("quit")')
+        self.assertIs(console.current, parent)
+        self.assertIsInstance(console.namespace['error'], ValueError)
+        console.submit('$.exit()')
+        self.assertTrue(console.done)
 
     def test_ctrl_c_and_ctrl_d_go_to_program_and_restore_python_parent(self):
         console, output, errors = self.open_console()

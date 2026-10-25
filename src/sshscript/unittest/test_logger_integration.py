@@ -62,7 +62,7 @@ class LoggerIntegrationTests(unittest.TestCase):
         class FailingSSHClient:
             closed = False
 
-            def set_missing_host_key_policy(self, policy):
+            def set_missing_host_key_policy(self, missing_host_key_policy):
                 pass
 
             def connect(self, *args, **kwargs):

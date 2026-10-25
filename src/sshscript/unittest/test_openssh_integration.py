@@ -232,7 +232,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
 
     def test_real_three_hop_trust_chain_and_nearest_mismatch(self):
         host1 = self._connect()
-        host1.known_hosts = 'chain'
+        host1.known_hosts_source = 'chain'
         trust1 = f'/tmp/sshscript-trust-{uuid.uuid4().hex}'
         trust2 = f'/tmp/sshscript-trust-{uuid.uuid4().hex}'
         self.addCleanup(self._remove_remote_tree, host1, trust1)
@@ -246,7 +246,7 @@ class OpenSSHIntegrationTests(unittest.TestCase):
             host2.known_hosts_path = trust2
             host1.upload(str(self.mismatch_hosts), trust2)
             with self.assertRaises(paramiko.BadHostKeyException):
-                host2.connect(self.host, policy=paramiko.AutoAddPolicy(), **options)
+                host2.connect(self.host, missing_host_key_policy=paramiko.AutoAddPolicy(), **options)
             # A readable empty nearest file permits fallback to host1.
             with host2.sftp.open(trust2, 'wb') as stream:
                 stream.write(b'')
