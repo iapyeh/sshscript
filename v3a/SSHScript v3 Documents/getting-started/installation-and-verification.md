@@ -8,9 +8,9 @@ permalink: /v3a/getting-started/installation-and-verification/
 
 # Installation and Verification
 
-> **7.0.0 source contract.** This page installs the current source branch.
-> A source push does not create a GitHub Release, tag or PyPI package.
-> The previously published 6.1.0 package has different connection parameter names.
+> **Documentation contract: SSHScript 7.0.0.** Install the published 7.0.0
+> package or the matching pinned source. Earlier packages have different
+> connection parameter names; review version differences before upgrading.
 
 ## Requirements
 
@@ -24,23 +24,35 @@ imports TripleDES from a namespace removed in cryptography 48. The minimum CI
 checks this compatible pair. Normal installations select the newer supported
 Paramiko backend; do not impose this cryptography cap on those installations.
 
-## Install the matching source
+## Install the published version
 
-Create an isolated environment and install the pinned 7.0.0 source snapshot:
+Create an isolated environment and install SSHScript 7.0.0 from PyPI:
 
 ```sh
 python3 --version
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip install "git+https://github.com/iapyeh/sshscript.git@5bc17cf190e215479af870437eeacd2770d9f283"
+python3 -m pip install "sshscript==7.0.0"
 ```
 
-The command pins the full source commit. Integration into the protected
-`release` branch is tracked in [PR #29](https://github.com/iapyeh/sshscript/pull/29). A verified local 7.0.0 wheel can also be
-installed with `python3 -m pip install /path/to/sshscript-7.0.0-py3-none-any.whl`.
-Do not assume `pip install sshscript` from PyPI provides the current source API.
+When replacing an existing source installation with the same version number,
+use `python3 -m pip install --force-reinstall "sshscript==7.0.0"` in the actual
+execution environment. Restart processes that already imported SSHScript.
 Pin transitive dependencies in your application's lock file as well.
+
+## Install matching source instead
+
+The [7.0.0 release](https://github.com/iapyeh/sshscript/releases/tag/v7.0.0)
+corresponds to this immutable source commit:
+
+```sh
+python3 -m pip install --force-reinstall "git+https://github.com/iapyeh/sshscript.git@a1c76d016419484b6ffb930bf2b16f30bae61208"
+```
+
+Retain that full SHA when reproducing a source installation. A verified local
+7.0.0 wheel can also be installed with
+`python3 -m pip install /path/to/sshscript-7.0.0-py3-none-any.whl`.
 
 For future PR/candidate snapshots, including installation of their matching
 agent documents and complete skill, follow
@@ -51,7 +63,7 @@ The same workflow covers returning to `release`.
 
 ```sh
 sshscript --version
-python3 -c "import sshscript; print(sshscript.__version__); print(sshscript.__file__)"
+python3 -I -c "import sshscript; print(sshscript.__version__); print(sshscript.__file__)"
 python3 -m pip check
 python3 -m pip show sshscript paramiko packaging
 ```
@@ -69,9 +81,10 @@ and artifact hash before adopting an installation. Publishing a source branch
 or passing local checks does not establish that native SSH/PAM/sudo behavior
 works in your environment. Repeat site-specific validation before rollout.
 
-The separately published [6.1.0 release](https://github.com/iapyeh/sshscript/releases/tag/v6.1.0)
-and [PyPI metadata](https://pypi.org/project/sshscript/) describe those packages;
-they do not establish publication or provenance of 7.0.0 artifacts.
+The [7.0.0 GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v7.0.0)
+retains verified artifacts and their SHA-256 manifest. Compare those hashes
+with the [7.0.0 PyPI files](https://pypi.org/project/sshscript/7.0.0/#files)
+when verifying a downloaded distribution.
 
 `sshscript --check-updates` queries compatible published PyPI versions and never
 installs anything. It is independent of the source checkout's version. Upgrade
@@ -83,6 +96,6 @@ lock file and repeat your SSH, host-key, PAM and sudoers checks.
 Run the [5-Minute Quickstart]({{ site.baseurl }}/v3a/getting-started/quickstart/),
 then use the [canonical guide]({{ site.baseurl }}/v3a/recommended-api/).
 
-*Last modified: 2026-10-24 20:10:23*
+*Last modified: 2026-10-25 21:18:40*
 
-Last Updated: 2026-10-24 20:10:23
+Last Updated: 2026-10-25 21:18:40

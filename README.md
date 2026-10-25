@@ -15,7 +15,7 @@ primary source-code branch.
 
 ## Published documentation
 
-The current documentation contract is SSHScript 7.0.0 (source contract), including public Console
+The current documentation contract is SSHScript 7.0.0, published on PyPI and GitHub, including public Console
 integration over existing Sessions. SSHScript remains under active development;
 backward compatibility is not required unless explicitly requested. Major
 differences are briefly documented. Historical examples remain explicitly labelled:
@@ -64,7 +64,7 @@ targets branch-level publishing files such as this README or `_config.yml`.
 - Do not duplicate the sidebar with a manually maintained child-page table of
   contents.
 - End each maintained v3a Markdown document with
-  `Last Updated: 2026-10-24 20:12:09
+  `Last Updated: 2026-10-25 21:18:40
 
 ## Sidebar navigation
 
@@ -127,6 +127,6 @@ SSHScript source code, releases, and issue tracking are available in the
 [iapyeh/sshscript repository](https://github.com/iapyeh/sshscript).
 SSHScript is released under the MIT License.
 
-*Last modified: 2026-10-24 20:12:09*
+*Last modified: 2026-10-25 21:18:40*
 
-Last Updated: 2026-10-24 20:12:09
+Last Updated: 2026-10-25 21:18:40

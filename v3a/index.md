@@ -5,8 +5,10 @@ nav_exclude: true
 
 # SSHScript 7.0.0
 
-> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
-> A source push does not publish a GitHub Release or PyPI package.
+> **SSHScript 7.0.0 is published.** Install the matching
+> [PyPI package](https://pypi.org/project/sshscript/7.0.0/) or verified source.
+> See the [GitHub Release](https://github.com/iapyeh/sshscript/releases/tag/v7.0.0)
+> for verified artifacts and hashes.
 
 SSHScript aims to help engineers and AI agents execute, understand, and hand
 off automation reliably. Use the regular Python Session API first; optional
@@ -96,6 +98,6 @@ SSHScript is released under the MIT License.
   [production checklist](security-and-operations/failure-model-and-production-checklist/)
   before privileged or destructive rollout.
 
-*Last modified: 2026-10-24 16:35:46*
+*Last modified: 2026-10-25 21:18:40*
 
-Last Updated: 2026-10-24 16:35:46
+Last Updated: 2026-10-25 21:18:40
