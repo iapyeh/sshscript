@@ -20,6 +20,11 @@ This skill describes the **SSHScript 7.0.0 contract, Python 3.11+**. Read
 [the agent guide](references/agent-guide.md) before generating automation.
 Select only the API sections needed for the user's task.
 
+SSHScript uses `exitcode` for execution status, including `result.exitcode`,
+`session.exitcode` and `$.exitcode`. Use this spelling consistently;
+`exit_code` and `returncode` are not supported SSHScript aliases. When catching
+`subprocess.CalledProcessError`, use the exception's native `returncode` attribute.
+
 For an authorized test install or update from a PR, candidate branch, or commit
 before release, follow [Testing an unreleased source snapshot](references/agent-guide.md#testing-an-unreleased-source-snapshot).
 Pin one full source SHA and update the package, matching documents, and complete
@@ -119,4 +124,4 @@ official links in the agent guide and confirm their contract version.
 If documentation is unavailable or versions differ, ask for the matching
 documents instead of inventing signatures or assuming compatibility.
 
-*Last modified: 2026-10-24 20:10:23*
+*Last modified: 2026-10-29 16:15:27*
