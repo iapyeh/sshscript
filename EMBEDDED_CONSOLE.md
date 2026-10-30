@@ -1,10 +1,10 @@
 # Unified Console API
 
-> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> **7.0.1 source contract.** Use the matching source checkout or verified wheel.
 > A source push does not publish a GitHub Release or PyPI package.
 
 
-**Contract: SSHScript 7.0.0; Python 3.11+.**
+**Contract: SSHScript 7.0.1; Python 3.11+.**
 
 Design and lifecycle contract, written before implementation.
 
@@ -143,7 +143,7 @@ apparently healthy parent layer. SSH/SFTP authentication and Session command API
 keep their existing responsibilities.
 
 Public Console integration first appeared in SSHScript 6.1.0; this guide
-describes its 7.0.0 connection and hidden-input contract. During development, minor releases
+describes its 7.0.1 connection and hidden-input contract. During development, minor releases
 may include incompatible changes; compatibility is required only when explicitly
 requested. Pin the released artifact or record the exact source revision/hash.
 
@@ -229,4 +229,4 @@ appeared successful. If the host body and cleanup both fail, both errors are
 preserved in a BaseExceptionGroup. Do not reuse an unknown Session on the strength
 of a prompt or a successful command from an unrelated shell.
 
-*Last modified: 2026-10-24 16:35:46*
+*Last modified: 2026-10-30 00:10:17*
