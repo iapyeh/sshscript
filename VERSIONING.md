@@ -28,7 +28,8 @@ require their existing authorization.
 | 4.0.2 | Previous production contract: completed console results, settings, managed jobs and authenticated-console handshakes; incompatible with parts of 3.1.5. |
 | 5.0.0 | Previous published contract: calling-host trust by default, explicit local/chain strategies and strict known_hosts file errors; preserves the 4.0 command execution contract. |
 | 6.0.0 | Previous release contract: interactive Python/dollar console, normal script completion with stop(), ScriptResult metadata, and removal of old exit/break APIs and control exceptions. |
-| 7.0.0 | Current source contract: renamed, keyword-only connection options without aliases; hidden program input, console exit controls, diagnostics and terminal output defaults. Source publication does not publish a GitHub Release/PyPI package. |
+| 7.0.1 | Current source contract: the 7.0 execution API with resumable maintainer release/documentation workflows and clarified agent result-status guidance. |
+| 7.0.0 | Previous release contract: renamed, keyword-only connection options without aliases; hidden program input, console exit controls, diagnostics and terminal output defaults. Source publication does not publish a GitHub Release/PyPI package. |
 | 6.1.0 | Public Console(existing_session), host/agent updates, credential hooks, explicit ownership and cleanup/reuse status; unified CLI and corrected program Ctrl-C readiness. |
 
 Version 4.0.1 introduced the published 4.0 contract after release validation.
@@ -36,6 +37,14 @@ Version 4.0.2 is a documentation and link maintenance patch with the same public
 execution contract. Native-system validation limits remain documented.
 Use the normal Python Session API as the canonical entry point; optional .spy
 syntax follows the same versioned execution contract.
+
+## 7.0.1 maintenance update
+
+7.0.1 retains the 7.0 execution API and adds maintainer release/documentation
+orchestration, its offline tests and clarified exitcode guidance. Public guides
+and executable-example profiles identify 7.0.1; the 7.0.0 changes below remain
+historical descriptions of when those execution features were introduced.
+Publication remains a separate authorized operation.
 
 ## 7.0.0 connection parameter changes
 
@@ -86,7 +95,7 @@ following migration table is historical.
 6.0.0 is an incompatible major version, approved for the new execution contract.
 A source push and successful CI do not create a GitHub Release, tag or PyPI upload.
 The 6.0.0 package was published separately; this historical section records its
-script-completion changes. The current source contract is 7.0.0.
+script-completion changes. The current source contract is 7.0.1.
 
 | Previous use | 6.0 replacement |
 | --- | --- |
@@ -236,4 +245,4 @@ Consult that artifact's version-labelled API guide before generating examples.
 Production gates reject prerelease/local versions before uploading; they never
 silently relabel development builds as stable.
 
-*Last modified: 2026-10-24 16:35:46*
+*Last modified: 2026-10-30 00:10:17*

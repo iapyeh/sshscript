@@ -38,6 +38,7 @@ include src/sshscript/unittest/test_production_contract.py
 include src/sshscript/unittest/test_public_types.py
 include src/sshscript/unittest/test_python_version.py
 include src/sshscript/unittest/test_release_inputs.py
+include src/sshscript/unittest/test_release_manager.py
 include src/sshscript/unittest/test_recommended_examples.py
 include src/sshscript/unittest/test_session_close_reporting.py
 include src/sshscript/unittest/test_session_proxy_cleanup.py

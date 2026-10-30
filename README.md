@@ -5,11 +5,11 @@
 > without a deprecation period. Pin the exact version or source revision,
 > review changes before upgrading, and validate your automation again.
 
-These examples describe the **7.0.0 source contract**. Use the matching
+These examples describe the **7.0.1 source contract**. Use the matching
 source checkout or verified wheel. A source push does not publish a GitHub
 Release or PyPI package. See [the connection changes](VERSIONING.md).
 
-SSHScript 7.0.0: [borrow an existing Session for interactive operation](EMBEDDED_CONSOLE.md).
+SSHScript 7.0.1: [borrow an existing Session for interactive operation](EMBEDDED_CONSOLE.md).
 Run `python3 -B sshscript.py console` from the development checkout.
 
 
@@ -32,7 +32,7 @@ output and status, distinguish failure from timeout, and make cleanup and
 unknown termination explicit. A successful command exit is evidence about
 that command; verify the deployment or other application outcome separately.
 
-**Source contract: 7.0.0.** Use the matching source checkout or verified wheel.
+**Source contract: 7.0.1.** Use the matching source checkout or verified wheel.
 [Release notes](https://github.com/iapyeh/sshscript/blob/release/CHANGELOG.md)
 (development-stage project) · **Python:** 3.11 or newer · **Tested:** Python
 3.11–3.14 on Linux and macOS
@@ -148,22 +148,23 @@ importing the Python API raises `ImportError` with the same diagnostic.
 
 For a production deployment that requires repeatable dependency resolution,
 pin SSHScript and all transitive dependencies in your application's lock file.
-To install the current source contract:
+After 7.0.1 is published, pin this guide's package version with:
 
 ```sh
-python3 -m pip install "git+https://github.com/iapyeh/sshscript.git@5bc17cf190e215479af870437eeacd2770d9f283"
+python3 -m pip install "sshscript==7.0.1"
 ```
 
-This pins the 7.0.0 source snapshot. Integration into the protected `release`
-branch is tracked in [PR #29](https://github.com/iapyeh/sshscript/pull/29). PyPI installation/upgrade follows the separately published package. The optional
+Before publication, use an authorized exact source SHA and its matching guides
+through [the source-snapshot procedure](skills/sshscript/references/agent-guide.md#testing-an-unreleased-source-snapshot).
+A source commit does not publish a PyPI package. The optional
 `sshscript --check-updates` command queries PyPI and prints an upgrade command;
 it never installs an update by itself.
 
 ## 60-second local quickstart
 
-Use the matching 7.0.0 source checkout or verified wheel for this guide.
+Use the matching 7.0.1 source checkout or verified wheel for this guide.
 
-This example runs on 7.0.0 and retains compatibility with the 3.1.5 command API.
+This example runs on 7.0.1 and retains compatibility with the 3.1.5 command API.
 The metadata below records that older compatibility baseline.
 
 <!-- example: {"id":"readme-quickstart", "profile":"3.1.5", "stdout":"sshscript is ready\nexit code: 0\n"} -->
@@ -602,7 +603,9 @@ suite under `unittest/` or `src/sshscript/unittest/` automatically. See the
 [contributing guide](https://github.com/iapyeh/sshscript/blob/release/CONTRIBUTING.md)
 before proposing a change and the
 [release guide](https://github.com/iapyeh/sshscript/blob/release/RELEASING.md)
-for maintainer-only release steps.
+for maintainer-only release steps, including the resumable
+`tools/release_manager.py` CLI that pushes, waits for CI and publishes to PyPI
+without keeping an AI session running.
 
 ## Project policies
 
@@ -622,4 +625,4 @@ For embedding an existing connected Session, see the new public
 [Console integration API](EMBEDDED_CONSOLE.md). CLI and embedding applications
 share one implementation; earlier 6.0 CLI compatibility is not maintained.
 
-*Last modified: 2026-10-24 20:10:23*
+*Last modified: 2026-10-30 00:10:17*

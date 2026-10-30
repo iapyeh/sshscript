@@ -19,7 +19,7 @@ ROOT_FILES = [
     '.github/workflows/release.yml',
 ]
 TOOLS = [
-    'sync_ai_docs.py',
+    'release_manager.py', 'sync_ai_docs.py',
     'check_baseline_examples.py', 'sync_api_guide.py', 'check_public_types.py', 'prepare_release.py', 'check_release.py', 'run_checks.py',
     'publish_release.py', 'version_policy.py', 'setup_openssh_ci.sh', 'run_native_auth_ci.py',
 ]
@@ -53,7 +53,7 @@ TESTS = [
     'test_public_types.py',
     'test_python_version.py',
     'test_version_policy.py',
-    'test_release_inputs.py',
+    'test_release_inputs.py', 'test_release_manager.py',
     'test_recommended_examples.py',
     'test_session_close_reporting.py',
     'test_session_proxy_cleanup.py',

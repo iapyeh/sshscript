@@ -1,5 +1,25 @@
 # Changelog
 
+## 7.0.1 — 2026-10-30
+
+- Add `tools/release_manager.py`, a resumable maintainer CLI for preparing,
+  submitting and verifying version releases, waiting for required CI, merging
+  pinned PRs, creating annotated tags and approving verified PyPI publication.
+- Add `docs-prepare` and `docs-finish` for reviewed, allowlisted Markdown updates
+  through a separate documentation PR. Keep version/tag/PyPI publication,
+  source-main integration and gh-pages synchronization as separate operations.
+- Freeze committed source and candidate content, preserve unrelated local work,
+  and reject changed plans, untracked destination collisions, mismatched PRs,
+  tags and artifacts. Save progress for retries and recovery without force-pushes
+  or replacement tags; retain required CI and protected-environment checks.
+- Include the maintainer CLI and its 46 offline regression tests in the public
+  release inputs, with matching sdist test allowlists and maintainer instructions.
+  Tests use disposable Git repositories and simulated GitHub/PyPI services.
+- Refresh current-version public guides, executable-example profiles and agent
+  bundle inputs for 7.0.1, retaining historical version descriptions.
+- Clarify the canonical `CommandResult.exitcode` property in the agent skill so
+  generated code uses the documented result attribute.
+
 ## 7.0.0 — 2026-10-25
 
 - Document reproducible test-snapshot updates for code, matching documents and
@@ -378,4 +398,4 @@ verified artifacts in the
 [Unreleased]: https://github.com/iapyeh/sshscript/compare/v3.1.4...release
 [3.1.4]: https://github.com/iapyeh/sshscript/releases/tag/v3.1.4
 
-*Last modified: 2026-10-25 15:43:18*
+*Last modified: 2026-10-30 00:10:17*

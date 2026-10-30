@@ -1,13 +1,13 @@
 # SSHScript for AI agents
 
-> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> **7.0.1 source contract.** Use the matching source checkout or verified wheel.
 > A source push does not publish a GitHub Release or PyPI package.
 
 
-**Documentation contract: SSHScript 7.0.0; Python 3.11+.**
+**Documentation contract: SSHScript 7.0.1; Python 3.11+.**
 
-This guide targets SSHScript 7.0.0 and its public Console integration API.
-Install the matching 7.0.0 source checkout or verified wheel and verify its version.
+This guide targets SSHScript 7.0.1 and its public Console integration API.
+Install the matching 7.0.1 source checkout or verified wheel and verify its version.
 For nested SSH, provision known_hosts on each calling host: `"parent"` is the
 default. Read the 4.0.2-to-5.0 migration before reusing older automation.
 
@@ -36,7 +36,7 @@ For step-by-step use from a human or UI agent's retained terminal, see the
 [console guide](CONSOLE.md) and the agent guide's
 [console instructions](skills/sshscript/references/agent-guide.md#interactive-console-61).
 Run `python3 -B sshscript.py console` from the matching development checkout;
-an installed 7.0.0 wheel provides `sshscript console`. Use public
+an installed 7.0.1 wheel provides `sshscript console`. Use public
 Console(session) for host integration; older 6.0 console internals are removed.
 
 Input remains Python with dollar commands: `$hostname` executes a command,
@@ -122,4 +122,4 @@ Validate links, skill structure, example behavior, source/ZIP equality and
 the rendered website. Source and website publishing are separate operations;
 copying files does not publish either of them.
 
-*Last modified: 2026-10-24 16:35:46*
+*Last modified: 2026-10-30 00:10:17*

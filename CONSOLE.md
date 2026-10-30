@@ -1,6 +1,6 @@
 # Interactive console (7.0)
 
-> **7.0.0 source contract.** Use the matching source checkout or verified wheel.
+> **7.0.1 source contract.** Use the matching source checkout or verified wheel.
 > A source push does not publish a GitHub Release or PyPI package.
 
 
@@ -11,7 +11,7 @@ python3 -B sshscript.py console
 ```
 
 Use Python 3.11 or newer with the project's dependencies. Install
-a matching 7.0.0 wheel or source distribution for `sshscript console`. No installation into the flat
+a matching 7.0.1 wheel or source distribution for `sshscript console`. No installation into the flat
 development checkout is required.
 
 ## Embed an existing Session (new API)
@@ -21,7 +21,7 @@ credential hooks and explicit cleanup/reuse reporting. Read
 [the embedded console contract](EMBEDDED_CONSOLE.md) and its executable examples.
 The CLI uses the same Console core and ownership contract. Earlier 6.0 CLI
 compatibility is not maintained; see the linked contract for removed entry points
-and aliases. This guide describes the 7.0.0 release contract.
+and aliases. This guide describes the 7.0.1 release contract.
 
 ## A Python console with dollar syntax
 
@@ -270,4 +270,4 @@ A late parent-shell return is checked before sending another program reply.
 Use `prompt="mysql>"` if you also want explicit MySQL readiness detection.
 Do not add a newline to `$.exit("quit")`; one is supplied automatically.
 
-*Last modified: 2026-10-24 16:36:46*
+*Last modified: 2026-10-30 00:10:17*
